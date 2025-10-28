@@ -8,6 +8,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ClassID: 10 (connection) |
+// MethodID: 40 (close)
+type ConnectionCloseMessage struct {
+	ReplyCode uint16
+	ReplyText string
+	ClassID   uint16
+	MethodID  uint16
+}
+
+// ClassID: 10 (connection) |
+// MethodID: 41 (close-Ok)
+type ConnectionCloseOkMessage struct {
+}
+
 func sendHeartbeat(conn net.Conn) error {
 	heartbeatFrame := createHeartbeatFrame()
 	return sendFrame(conn, heartbeatFrame)

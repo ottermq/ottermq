@@ -7,6 +7,37 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type QueueDeclareMessage struct {
+	QueueName  string
+	Passive    bool
+	Durable    bool
+	Exclusive  bool
+	AutoDelete bool
+	NoWait     bool
+	Arguments  map[string]interface{}
+}
+
+type QueueDeleteMessage struct {
+	QueueName string
+	IfUnused  bool
+	NoWait    bool
+}
+
+type QueueBindMessage struct {
+	Queue      string
+	Exchange   string
+	RoutingKey string
+	NoWait     bool
+	Arguments  map[string]interface{}
+}
+
+type QueueUnbindMessage struct {
+	Queue      string
+	Exchange   string
+	RoutingKey string
+	Arguments  map[string]interface{}
+}
+
 func createQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,

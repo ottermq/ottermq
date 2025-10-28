@@ -7,6 +7,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type ExchangeDeclareMessage struct {
+	ExchangeName string
+	ExchangeType string
+	Passive      bool
+	Durable      bool
+	AutoDelete   bool
+	Internal     bool
+	NoWait       bool
+	Arguments    map[string]interface{}
+}
+
+type ExchangeDeleteMessage struct {
+	ExchangeName string
+	IfUnused     bool
+	NoWait       bool
+}
+
 func createExchangeDeclareFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
