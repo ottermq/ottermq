@@ -28,7 +28,7 @@ func sendHeartbeat(conn net.Conn) error {
 	return sendFrame(conn, heartbeatFrame)
 }
 
-func createCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
+func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
 	replyCodeKv := KeyValue{
 		Key:   INT_SHORT,
 		Value: replyCode,
@@ -50,8 +50,8 @@ func createCloseFrame(channel, replyCode, classID, methodID, closeClassID, close
 	}
 	frame := ResponseMethodMessage{
 		Channel:  channel,
-		ClassID:  closeClassID,
-		MethodID: closeClassMethod,
+		ClassID:  uint16(CONNECTION),
+		MethodID: uint16(CONNECTION_CLOSE),
 		Content:  content,
 	}.FormatMethodFrame()
 	return frame

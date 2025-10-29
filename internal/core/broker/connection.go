@@ -128,7 +128,7 @@ func (b *Broker) closeConnectionRequested(request *amqp.RequestMethodMessage, co
 
 // closeConnection sends `connection.close` when the server needs to shutdown for some reason
 func (b *Broker) sendCloseConnection(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) (any, error) {
-	frame := b.framer.CreateCloseFrame(channel, replyCode, methodId, classId, uint16(amqp.CONNECTION_CLOSE), uint16(amqp.CONNECTION_CLOSE), replyText)
+	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
 	err := b.framer.SendFrame(conn, frame)
 
 	return nil, err

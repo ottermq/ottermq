@@ -14,6 +14,7 @@ type Framer interface {
 	CreateBodyFrame(channel uint16, content []byte) []byte
 
 	// Basic Methods
+	
 	CreateBasicQosOkFrame(channel uint16) []byte
 	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte
@@ -24,22 +25,25 @@ type Framer interface {
 	CreateBasicRecoverOkFrame(channel uint16) []byte
 
 	// Queue Methods
+
 	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
 	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
 	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
 
 	// Exchange Methods
+
 	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
 	CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte
 
 	// Channel Methods
+
 	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
 	CreateChannelCloseOkFrame(channel uint16) []byte
 
 	// Connection Methods
-	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
 
-	CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte
+	CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
+	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
 }
 
 type DefaultFramer struct{}
