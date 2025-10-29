@@ -44,6 +44,20 @@ func createExchangeDeleteFrame(request *RequestMethodMessage) []byte {
 	return frame
 }
 
+func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
+	switch methodID {
+	case uint16(EXCHANGE_DECLARE):
+		log.Debug().Msg("Received EXCHANGE_DECLARE frame \n")
+		return parseExchangeDeclareFrame(payload)
+	case uint16(EXCHANGE_DELETE):
+		log.Debug().Msg("Received EXCHANGE_DELETE frame \n")
+		return parseExchangeDeleteFrame(payload)
+
+	default:
+		return nil, fmt.Errorf("unknown method ID: %d", methodID)
+	}
+}
+
 // Fields:
 // 0-1: reserved short int
 // 2: exchange name - length (short)
