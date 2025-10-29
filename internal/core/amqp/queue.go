@@ -90,16 +90,6 @@ func createQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32
 	return frame
 }
 
-// Fields:
-// 0-1: reserved short int
-// 2: exchange name - length (short)
-// 3: type - (string)
-// 4: passive - (bit)
-// 5: durable - (bit)
-// 6: reserved 2
-// 7: reserved 3
-// 8: no-wait - (bit)
-// 9: arguments - (table)
 func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
@@ -159,16 +149,75 @@ func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
 	case uint16(QUEUE_DECLARE):
 		log.Debug().Msg("Received QUEUE_DECLARE frame")
 		return parseQueueDeclareFrame(payload)
+
+	case uint16(QUEUE_DECLARE_OK):
+		log.Debug().Msg("Received QUEUE_DECLARE_OK frame \n")
+		// TODO: return the appropriate exception
+		return nil, fmt.Errorf("server should not receive QUEUE_DECLARE_OK frames from clients")
+
+	case uint16(QUEUE_BIND):
+		log.Debug().Msg("Received QUEUE_BIND frame")
+		return parseQueueBindFrame(payload)
+
 	case uint16(QUEUE_DELETE):
 		log.Debug().Msg("Received QUEUE_DELETE frame")
 		return parseQueueDeleteFrame(payload)
-	case uint16(QUEUE_BIND):
-		log.Printf("[DEBUG] Received QUEUE_BIND frame \n")
-		return parseQueueBindFrame(payload)
 
+	case uint16(QUEUE_UNBIND):
+		log.Debug().Msg("Received QUEUE_UNBIND frame")
+		return parseQueueUnbindFrame(payload)
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseQueueUnbindFrame(payload []byte) (any, error) {
+	// Expected fields:
+	// reserved1(shortint),
+	// queue (short str),
+	// exchange (short str),
+	// routing key (short str),
+	// arguments (table)
+	if len(payload) < 6 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	_, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue name: %v", err)
+	}
+	exchange, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
+	}
+	routingKey, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode routing key: %v", err)
+	}
+	arguments := make(map[string]any)
+	if buf.Len() > 4 {
+		argumentsStr, _ := DecodeLongStr(buf)
+		arguments, err = DecodeTable([]byte(argumentsStr))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read arguments: %v", err)
+		}
+	}
+	msg := &QueueUnbindMessage{
+		Queue:      queue,
+		Exchange:   exchange,
+		RoutingKey: routingKey,
+		Arguments:  arguments,
+	}
+	request := &RequestMethodMessage{
+		Content: msg,
+	}
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
+	return request, nil
+
 }
 
 // Fields:

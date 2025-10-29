@@ -97,6 +97,7 @@ OO   OO tt    tt    eeeee  rr     MM    MM QQ  QQ
 
 `)
 }
+
 func (b *Broker) setConfigurations() map[string]any {
 	capabilities := map[string]any{
 		"basic.nack":             true,

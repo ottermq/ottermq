@@ -177,3 +177,9 @@ func (b *Broker) connectionHandler(request *amqp.RequestMethodMessage, conn net.
 		return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
 	}
 }
+
+// sendCloseChannel sends `channel.close` when the server needs to close a channel for some reason
+func (b *Broker) sendCloseChannel(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) error {
+	frame := b.framer.CreateChannelCloseFrame(channel, replyCode, methodId, classId, replyText)
+	return b.framer.SendFrame(conn, frame)
+}

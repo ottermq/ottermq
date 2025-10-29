@@ -14,7 +14,7 @@ type Framer interface {
 	CreateBodyFrame(channel uint16, content []byte) []byte
 
 	// Basic Methods
-	
+
 	CreateBasicQosOkFrame(channel uint16) []byte
 	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte
@@ -38,6 +38,7 @@ type Framer interface {
 	// Channel Methods
 
 	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
+	CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
 	CreateChannelCloseOkFrame(channel uint16) []byte
 
 	// Connection Methods
@@ -72,7 +73,7 @@ func (d *DefaultFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
 	return createBodyFrame(channel, content)
 }
 
-// Queue Methods
+// REGION Queue Methods
 
 func (d *DefaultFramer) CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return createQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
@@ -86,6 +87,10 @@ func (d *DefaultFramer) CreateQueueDeleteOkFrame(request *RequestMethodMessage, 
 	return createQueueDeleteOkFrame(request, messageCount)
 }
 
+// ENDREGION
+
+// REGION Exchange Methods
+
 func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
 	return createExchangeDeclareFrame(request)
 }
@@ -94,17 +99,21 @@ func (d *DefaultFramer) CreateExchangeDeleteFrame(request *RequestMethodMessage)
 	return createExchangeDeleteFrame(request)
 }
 
+// ENDREGION
+
+// REGION Channel Methods
+
 func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 	return createChannelOpenOkFrame(request)
-}
-
-func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
-	return createConnectionCloseOkFrame(request)
 }
 
 func (d *DefaultFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return createChannelCloseOkFrame(channel)
 }
+
+// ENDREGION
+
+// REGION Basic Methods
 
 func (d *DefaultFramer) CreateBasicQosOkFrame(channel uint16) []byte {
 	return createBasicQosOkFrame(channel)
@@ -138,6 +147,14 @@ func (d *DefaultFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
 	return createBasicRecoverOkFrame(channel)
 }
 
-func (d *DefaultFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return createCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod, replyText)
+// ENDREGION
+
+// REGION Connection Methods
+
+func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return createConnectionCloseFrame(channel, replyCode, classID, methodID, replyText)
+}
+
+func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
+	return createConnectionCloseOkFrame(request)
 }
