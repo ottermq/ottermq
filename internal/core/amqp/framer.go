@@ -107,6 +107,10 @@ func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) 
 	return createChannelOpenOkFrame(request)
 }
 
+func (d *DefaultFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return createChannelCloseFrame(channel, replyCode, classID, methodID, replyText)
+}
+
 func (d *DefaultFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return createChannelCloseOkFrame(channel)
 }

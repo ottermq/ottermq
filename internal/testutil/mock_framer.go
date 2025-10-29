@@ -93,6 +93,10 @@ func (m *MockFramer) CreateChannelOpenOkFrame(request *amqp.RequestMethodMessage
 	return []byte("channel-open-ok")
 }
 
+func (m *MockFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return []byte("channel-close")
+}
+
 func (m *MockFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return []byte("channel-close-ok")
 }
@@ -101,6 +105,6 @@ func (m *MockFramer) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMes
 	return []byte("connection-close-ok")
 }
 
-func (m *MockFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return []byte("close")
+func (m *MockFramer) CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return []byte("connection-close")
 }

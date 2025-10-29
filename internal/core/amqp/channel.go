@@ -20,7 +20,7 @@ type ChannelOpenMessage struct {
 func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		ClassID:  uint16(CHANNEL),
 		MethodID: uint16(CHANNEL_OPEN_OK),
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
@@ -30,6 +30,35 @@ func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 				},
 			},
 		},
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	replyCodeKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: replyCode,
+	}
+	replyTextKv := KeyValue{
+		Key:   STRING_SHORT,
+		Value: replyText,
+	}
+	classIDKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: classID,
+	}
+	methodIDKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: methodID,
+	}
+	content := ContentList{
+		KeyValuePairs: []KeyValue{replyCodeKv, replyTextKv, classIDKv, methodIDKv},
+	}
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(CHANNEL),
+		MethodID: uint16(CHANNEL_CLOSE_OK),
+		Content:  content,
 	}.FormatMethodFrame()
 	return frame
 }
