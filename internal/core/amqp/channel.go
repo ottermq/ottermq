@@ -57,7 +57,7 @@ func createChannelCloseFrame(channel, replyCode, classID, methodID uint16, reply
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(CHANNEL),
-		MethodID: uint16(CHANNEL_CLOSE_OK),
+		MethodID: uint16(CHANNEL_CLOSE),
 		Content:  content,
 	}.FormatMethodFrame()
 	return frame
