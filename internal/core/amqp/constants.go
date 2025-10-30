@@ -144,25 +144,36 @@ const (
 
 // ReplyText returns the default reply text for a given reply code
 var ReplyText = map[ReplyCode]string{
-	REPLY_SUCCESS:       "Success",
-	CONTENT_TOO_LARGE:   "Content too large",
-	NO_ROUTE:            "No route",
-	NO_CONSUMERS:        "No consumers",
-	CONNECTION_FORCED:   "Connection forced",
-	INVALID_PATH:        "Invalid path",
-	ACCESS_REFUSED:      "Access refused",
-	NOT_FOUND:           "Not found",
-	RESOURCE_LOCKED:     "Resource locked",
-	PRECONDITION_FAILED: "Precondition failed",
-	FRAME_ERROR:         "Frame error",
-	SYNTAX_ERROR:        "Syntax error",
-	COMMAND_INVALID:     "Command invalid",
-	CHANNEL_ERROR:       "Channel error",
-	UNEXPECTED_FRAME:    "Unexpected frame",
-	RESOURCE_ERROR:      "Resource error",
-	NOT_ALLOWED:         "Not allowed",
-	NOT_IMPLEMENTED:     "Not implemented",
-	INTERNAL_ERROR:      "Internal error",
+	REPLY_SUCCESS:       "REPLY_SUCCESS",
+	CONTENT_TOO_LARGE:   "CONTENT_TOO_LARGE",
+	NO_ROUTE:            "NO_ROUTE",
+	NO_CONSUMERS:        "NO_CONSUMERS",
+	CONNECTION_FORCED:   "CONNECTION_FORCED",
+	INVALID_PATH:        "INVALID_PATH",
+	ACCESS_REFUSED:      "ACCESS_REFUSED",
+	NOT_FOUND:           "NOT_FOUND",
+	RESOURCE_LOCKED:     "RESOURCE_LOCKED",
+	PRECONDITION_FAILED: "PRECONDITION_FAILED",
+	FRAME_ERROR:         "FRAME_ERROR",
+	SYNTAX_ERROR:        "SYNTAX_ERROR",
+	COMMAND_INVALID:     "COMMAND_INVALID",
+	CHANNEL_ERROR:       "CHANNEL_ERROR",
+	UNEXPECTED_FRAME:    "UNEXPECTED_FRAME",
+	RESOURCE_ERROR:      "RESOURCE_ERROR",
+	NOT_ALLOWED:         "NOT_ALLOWED",
+	NOT_IMPLEMENTED:     "NOT_IMPLEMENTED",
+	INTERNAL_ERROR:      "INTERNAL_ERROR",
+}
+
+func (rc ReplyCode) String() string {
+	if text, exists := ReplyText[rc]; exists {
+		return text
+	}
+	return "UNKNOWN_REPLY_CODE"
+}
+
+func (rc ReplyCode) Format(reason string) string {
+	return fmt.Sprintf("%s - %s", rc.String(), reason)
 }
 
 type DeliveryMode uint8
