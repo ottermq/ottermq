@@ -12,10 +12,11 @@ const (
 )
 
 type ChannelState struct {
-	MethodFrame *RequestMethodMessage
-	HeaderFrame *HeaderFrame
-	Body        []byte
-	BodySize    uint64
+	MethodFrame      *RequestMethodMessage
+	HeaderFrame      *HeaderFrame
+	Body             []byte
+	BodySize         uint64
+	SentCloseChannel bool
 }
 
 type HeaderFrame struct {
