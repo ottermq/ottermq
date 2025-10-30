@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
@@ -163,11 +164,10 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 
 	// Passive declaration: error if queue doesn't exist
 	if props != nil && props.Passive {
-		if existing, ok := vh.Queues[name]; ok {
-			log.Debug().Str("queue", name).Msg("Passive declaration succeeded")
-			return existing, nil
+		if vh.Queues[name] == nil {
+			text := fmt.Sprintf("queue %s does not exist", name)
+			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
 		}
-		return nil, fmt.Errorf("queue %s does not exist", name)
 	}
 
 	// Queue already exists: validate compatibility

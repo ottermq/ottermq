@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
@@ -108,6 +109,16 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 		Arguments:  content.Arguments,
 	})
 	if err != nil {
+		if amqpErr, ok := err.(errors.AMQPError); ok {
+			b.sendCloseChannel(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+			return nil, nil
+		}
 		return nil, err
 	}
 
