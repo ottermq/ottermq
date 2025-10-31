@@ -163,9 +163,13 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 
 	// Passive declaration: error if queue doesn't exist
 	if props != nil && props.Passive {
-		if vh.Queues[name] == nil {
+		queue := vh.Queues[name]
+		if queue == nil {
 			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
 			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
+		} else {
+			log.Debug().Str("queue", name).Msg("Passive queue declare: queue exists")
+			return queue, nil
 		}
 	}
 
