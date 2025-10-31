@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 )
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
@@ -18,7 +20,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("exchange %s not found", exchangeName)
+		return errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
 	queue, ok := vh.Queues[queueName]
 	if !ok {

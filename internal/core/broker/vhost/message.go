@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
@@ -27,7 +28,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
-		return "", fmt.Errorf("Exchange %s not found", exchangeName)
+		return "", errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.BASIC), uint16(amqp.BASIC_PUBLISH))
 	}
 
 	// verify if exchange is internal
