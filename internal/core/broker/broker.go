@@ -178,7 +178,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		}
 	}
-	if sentChannelClose := newState.SentCloseChannel; sentChannelClose {
+	if sentChannelClose := newState.ClosingChannel; sentChannelClose {
 		log.Debug().Uint16("channel", request.Channel).Msg("Sent channel.close already, ignoring further requests")
 		if request.ClassID != uint16(amqp.CHANNEL) ||
 			(request.MethodID != uint16(amqp.CHANNEL_CLOSE) &&

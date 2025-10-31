@@ -191,7 +191,7 @@ func (b *Broker) sendCloseChannel(conn net.Conn, channel, replyCode, classId, me
 		b.mu.Unlock()
 		return fmt.Errorf("channel %d not found", channel)
 	}
-	chState.SentCloseChannel = true
+	chState.ClosingChannel = true
 	b.mu.Unlock()
 	frame := b.framer.CreateChannelCloseFrame(channel, replyCode, classId, methodId, replyText)
 	return b.framer.SendFrame(conn, frame)
