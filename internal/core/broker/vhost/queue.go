@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/rs/zerolog/log"
 )
 
 type QueueArgs map[string]any
@@ -165,7 +164,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	// Passive declaration: error if queue doesn't exist
 	if props != nil && props.Passive {
 		if vh.Queues[name] == nil {
-			text := fmt.Sprintf("queue %s does not exist", name)
+			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
 			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
 		}
 	}
