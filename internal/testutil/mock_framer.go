@@ -101,7 +101,7 @@ func (m *MockFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return []byte("channel-close-ok")
 }
 
-func (m *MockFramer) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
 	return []byte("connection-close-ok")
 }
 
