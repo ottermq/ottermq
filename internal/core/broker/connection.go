@@ -120,10 +120,27 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 
 // closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame
 func (b *Broker) closeConnectionRequested(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
-	frame := b.framer.CreateConnectionCloseOkFrame(request)
+	frame := b.framer.CreateConnectionCloseOkFrame(request.Channel)
 	err := b.framer.SendFrame(conn, frame)
-	b.cleanupConnection(conn)
+	b.mu.Lock()
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		b.mu.Unlock()
+		return nil, nil
+	}
+	connInfo.ClosingConnection = true
+	b.mu.Unlock()
 	return nil, err
+}
+
+func (b *Broker) isConnectionClosing(conn net.Conn) (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		return false, fmt.Errorf("connection not found")
+	}
+	return connInfo.ClosingConnection, nil
 }
 
 // closeConnection sends `connection.close` when the server needs to shutdown for some reason

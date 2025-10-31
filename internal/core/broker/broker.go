@@ -171,14 +171,20 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		return nil, nil
 	}
 	vh := b.VHosts[connInfo.VHostName]
-	if ok := b.ShuttingDown.Load(); ok {
+	isConnectionClosing, err := b.isConnectionClosing(conn)
+	if err != nil {
+		return nil, err
+	}
+	isShuttingDown := b.ShuttingDown.Load()
+	if isConnectionClosing || isShuttingDown {
+		log.Debug().Str("client", conn.RemoteAddr().String()).Msg("Connection is closing or broker is shutting down, ignoring further requests")
 		if request.ClassID != uint16(amqp.CONNECTION) ||
 			(request.MethodID != uint16(amqp.CONNECTION_CLOSE) &&
 				request.MethodID != uint16(amqp.CONNECTION_CLOSE_OK)) {
 			return nil, nil
 		}
 	}
-	if sentChannelClose := newState.ClosingChannel; sentChannelClose {
+	if isChannelClosing := newState.ClosingChannel; isChannelClosing {
 		log.Debug().Uint16("channel", request.Channel).Msg("Sent channel.close already, ignoring further requests")
 		if request.ClassID != uint16(amqp.CHANNEL) ||
 			(request.MethodID != uint16(amqp.CHANNEL_CLOSE) &&

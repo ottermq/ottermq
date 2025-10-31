@@ -57,9 +57,9 @@ func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, re
 	return frame
 }
 
-func createConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
+func createConnectionCloseOkFrame(channel uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
+		Channel:  channel,
 		ClassID:  uint16(CONNECTION),
 		MethodID: uint16(CONNECTION_CLOSE_OK),
 		Content:  ContentList{},

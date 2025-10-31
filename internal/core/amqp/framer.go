@@ -44,7 +44,7 @@ type Framer interface {
 	// Connection Methods
 
 	CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
-	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
+	CreateConnectionCloseOkFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -159,6 +159,6 @@ func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, classID, 
 	return createConnectionCloseFrame(channel, replyCode, classID, methodID, replyText)
 }
 
-func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
-	return createConnectionCloseOkFrame(request)
+func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
+	return createConnectionCloseOkFrame(channel)
 }
