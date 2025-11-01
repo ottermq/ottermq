@@ -3,9 +3,9 @@ package vhost
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/amqp/errors"
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/rs/zerolog/log"
 )
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
