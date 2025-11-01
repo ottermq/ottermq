@@ -184,12 +184,20 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		}
 	}
-	if isChannelClosing := newState.ClosingChannel; isChannelClosing {
-		log.Debug().Uint16("channel", request.Channel).Msg("Sent channel.close already, ignoring further requests")
-		if request.ClassID != uint16(amqp.CHANNEL) ||
-			(request.MethodID != uint16(amqp.CHANNEL_CLOSE) &&
-				request.MethodID != uint16(amqp.CHANNEL_CLOSE_OK)) {
-			return nil, nil
+	// Check if the channel is in closing state (stored state, not incoming frame)
+	if request.Channel > 0 {
+		b.mu.Lock()
+		if storedState, exists := connInfo.Channels[request.Channel]; exists && storedState.ClosingChannel {
+			b.mu.Unlock()
+			// Allow channel.close and channel.close-ok through, but ignore all other methods
+			if request.ClassID != uint16(amqp.CHANNEL) ||
+				(request.MethodID != uint16(amqp.CHANNEL_CLOSE) &&
+					request.MethodID != uint16(amqp.CHANNEL_CLOSE_OK)) {
+				log.Debug().Uint16("channel", request.Channel).Msg("Channel closing - ignoring non-close request")
+				return nil, nil
+			}
+		} else {
+			b.mu.Unlock()
 		}
 	}
 
