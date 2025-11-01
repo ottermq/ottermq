@@ -26,18 +26,19 @@ type Framer interface {
 
 	// Queue Methods
 
-	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
-	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
-	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
+	CreateQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte
+	CreateQueueBindOkFrame(channel uint16) []byte
+	CreateQueueUnbindOkFrame(channel uint16) []byte
+	CreateQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte
 
 	// Exchange Methods
 
-	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
-	CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte
+	CreateExchangeDeclareFrame(channel uint16) []byte
+	CreateExchangeDeleteFrame(channel uint16) []byte
 
 	// Channel Methods
 
-	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
+	CreateChannelOpenOkFrame(channel uint16) []byte
 	CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
 	CreateChannelCloseOkFrame(channel uint16) []byte
 
@@ -75,36 +76,40 @@ func (d *DefaultFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
 
 // REGION Queue Methods
 
-func (d *DefaultFramer) CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
-	return createQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
+func (d *DefaultFramer) CreateQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
+	return createQueueDeclareOkFrame(channel, queueName, messageCount, consumerCount)
 }
 
-func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {
-	return createQueueBindOkFrame(request)
+func (d *DefaultFramer) CreateQueueBindOkFrame(channel uint16) []byte {
+	return createQueueAckFrame(channel, uint16(QUEUE_BIND_OK))
 }
 
-func (d *DefaultFramer) CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
-	return createQueueDeleteOkFrame(request, messageCount)
+func (d *DefaultFramer) CreateQueueUnbindOkFrame(channel uint16) []byte {
+	return createQueueAckFrame(channel, uint16(QUEUE_UNBIND_OK))
+}
+
+func (d *DefaultFramer) CreateQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
+	return createQueueDeleteOkFrame(channel, messageCount)
 }
 
 // ENDREGION
 
 // REGION Exchange Methods
 
-func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
-	return createExchangeDeclareFrame(request)
+func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16) []byte {
+	return createExchangeDeclareFrame(channel)
 }
 
-func (d *DefaultFramer) CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte {
-	return createExchangeDeleteFrame(request)
+func (d *DefaultFramer) CreateExchangeDeleteFrame(channel uint16) []byte {
+	return createExchangeDeleteFrame(channel)
 }
 
 // ENDREGION
 
 // REGION Channel Methods
 
-func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte {
-	return createChannelOpenOkFrame(request)
+func (d *DefaultFramer) CreateChannelOpenOkFrame(channel uint16) []byte {
+	return createChannelOpenOkFrame(channel)
 }
 
 func (d *DefaultFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {

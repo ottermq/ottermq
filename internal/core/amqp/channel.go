@@ -17,9 +17,9 @@ type ChannelCloseMessage struct {
 type ChannelOpenMessage struct {
 }
 
-func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
+func createChannelOpenOkFrame(channel uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
+		Channel:  channel,
 		ClassID:  uint16(CHANNEL),
 		MethodID: uint16(CHANNEL_OPEN_OK),
 		Content: ContentList{

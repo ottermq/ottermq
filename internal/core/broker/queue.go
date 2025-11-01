@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
@@ -15,27 +16,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		return queueDeclareHandler(request, vh, b, conn)
 
 	case uint16(amqp.QUEUE_BIND):
-		log.Debug().Interface("request", request).Msg("Received queue bind request")
-		content, ok := request.Content.(*amqp.QueueBindMessage)
-		if !ok {
-			log.Error().Msg("Invalid content type for QueueBindMessage")
-			return nil, fmt.Errorf("invalid content type for QueueBindMessage")
-		}
-		log.Debug().Interface("content", content).Msg("Content")
-		queue := content.Queue
-		exchange := content.Exchange
-		routingKey := content.RoutingKey
-
-		err := vh.BindQueue(exchange, queue, routingKey)
-		if err != nil {
-			log.Debug().Err(err).Msg("Error binding to exchange")
-			return nil, err
-		}
-		frame := b.framer.CreateQueueBindOkFrame(request)
-		if err := b.framer.SendFrame(conn, frame); err != nil {
-			log.Error().Err(err).Msg("Failed to send queue bind ok frame")
-		}
-		return nil, nil
+		return b.queueBindHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_DELETE):
 		log.Debug().Interface("request", request).Msg("Received queue delete request")
@@ -75,7 +56,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 
 		// Honor no-wait flag
 		if !content.NoWait {
-			frame := b.framer.CreateQueueDeleteOkFrame(request, messageCount)
+			frame := b.framer.CreateQueueDeleteOkFrame(request.Channel, messageCount)
 			if err := b.framer.SendFrame(conn, frame); err != nil {
 				log.Error().Err(err).Msg("Failed to send queue delete ok frame")
 			}
@@ -83,11 +64,66 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		return nil, nil
 
 	case uint16(amqp.QUEUE_UNBIND):
-		return nil, fmt.Errorf("not implemented")
+		return queueUnbindHandler(request, vh, b, conn)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	content, ok := request.Content.(*amqp.QueueBindMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for QueueBindMessage")
+		return nil, fmt.Errorf("invalid content type for QueueBindMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	queue := content.Queue
+	exchange := content.Exchange
+	routingKey := content.RoutingKey
+
+	err := vh.BindQueue(exchange, queue, routingKey)
+	if err != nil {
+		log.Debug().Err(err).Msg("Error binding to exchange")
+		return nil, err
+	}
+	frame := b.framer.CreateQueueBindOkFrame(request.Channel)
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send queue bind ok frame")
+	}
+	return nil, nil
+}
+
+func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+	content, ok := request.Content.(*amqp.QueueBindMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for QueueBindMessage")
+		return nil, fmt.Errorf("invalid content type for QueueBindMessage")
+	}
+	queue := content.Queue
+	exchange := content.Exchange
+	routingKey := content.RoutingKey
+	args := content.Arguments
+
+	err := vh.UnbindQueue(exchange, queue, routingKey, args)
+	if err != nil {
+		if amqpErr, ok := err.(errors.AMQPError); ok {
+			b.sendConnectionClosing(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+			return nil, nil
+		}
+		return nil, err
+	}
+	frame := b.framer.CreateQueueUnbindOkFrame(request.Channel)
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send queue unbind ok frame")
+	}
+	return nil, nil
 }
 
 func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
@@ -130,7 +166,7 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 	consumerCount := uint32(0)
 
 	if !content.NoWait {
-		frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
+		frame := b.framer.CreateQueueDeclareOkFrame(request.Channel, queueName, messageCount, consumerCount)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send queue declare frame")
 		}

@@ -38,10 +38,10 @@ type QueueUnbindMessage struct {
 	Arguments  map[string]interface{}
 }
 
-func createQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+func createQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
 		MethodID: uint16(QUEUE_DECLARE_OK),
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
@@ -63,20 +63,20 @@ func createQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, 
 	return frame
 }
 
-func createQueueBindOkFrame(request *RequestMethodMessage) []byte {
+func createQueueAckFrame(channel, method uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
-		MethodID: uint16(QUEUE_BIND_OK),
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
+		MethodID: method,
 		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }
 
-func createQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
+func createQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
 		MethodID: uint16(QUEUE_DELETE_OK),
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
