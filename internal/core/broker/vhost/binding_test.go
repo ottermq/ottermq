@@ -25,7 +25,7 @@ func TestDeleteBinding_AutoDeleteExchange(t *testing.T) {
 	ex.Bindings["rk"] = []*Queue{q}
 
 	// Delete binding
-	err := vh.DeleteBinding("ex1", "q1", "rk")
+	err := vh.DeleteBindingUnlocked(ex, "q1", "rk")
 	if err != nil {
 		t.Fatalf("DeleteBinding failed: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestDeleteBinding_NoAutoDeleteExchange(t *testing.T) {
 	q := &Queue{Name: "q2"}
 	ex.Bindings["rk"] = []*Queue{q}
 
-	err := vh.DeleteBinding("ex2", "q2", "rk")
+	err := vh.DeleteBindingUnlocked(ex, "q2", "rk")
 	if err != nil {
 		t.Fatalf("DeleteBinding failed: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestDeleteBinding_QueueNotFound(t *testing.T) {
 	q := &Queue{Name: "q3"}
 	ex.Bindings["rk"] = []*Queue{q}
 
-	err := vh.DeleteBinding("ex3", "notfound", "rk")
+	err := vh.DeleteBindingUnlocked(ex, "notfound", "rk")
 	if err == nil {
 		t.Errorf("Expected error for queue not found, got nil")
 	}
@@ -97,7 +97,7 @@ func TestDeleteBinding_BindingNotFound(t *testing.T) {
 	}
 	vh.Exchanges["ex4"] = ex
 
-	err := vh.DeleteBinding("ex4", "q4", "notfound")
+	err := vh.DeleteBindingUnlocked(ex, "q4", "notfound")
 	if err == nil {
 		t.Errorf("Expected error for binding not found, got nil")
 	}

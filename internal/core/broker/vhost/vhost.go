@@ -164,7 +164,7 @@ func (vh *VHost) loadPersistedState() {
 		}
 		vh.Exchanges[exchange.Name] = NewExchange(exchange.Name, typ, props)
 		for _, bindingData := range exchange.Bindings {
-			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey)
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments)
 			if err != nil {
 				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
 			}

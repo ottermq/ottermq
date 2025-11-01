@@ -81,8 +81,9 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	queue := content.Queue
 	exchange := content.Exchange
 	routingKey := content.RoutingKey
+	args := content.Arguments
 
-	err := vh.BindQueue(exchange, queue, routingKey)
+	err := vh.BindQueue(exchange, queue, routingKey, args)
 	if err != nil {
 		log.Debug().Err(err).Msg("Error binding to exchange")
 		return nil, err
