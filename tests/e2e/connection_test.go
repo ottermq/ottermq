@@ -35,6 +35,29 @@ func TestChannelCloseScenarios(t *testing.T) {
 			expectText: "no exchange",
 		},
 		{
+			name: "Passive Declare on non-existent exchange",
+			trigger: func(ch *amqp.Channel) error {
+				err := ch.ExchangeDeclarePassive("ghost_exchange", "direct", false, false, false, false, nil)
+				return err
+			},
+			expectCode: amqp.NotFound,
+			expectText: "no exchange",
+		},
+		{
+			name: "Bind to non-existent exchange",
+			trigger: func(ch *amqp.Channel) error {
+				return ch.QueueBind(
+					"some_queue",
+					"key",
+					"ghost_exchange",
+					false,
+					nil,
+				)
+			},
+			expectCode: amqp.NotFound,
+			expectText: "no exchange",
+		},
+		{
 			name: "Bind to non-existent exchange",
 			trigger: func(ch *amqp.Channel) error {
 				return ch.QueueBind(
