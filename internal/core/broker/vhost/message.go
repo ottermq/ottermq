@@ -157,27 +157,27 @@ func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
 	return nil
 }
 
-func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) bool {
+func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return false
+		return false, errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
 
 	switch exchange.Typ {
 	case DIRECT:
 		// For direct exchanges, check if there are bindings for the specific routing key
 		queues, ok := exchange.Bindings[routingKey]
-		return ok && len(queues) > 0
+		return ok && len(queues) > 0, nil
 	case FANOUT:
 		// For fanout exchanges, check if there are any bound queues
-		return len(exchange.Queues) > 0
+		return len(exchange.Queues) > 0, nil
 	case TOPIC:
 		// TODO: Implement topic routing check (needs pattern matching)
-		return false
+		return false, nil
 	default:
-		return false
+		return false, nil
 	}
 }

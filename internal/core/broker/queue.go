@@ -110,7 +110,7 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 	})
 	if err != nil {
 		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendCloseChannel(conn,
+			b.sendChannelClosing(conn,
 				request.Channel,
 				amqpErr.ReplyCode(),
 				amqpErr.ClassID(),

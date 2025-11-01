@@ -195,8 +195,8 @@ func (b *Broker) connectionHandler(request *amqp.RequestMethodMessage, conn net.
 	}
 }
 
-// sendCloseChannel sends `channel.close` when the server needs to close a channel for some reason
-func (b *Broker) sendCloseChannel(conn net.Conn, channel, replyCode, classId, methodId uint16, replyText string) error {
+// sendChannelClosing sends `channel.close` when the server raises a channel exception or needs to close the channel for some reason
+func (b *Broker) sendChannelClosing(conn net.Conn, channel, replyCode, classId, methodId uint16, replyText string) error {
 	b.mu.Lock()
 	connInfo, exists := b.Connections[conn]
 	if !exists {

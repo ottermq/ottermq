@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/google/uuid"
@@ -162,7 +163,20 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 
 		body := currentState.Body
 		props := currentState.HeaderFrame.Properties
-		hasRouting := vh.HasRoutingForMessage(exchange, routingKey)
+		hasRouting, err := vh.HasRoutingForMessage(exchange, routingKey)
+		if err != nil {
+			if amqpErr, ok := err.(errors.AMQPError); ok {
+				b.sendChannelClosing(conn,
+					request.Channel,
+					amqpErr.ReplyCode(),
+					amqpErr.ClassID(),
+					amqpErr.MethodID(),
+					amqpErr.ReplyText(),
+				)
+				return nil, nil
+			}
+			return nil, err
+		}
 
 		msgID := uuid.New().String()
 		msg := &amqp.Message{
@@ -185,7 +199,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			return nil, nil
 		}
 
-		_, err := vh.Publish(exchange, routingKey, msg)
+		_, err = vh.Publish(exchange, routingKey, msg)
 		if err == nil {
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}

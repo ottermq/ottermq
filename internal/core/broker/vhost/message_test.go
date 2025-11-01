@@ -1,8 +1,10 @@
 package vhost
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/google/uuid"
 )
@@ -37,6 +39,7 @@ func TestPublishToInternalExchange(t *testing.T) {
 
 func TestPublishToNonExistentExchange(t *testing.T) {
 	vh := &VHost{
+		Name:      "Test",
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
 	}
@@ -50,7 +53,8 @@ func TestPublishToNonExistentExchange(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when publishing to non-existent exchange, got nil")
 	}
-	if err != nil && err.Error() != "Exchange non-existent not found" {
+
+	if err != nil && err.Error() != fmt.Sprintf("AMQP Channel Error 404: no exchange '%s' in vhost '%s'", "non-existent", vh.Name) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -215,11 +219,21 @@ func TestHasRoutingForMessage_NonExistentExchange(t *testing.T) {
 		Exchanges: make(map[string]*Exchange),
 	}
 
-	if vh.HasRoutingForMessage("non-existent", "any.key") {
+	hasRouting, err := vh.HasRoutingForMessage("non-existent", "any.key")
+	if hasRouting {
 		t.Error("Expected false for non-existent exchange")
+	}
+	if err == nil {
+		t.Errorf("Expected error for non-existent exchange, got nil")
+	}
+	if amqpErr, ok := err.(errors.AMQPError); ok {
+		if amqpErr.ReplyCode() != uint16(amqp.NOT_FOUND) {
+			t.Errorf("Expected NotFound error code, got %d", amqpErr.ReplyCode())
+		}
 	}
 }
 
+// TestHasRoutingForMessage_DirectExchange_WithBinding tests the HasRoutingForMessage method for a direct exchange with a binding.
 func TestHasRoutingForMessage_DirectExchange_WithBinding(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -237,11 +251,16 @@ func TestHasRoutingForMessage_DirectExchange_WithBinding(t *testing.T) {
 		},
 	}
 
-	if !vh.HasRoutingForMessage("direct-ex", "test.key") {
+	hasRouting, err := vh.HasRoutingForMessage("direct-ex", "test.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !hasRouting {
 		t.Error("Expected true for direct exchange with matching routing key")
 	}
 }
 
+// TestHasRoutingForMessage_DirectExchange_WithoutBinding tests the HasRoutingForMessage method for a direct exchange without a binding.
 func TestHasRoutingForMessage_DirectExchange_WithoutBinding(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -253,11 +272,16 @@ func TestHasRoutingForMessage_DirectExchange_WithoutBinding(t *testing.T) {
 		Bindings: make(map[string][]*Queue),
 	}
 
-	if vh.HasRoutingForMessage("direct-ex", "unbound.key") {
+	hasRouting, err := vh.HasRoutingForMessage("direct-ex", "unbound.key")
+	if hasRouting {
 		t.Error("Expected false for direct exchange without matching routing key")
+	}
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
+// TestHasRoutingForMessage_DirectExchange_EmptyQueueList tests the HasRoutingForMessage method for a direct exchange with an empty queue list for a routing key.
 func TestHasRoutingForMessage_DirectExchange_EmptyQueueList(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -271,8 +295,12 @@ func TestHasRoutingForMessage_DirectExchange_EmptyQueueList(t *testing.T) {
 		},
 	}
 
-	if vh.HasRoutingForMessage("direct-ex", "test.key") {
+	hasRouting, err := vh.HasRoutingForMessage("direct-ex", "test.key")
+	if hasRouting {
 		t.Error("Expected false when routing key exists but has no queues")
+	}
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -295,14 +323,23 @@ func TestHasRoutingForMessage_FanoutExchange_WithQueues(t *testing.T) {
 	}
 
 	// Fanout ignores routing key, so any key should work
-	if !vh.HasRoutingForMessage("fanout-ex", "any.key") {
+	hasRouting, err := vh.HasRoutingForMessage("fanout-ex", "any.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !hasRouting {
 		t.Error("Expected true for fanout exchange with bound queues")
 	}
-	if !vh.HasRoutingForMessage("fanout-ex", "another.key") {
+	hasRouting, err = vh.HasRoutingForMessage("fanout-ex", "another.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !hasRouting {
 		t.Error("Expected true for fanout exchange regardless of routing key")
 	}
 }
 
+// TestHasRoutingForMessage_FanoutExchange_WithoutQueues tests the HasRoutingForMessage method for a fanout exchange without any bound queues.
 func TestHasRoutingForMessage_FanoutExchange_WithoutQueues(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -313,12 +350,16 @@ func TestHasRoutingForMessage_FanoutExchange_WithoutQueues(t *testing.T) {
 		Typ:    FANOUT,
 		Queues: make(map[string]*Queue),
 	}
-
-	if vh.HasRoutingForMessage("fanout-ex", "any.key") {
+	hasRouting, err := vh.HasRoutingForMessage("fanout-ex", "any.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if hasRouting {
 		t.Error("Expected false for fanout exchange without bound queues")
 	}
 }
 
+// TestHasRoutingForMessage_TopicExchange tests the HasRoutingForMessage method for a topic exchange.
 func TestHasRoutingForMessage_TopicExchange(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -330,11 +371,16 @@ func TestHasRoutingForMessage_TopicExchange(t *testing.T) {
 	}
 
 	// Topic routing not yet implemented
-	if vh.HasRoutingForMessage("topic-ex", "test.key") {
+	hasRouting, err := vh.HasRoutingForMessage("topic-ex", "test.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if hasRouting {
 		t.Error("Expected false for topic exchange (not yet implemented)")
 	}
 }
 
+// TestHasRoutingForMessage_UnknownExchangeType tests the HasRoutingForMessage method for an exchange with an unknown type.
 func TestHasRoutingForMessage_UnknownExchangeType(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
@@ -345,7 +391,11 @@ func TestHasRoutingForMessage_UnknownExchangeType(t *testing.T) {
 		Typ:  "unknown-type", // Invalid exchange type
 	}
 
-	if vh.HasRoutingForMessage("unknown-ex", "test.key") {
+	hasRouting, err := vh.HasRoutingForMessage("unknown-ex", "test.key")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if hasRouting {
 		t.Error("Expected false for unknown exchange type")
 	}
 }
