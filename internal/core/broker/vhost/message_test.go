@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/google/uuid"
 )
 

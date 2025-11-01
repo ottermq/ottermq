@@ -3,8 +3,8 @@ package vhost
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/andrelcunha/ottermq/internal/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -151,7 +151,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		log.Trace().Interface("state", currentState).Msg("All fields must be filled")
 		if len(currentState.Body) != int(currentState.BodySize) {
 			log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
-			// TODO: handle this error properly, maybe sending the correct channel exception
+			// TODO: raise connection excepion (501 - Frame error)
 			// vide amqp.constants.go Exceptions
 			return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
 		}
