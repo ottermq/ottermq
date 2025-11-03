@@ -58,12 +58,17 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+		return errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
+
+	// TODO: use args to identify the binding uniquely
+	// if they didn't match, raise 406 (PRECONDITION_FAILED)
+
+	// TODO: deal with queue exclusivity and raise 403 (ACCESS_REFUSED) if needed
 
 	switch exchange.Typ {
 	case DIRECT:
@@ -90,7 +95,8 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey string) error {
 	queues, ok := exchange.Bindings[routingKey]
 	if !ok {
-		return errors.NewChannelError(fmt.Sprintf("binding with routing key '%s' not found in vhost '%s'", routingKey, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
+		log.Printf("No bindings found for routing key '%s' in exchange '%s'", routingKey, exchange.Name)
+		return errors.NewChannelError(fmt.Sprintf("no binding in vhost '%s'", vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
 	// Find queue in the bindings
@@ -106,7 +112,7 @@ func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey
 
 	// This should not happen as we checked before, but just in case
 	if !found {
-		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
 	// Remove the queue from the bindings

@@ -96,10 +96,10 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 }
 
 func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
-	content, ok := request.Content.(*amqp.QueueBindMessage)
+	content, ok := request.Content.(*amqp.QueueUnbindMessage)
 	if !ok {
-		log.Error().Msg("Invalid content type for QueueBindMessage")
-		return nil, fmt.Errorf("invalid content type for QueueBindMessage")
+		log.Error().Msg("Invalid content type for QueueUnbindMessage")
+		return nil, fmt.Errorf("invalid content type for QueueUnbindMessage")
 	}
 	queue := content.Queue
 	exchange := content.Exchange
@@ -109,7 +109,7 @@ func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *
 	err := vh.UnbindQueue(exchange, queue, routingKey, args)
 	if err != nil {
 		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendConnectionClosing(conn,
+			b.sendChannelClosing(conn,
 				request.Channel,
 				amqpErr.ReplyCode(),
 				amqpErr.ClassID(),
