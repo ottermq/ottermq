@@ -133,6 +133,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 ### ✅ **Phase 1-3: Core Messaging (COMPLETED)**
 
 **Completed implementations**:
+
 - Push and pull-based message consumption
 - Message acknowledgments and recovery
 - Quality of Service (QoS) with prefetch limits

@@ -7,24 +7,55 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func createExchangeDeclareFrame(request *RequestMethodMessage) []byte {
+type ExchangeDeclareMessage struct {
+	ExchangeName string
+	ExchangeType string
+	Passive      bool
+	Durable      bool
+	AutoDelete   bool
+	Internal     bool
+	NoWait       bool
+	Arguments    map[string]interface{}
+}
+
+type ExchangeDeleteMessage struct {
+	ExchangeName string
+	IfUnused     bool
+	NoWait       bool
+}
+
+func createExchangeDeclareFrame(channel uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(EXCHANGE),
 		MethodID: uint16(EXCHANGE_DECLARE_OK),
 		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }
 
-func createExchangeDeleteFrame(request *RequestMethodMessage) []byte {
+func createExchangeDeleteFrame(channel uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(EXCHANGE),
 		MethodID: uint16(EXCHANGE_DELETE_OK),
 		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
+}
+
+func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
+	switch methodID {
+	case uint16(EXCHANGE_DECLARE):
+		log.Debug().Msg("Received EXCHANGE_DECLARE frame \n")
+		return parseExchangeDeclareFrame(payload)
+	case uint16(EXCHANGE_DELETE):
+		log.Debug().Msg("Received EXCHANGE_DELETE frame \n")
+		return parseExchangeDeleteFrame(payload)
+
+	default:
+		return nil, fmt.Errorf("unknown method ID: %d", methodID)
+	}
 }
 
 // Fields:

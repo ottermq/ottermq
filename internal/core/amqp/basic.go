@@ -571,7 +571,7 @@ func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: content,
 	}
-	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
+	log.Debug().Interface("BasicConsume", content).Msg("BasicConsume formatted")
 	return request, nil
 }
 
@@ -686,7 +686,7 @@ func parseBasicAckFrame(payload []byte) (*RequestMethodMessage, error) {
 	// 8 deliveryTag (long long int),
 	// 1 multiple (bit - packed as octet)
 	if len(payload) < 9 {
-		return nil, fmt.Errorf("payload too short")
+		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
 	deliveryTag, err := DecodeLongLongInt(buf)
@@ -714,7 +714,7 @@ func parseBasicRejectFrame(payload []byte) (*RequestMethodMessage, error) {
 	// 8 deliveryTag (long long int),
 	// 1 requeue (bit - packed as octet)
 	if len(payload) < 9 {
-		return nil, fmt.Errorf("payload too short")
+		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
 	deliveryTag, err := DecodeLongLongInt(buf)

@@ -69,38 +69,46 @@ func (m *MockFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
 	return []byte("basic-recover-ok")
 }
 
-func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+func (m *MockFramer) CreateQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
 	return []byte("queue-declare")
 }
 
-func (m *MockFramer) CreateQueueBindOkFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateQueueBindOkFrame(channel uint16) []byte {
 	return []byte("queue-bind-ok")
 }
 
-func (m *MockFramer) CreateQueueDeleteOkFrame(request *amqp.RequestMethodMessage, messageCount uint32) []byte {
+func (m *MockFramer) CreateQueueUnbindOkFrame(channel uint16) []byte {
+	return []byte("queue-unbind-ok")
+}
+
+func (m *MockFramer) CreateQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
 	return []byte("queue-delete-ok")
 }
 
-func (m *MockFramer) CreateExchangeDeclareFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateExchangeDeclareFrame(channel uint16) []byte {
 	return []byte("exchange-declare")
 }
 
-func (m *MockFramer) CreateExchangeDeleteFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateExchangeDeleteFrame(channel uint16) []byte {
 	return []byte("exchange-delete")
 }
 
-func (m *MockFramer) CreateChannelOpenOkFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateChannelOpenOkFrame(channel uint16) []byte {
 	return []byte("channel-open-ok")
+}
+
+func (m *MockFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return []byte("channel-close")
 }
 
 func (m *MockFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return []byte("channel-close-ok")
 }
 
-func (m *MockFramer) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
 	return []byte("connection-close-ok")
 }
 
-func (m *MockFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return []byte("close")
+func (m *MockFramer) CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
+	return []byte("connection-close")
 }

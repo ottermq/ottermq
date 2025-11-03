@@ -7,10 +7,41 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func createQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+type QueueDeclareMessage struct {
+	QueueName  string
+	Passive    bool
+	Durable    bool
+	Exclusive  bool
+	AutoDelete bool
+	NoWait     bool
+	Arguments  map[string]interface{}
+}
+
+type QueueDeleteMessage struct {
+	QueueName string
+	IfUnused  bool
+	NoWait    bool
+}
+
+type QueueBindMessage struct {
+	Queue      string
+	Exchange   string
+	RoutingKey string
+	NoWait     bool
+	Arguments  map[string]interface{}
+}
+
+type QueueUnbindMessage struct {
+	Queue      string
+	Exchange   string
+	RoutingKey string
+	Arguments  map[string]interface{}
+}
+
+func createQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
 		MethodID: uint16(QUEUE_DECLARE_OK),
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
@@ -32,20 +63,20 @@ func createQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, 
 	return frame
 }
 
-func createQueueBindOkFrame(request *RequestMethodMessage) []byte {
+func createQueueAckFrame(channel, method uint16) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
-		MethodID: uint16(QUEUE_BIND_OK),
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
+		MethodID: method,
 		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }
 
-func createQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
+func createQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(QUEUE),
 		MethodID: uint16(QUEUE_DELETE_OK),
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
@@ -59,16 +90,6 @@ func createQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32
 	return frame
 }
 
-// Fields:
-// 0-1: reserved short int
-// 2: exchange name - length (short)
-// 3: type - (string)
-// 4: passive - (bit)
-// 5: durable - (bit)
-// 6: reserved 2
-// 7: reserved 3
-// 8: no-wait - (bit)
-// 9: arguments - (table)
 func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
@@ -91,6 +112,7 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
 	flags := DecodeFlags(octet, []string{"passive", "durable", "exclusive", "autoDelete", "noWait"}, true)
+	passive := flags["passive"]
 	durable := flags["durable"]
 	exclusive := flags["exclusive"]
 	autoDelete := flags["autoDelete"]
@@ -110,6 +132,7 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 	msg := &QueueDeclareMessage{
 		QueueName:  queueName,
+		Passive:    passive,
 		Durable:    durable,
 		Exclusive:  exclusive,
 		AutoDelete: autoDelete,
@@ -128,16 +151,75 @@ func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
 	case uint16(QUEUE_DECLARE):
 		log.Debug().Msg("Received QUEUE_DECLARE frame")
 		return parseQueueDeclareFrame(payload)
+
+	case uint16(QUEUE_DECLARE_OK):
+		log.Debug().Msg("Received QUEUE_DECLARE_OK frame \n")
+		// TODO: return the appropriate exception
+		return nil, fmt.Errorf("server should not receive QUEUE_DECLARE_OK frames from clients")
+
+	case uint16(QUEUE_BIND):
+		log.Debug().Msg("Received QUEUE_BIND frame")
+		return parseQueueBindFrame(payload)
+
 	case uint16(QUEUE_DELETE):
 		log.Debug().Msg("Received QUEUE_DELETE frame")
 		return parseQueueDeleteFrame(payload)
-	case uint16(QUEUE_BIND):
-		log.Printf("[DEBUG] Received QUEUE_BIND frame \n")
-		return parseQueueBindFrame(payload)
 
+	case uint16(QUEUE_UNBIND):
+		log.Debug().Msg("Received QUEUE_UNBIND frame")
+		return parseQueueUnbindFrame(payload)
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseQueueUnbindFrame(payload []byte) (any, error) {
+	// Expected fields:
+	// reserved1(shortint),
+	// queue (short str),
+	// exchange (short str),
+	// routing key (short str),
+	// arguments (table)
+	if len(payload) < 6 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	_, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue name: %v", err)
+	}
+	exchange, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
+	}
+	routingKey, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode routing key: %v", err)
+	}
+	arguments := make(map[string]any)
+	if buf.Len() > 4 {
+		argumentsStr, _ := DecodeLongStr(buf)
+		arguments, err = DecodeTable([]byte(argumentsStr))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read arguments: %v", err)
+		}
+	}
+	msg := &QueueUnbindMessage{
+		Queue:      queue,
+		Exchange:   exchange,
+		RoutingKey: routingKey,
+		Arguments:  arguments,
+	}
+	request := &RequestMethodMessage{
+		Content: msg,
+	}
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
+	return request, nil
+
 }
 
 // Fields:

@@ -35,7 +35,7 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		if err != nil {
 			return nil, err
 		}
-		frame := b.framer.CreateExchangeDeclareFrame(request)
+		frame := b.framer.CreateExchangeDeclareFrame(request.Channel)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send exchange declare frame")
 		}
@@ -57,7 +57,7 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			return nil, err
 		}
 
-		frame := b.framer.CreateExchangeDeleteFrame(request)
+		frame := b.framer.CreateExchangeDeleteFrame(request.Channel)
 
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send exchange delete frame")

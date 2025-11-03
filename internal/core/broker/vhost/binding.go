@@ -3,26 +3,29 @@ package vhost
 import (
 	"fmt"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
-	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName)
+	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName, nil)
 }
 
-func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
+// BindQueue binds a queue to an exchange with a given routing key.
+func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("exchange %s not found", exchangeName)
+		return errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		return fmt.Errorf("queue %s not found", queueName)
+		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
 
 	switch exchange.Typ {
@@ -48,22 +51,55 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	return nil
 }
 
-func (vh *VHost) DeleteBinding(exchangeName, queueName, routingKey string) error {
+func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("exchange %s not found", exchangeName)
+		return errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
+	}
+	queue, ok := vh.Queues[queueName]
+	if !ok {
+		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
+	// TODO: use args to identify the binding uniquely
+	// if they didn't match, raise 406 (PRECONDITION_FAILED)
+
+	// TODO: deal with queue exclusivity and raise 403 (ACCESS_REFUSED) if needed
+
+	switch exchange.Typ {
+	case DIRECT:
+		err := vh.DeleteBindingUnlocked(exchange, queueName, routingKey)
+		if err != nil {
+			return err
+		}
+
+	case FANOUT:
+		delete(exchange.Queues, queueName)
+	}
+
+	if exchange.Props.Durable && queue.Props.Durable {
+		// it is ignoring the args. TODO: use args to identify the binding uniquely
+		err := vh.persist.DeleteBindingState(vh.Name, exchangeName, queueName, routingKey /*, exchange.Props.Arguments*/)
+		if err != nil {
+			log.Printf("Failed to save binding state: %v", err)
+		}
+	}
+	log.Debug().Str("queue", queueName).Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("Queue unbound from exchange")
+	return nil
+}
+
+func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey string) error {
 	queues, ok := exchange.Bindings[routingKey]
 	if !ok {
-		return fmt.Errorf("binding with routing key %s not found", routingKey)
+		log.Printf("No bindings found for routing key '%s' in exchange '%s'", routingKey, exchange.Name)
+		return errors.NewChannelError(fmt.Sprintf("no binding in vhost '%s'", vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
-	// Find the queue
+	// Find queue in the bindings
 	var index int
 	found := false
 	for i, q := range queues {
@@ -73,8 +109,10 @@ func (vh *VHost) DeleteBinding(exchangeName, queueName, routingKey string) error
 			break
 		}
 	}
+
+	// This should not happen as we checked before, but just in case
 	if !found {
-		return fmt.Errorf("Queue %s not found", queueName)
+		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
 	// Remove the queue from the bindings

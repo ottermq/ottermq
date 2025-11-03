@@ -61,9 +61,10 @@ func NewAmqpClientConfig(configurations *map[string]any) *AmqpClientConfig {
 
 // ConnectionInfo represents the information of a connection to the AMQP server
 type ConnectionInfo struct {
-	VHostName string                   `json:"vhost"`
-	Client    *AmqpClient              `json:"client"`
-	Channels  map[uint16]*ChannelState `json:"channels"`
+	VHostName         string                   `json:"vhost"`
+	Client            *AmqpClient              `json:"client"`
+	Channels          map[uint16]*ChannelState `json:"channels"`
+	ClosingConnection bool                     `json:"closing_connection"`
 }
 
 // NewConnectionInfo creates a new ConnectionInfo, receiving the `vhost` name

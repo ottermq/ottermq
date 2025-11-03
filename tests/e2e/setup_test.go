@@ -31,15 +31,23 @@ func TestMain(m *testing.M) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 	zerolog.SetGlobalLevel(zerolog.WarnLevel) // Only show warnings and errors during tests
 
-	// Start the broker for tests
-	if err := setupBroker(); err != nil {
-		log.Fatal().Err(err).Msg("Failed to setup broker for e2e tests")
-	}
+	// Verify that no other broker is running on the test port
+	conn, err := amqp.Dial(brokerURL)
+	if err == nil {
+		conn.Close()
+		log.Debug().Msg("Another AMQP broker is running on the test port. Using existing broker for tests.")
+	} else {
 
-	// Wait for broker to be ready
-	if err := waitForBroker(30 * time.Second); err != nil {
-		testBrokerStop()
-		log.Fatal().Err(err).Msg("Broker did not become ready in time")
+		// Start the broker for tests
+		if err := setupBroker(); err != nil {
+			log.Fatal().Err(err).Msg("Failed to setup broker for e2e tests")
+		}
+
+		// Wait for broker to be ready
+		if err := waitForBroker(30 * time.Second); err != nil {
+			testBrokerStop()
+			log.Fatal().Err(err).Msg("Broker did not become ready in time")
+		}
 	}
 
 	log.Info().Msg("Broker is ready for e2e tests")

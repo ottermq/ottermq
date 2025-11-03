@@ -120,15 +120,32 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 
 // closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame
 func (b *Broker) closeConnectionRequested(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
-	frame := b.framer.CreateConnectionCloseOkFrame(request)
+	frame := b.framer.CreateConnectionCloseOkFrame(request.Channel)
 	err := b.framer.SendFrame(conn, frame)
-	b.cleanupConnection(conn)
+	b.mu.Lock()
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		b.mu.Unlock()
+		return nil, nil
+	}
+	connInfo.ClosingConnection = true
+	b.mu.Unlock()
 	return nil, err
 }
 
-// closeConnection sends `connection.close` when the server needs to shutdown for some reason
-func (b *Broker) sendCloseConnection(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) (any, error) {
-	frame := b.framer.CreateCloseFrame(channel, replyCode, methodId, classId, uint16(amqp.CONNECTION_CLOSE), uint16(amqp.CONNECTION_CLOSE), replyText)
+func (b *Broker) isConnectionClosing(conn net.Conn) (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		return false, fmt.Errorf("connection not found")
+	}
+	return connInfo.ClosingConnection, nil
+}
+
+// sendConnectionClosing sends `connection.close` when the server needs to shutdown for some reason
+func (b *Broker) sendConnectionClosing(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) (any, error) {
+	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
 	err := b.framer.SendFrame(conn, frame)
 
 	return nil, err
@@ -159,7 +176,7 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		if _, err := b.sendCloseConnection(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED]); err != nil {
+		if _, err := b.sendConnectionClosing(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED]); err != nil {
 			log.Error().Err(err).Msg("Failed to send close connection")
 		}
 	}
@@ -176,4 +193,23 @@ func (b *Broker) connectionHandler(request *amqp.RequestMethodMessage, conn net.
 		log.Debug().Uint16("method_id", request.MethodID).Msg("Unknown connection method")
 		return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
 	}
+}
+
+// sendChannelClosing sends `channel.close` when the server raises a channel exception or needs to close the channel for some reason
+func (b *Broker) sendChannelClosing(conn net.Conn, channel, replyCode, classId, methodId uint16, replyText string) error {
+	b.mu.Lock()
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		b.mu.Unlock()
+		return fmt.Errorf("connection not found")
+	}
+	chState, exists := connInfo.Channels[channel]
+	if !exists {
+		b.mu.Unlock()
+		return fmt.Errorf("channel %d not found", channel)
+	}
+	chState.ClosingChannel = true
+	b.mu.Unlock()
+	frame := b.framer.CreateChannelCloseFrame(channel, replyCode, classId, methodId, replyText)
+	return b.framer.SendFrame(conn, frame)
 }
