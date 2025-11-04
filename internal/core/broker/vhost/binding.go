@@ -85,7 +85,7 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 		// it is ignoring the args. TODO: use args to identify the binding uniquely
 		err := vh.persist.DeleteBindingState(vh.Name, exchangeName, queueName, routingKey /*, exchange.Props.Arguments*/)
 		if err != nil {
-			log.Printf("Failed to save binding state: %v", err)
+			log.Printf("Failed to delete binding state: %v", err)
 		}
 	}
 	log.Debug().Str("queue", queueName).Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("Queue unbound from exchange")
