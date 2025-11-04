@@ -50,16 +50,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 - [x] Consumer management system refactoring
 - [x] **`BASIC_CONSUME`** - Start consuming messages from queue
-  - [x] Consumer tag generation and management
-  - [x] Consumer registration per channel
-  - [x] Integration with queue message delivery
 - [x] **`BASIC_DELIVER`** - Server-initiated message delivery
-  - [x] Push-based message delivery to consumers
-  - [x] Delivery tag generation and tracking
 - [x] **`BASIC_CANCEL`** - Cancel consumer subscription
-  - [x] Clean consumer shutdown
-  - [x] Resource cleanup on cancellation
-- [x] **`BASIC_CONSUME_OK`** / **`BASIC_CANCEL_OK`** - Response frames
+- [x] **`QUEUE_UNBIND`** - Remove queue bindings (Phase 2 completion)
+  - [x] Support for DIRECT and FANOUT exchanges
+  - [x] Proper error handling with channel exceptions
+  - [x] Auto-delete exchange when last binding is removed
+  - [x] Comprehensive unit test coverage
 
 ### ❌ **Missing Features**
 
@@ -72,7 +69,9 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 #### **Phase 2: Advanced Queue Operations (Medium Priority)**
 
-- [ ] **`QUEUE_UNBIND`** - Remove queue bindings
+- [ ] **`QUEUE_UNBIND` enhancements** - Argument validation and exclusivity checks
+  - [ ] Binding argument matching (406 PRECONDITION_FAILED on mismatch)
+  - [ ] Queue exclusivity validation (403 ACCESS_REFUSED for wrong connection)
 - [ ] **`QUEUE_PURGE`** - Clear queue contents
 - [ ] **`QUEUE_DELETE` improvements** - Support if-unused and if-empty flags
 

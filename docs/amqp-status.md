@@ -65,12 +65,20 @@ Status levels:
 | queue.declare-ok | ✅ | |
 | queue.bind | ✅ | |
 | queue.bind-ok | ✅ | |
-| queue.unbind | ❌ | |
-| queue.unbind-ok | ❌ | |
+| queue.unbind | ✅ | Raises channel exception on errors; see notes below |
+| queue.unbind-ok | ✅ | |
 | queue.purge | ❌ | |
 | queue.purge-ok | ❌ | |
 | queue.delete | ⚠️ | Basic deletion works; `if-unused`/`if-empty` flags TODO |
 | queue.delete-ok | ✅ | |
+
+**queue.unbind Implementation Notes:**
+
+- Returns 404 NOT_FOUND if exchange, queue, or binding doesn't exist
+- Supports DIRECT and FANOUT exchange types
+- Triggers exchange auto-delete if `auto-delete=true` and no bindings remain
+- **TODO**: Argument matching for unique binding identification (will raise 406 PRECONDITION_FAILED)
+- **TODO**: Queue exclusivity validation (will raise 403 ACCESS_REFUSED)
 
 ## basic
 
