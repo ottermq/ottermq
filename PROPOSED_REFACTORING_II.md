@@ -1,23 +1,25 @@
-# TODO 1: Queue Exclusivity Check (403 ACCESS_REFUSED)
+# TODO 2: Queue Exclusivity Check (403 ACCESS_REFUSED)
 
-Current Issue: Exclusive queues should only be accessible by the connection that declared them. Operations from other connections should raise 403.
+## 📌 Summary
 
-## Sumary
+OtterMQ currently allows any connection to interact with any queue. However, AMQP 0-9-1 specifies that **exclusive queues must only be accessible by the connection that declared them**. This proposal introduces a mechanism to enforce exclusivity and raise a `403 ACCESS_REFUSED` error when violated.
 
-1. Add OwnerConn net.Conn to Queue struct
-2. Set owner when declaring exclusive queues
-3. Pass conn through bind/unbind operations
-4. Validate connection matches owner before operations
-5. Clean up on connection close
+---
 
-Approach:
+## 🔐 Problem
 
-### Step 1: Track Queue Owner
+- Exclusive queues are not protected from access by other connections.
+- This violates AMQP semantics and can lead to race conditions or unexpected behavior.
 
-Add owner tracking to `Queue` and `QueueProperties`:
+---
+
+## 🧱 Proposed Changes
+
+### 1. Track Queue Ownership
+
+Add an `OwnerConn net.Conn` field to the `Queue` struct:
 
 ```go
-// In internal/core/broker/vhost/queue.go
 type Queue struct {
     Name           string
     Props          *QueueProperties
@@ -31,54 +33,47 @@ type Queue struct {
 }
 ```
 
-### Step 2: Set Owner on Queue Declaration
+### 2. Set Owner on Declaration
 
-```
-// In internal/core/broker/vhost/queue.go - CreateQueue function
+When creating an exclusive queue, set the owner:
+
+```go
 if props.Exclusive {
     queue.OwnerConn = conn  // Pass conn from handler
 }
 ```
 
-This means CreateQueue needs a `conn net.Conn` parameter when creating exclusive queues.
+This requires `CreateQueue` to accept a `conn net.Conn` parameter.
 
-### Step 3: Add Connection Context to Bind/Unbind
+### 3. Pass Connection to Bind/Unbind
+
+Update method signatures:
 
 ```go
-// In internal/core/broker/vhost/binding.go
 func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}, conn net.Conn) error
 func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}, conn net.Conn) error
 ```
 
-### Step 4: Exclusivity Validation
+### 4. Validate Exclusivity
+
+Before binding or unbinding, check ownership:
 
 ```go
-func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}, conn net.Conn) error {
-    vh.mu.Lock()
-    defer vh.mu.Unlock()
-
-    // ... existing exchange/queue lookup ...
-
-    // Check exclusivity
-    if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
-        return errors.NewChannelError(
-            fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
-            uint16(amqp.ACCESS_REFUSED),  // 403
-            uint16(amqp.QUEUE),
-            uint16(amqp.QUEUE_UNBIND),
-        )
-    }
-
-    // ... rest of unbind logic ...
+if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+    return errors.NewChannelError(
+        fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
+        uint16(amqp.ACCESS_REFUSED),  // 403
+        uint16(amqp.QUEUE),
+        uint16(amqp.QUEUE_UNBIND),
+    )
 }
 ```
 
-### Step 5: Clean Up Owner on Connection Close
+### 5. Clean Up on Connection Close
 
-When a connection closes, clear the owner from exclusive queues (or delete them based on auto-delete/exclusive semantics):
+When a connection closes, release or delete exclusive queues:
 
 ```go
-// In connection cleanup code
 for _, queue := range vh.Queues {
     if queue.OwnerConn == conn {
         if queue.Props.AutoDelete {
@@ -90,5 +85,15 @@ for _, queue := range vh.Queues {
 }
 ```
 
+## ✅ Benefits
+
+- Enforces AMQP exclusivity rules
+- Prevents unauthorized access to exclusive queues
+- Supports auto-delete semantics on connection close
+- Aligns OtterMQ with RabbitMQ behavior and client expectations
+
 ---
 
+### 📌 Status
+
+This proposal is under implementation. Current behavior does not enforce exclusivity. This change will ensure protocol compliance and improve queue isolation.
