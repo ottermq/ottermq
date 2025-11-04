@@ -1,8 +1,10 @@
-# Proposal: Refactor Exchange Bindings to Unified `[]Binding` Structure
+# TODO 1: Argument Validation for Binding Identification
 
 ## 📌 Summary
 
 OtterMQ currently uses a `map[string][]*Queue` structure to represent bindings in direct and topic exchanges, and a separate `map[string]*Queue` for fanout. This proposal suggests refactoring to a unified `[]Binding` structure to simplify routing, persistence, and future extensibility.
+
+**Current Issue**: Multiple bindings with the same exchange+queue+routing key but different arguments aren't distinguished. AMQP spec allows this and requires matching arguments on unbind.
 
 ---
 
@@ -25,7 +27,7 @@ type Binding struct {
 type Exchange struct {
     Name      string
     Type      ExchangeType
-    Bindings  []Binding
+    Bindings  map[string][]*Binding
     Props     *ExchangeProperties
 }
 ```
@@ -54,6 +56,37 @@ type Exchange struct {
 3. Refactor persistence layer to store `[]Binding`
 4. Update routing logic to iterate over `[]Binding`
 5. Add helper functions for matching by exchange type
+6. Add error handling
+
+### Helpers
+
+```go
+// Helper to compare binding arguments
+func bindingArgumentsMatch(a, b map[string]interface{}) bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for k, v := range a {
+        if bv, ok := b[k]; !ok || !reflect.DeepEqual(v, bv) {
+            return false
+        }
+    }
+    return true
+}
+```
+
+### Error Handling
+
+When arguments don't match during unbind:
+
+```go
+return errors.NewChannelError(
+    "binding arguments do not match",
+    uint16(amqp.PRECONDITION_FAILED),  // 406
+    uint16(amqp.QUEUE),
+    uint16(amqp.QUEUE_UNBIND),
+)
+```
 
 ## 🧠 Future Extensions
 
