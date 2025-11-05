@@ -148,14 +148,14 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 
 func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 	vh := NewVhost("test-vhost", 1000, nil)
+	var conn net.Conn = nil
 	// Create a queue
-	q, err := vh.CreateQueue("q-clean", nil)
+	q, err := vh.CreateQueue("q-clean", nil, conn)
 	if err != nil {
 		t.Fatalf("CreateQueue error: %v", err)
 	}
 
 	// Prepare an unacked record on channel (conn=nil, ch=3)
-	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 3}
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
 	vh.mu.Lock()

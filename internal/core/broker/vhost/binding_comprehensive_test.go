@@ -20,7 +20,7 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 	// Create and bind multiple queues
 	queues := []string{"queue1", "queue2", "queue3"}
 	for _, qName := range queues {
-		vh.CreateQueue(qName, &QueueProperties{Durable: false})
+		vh.CreateQueue(qName, &QueueProperties{Durable: false}, nil)
 		err := vh.BindQueue(exchangeName, qName, "", nil)
 		if err != nil {
 			t.Fatalf("Failed to bind %s: %v", qName, err)
@@ -85,7 +85,7 @@ func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "", nil)
 
 	msg := &amqp.Message{
@@ -120,9 +120,9 @@ func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
 
 	// Bind multiple queues
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue3", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue3", &QueueProperties{Durable: false}, nil)
 
 	vh.BindQueue(exchangeName, "queue1", "", nil)
 	vh.BindQueue(exchangeName, "queue2", "", nil)
@@ -179,7 +179,7 @@ func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
 		AutoDelete: true,
 	})
 
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "", nil)
 
 	// Verify exchange exists
@@ -205,7 +205,7 @@ func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "", nil)
 
 	// Unbind with various routing keys - all should work because fanout ignores them
@@ -232,7 +232,7 @@ func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind with first set of args
 	args1 := map[string]interface{}{"x-match": "all", "format": "pdf"}
@@ -270,7 +270,7 @@ func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	args := map[string]interface{}{"x-match": "all", "format": "pdf"}
 
@@ -305,7 +305,7 @@ func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind with specific args
 	args1 := map[string]interface{}{"format": "pdf"}
@@ -346,7 +346,7 @@ func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Create two bindings with different args
 	args1 := map[string]interface{}{"priority": 1}
@@ -387,7 +387,7 @@ func TestBindQueue_NilArguments(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind with nil args
 	err := vh.BindQueue(exchangeName, queueName, routingKey, nil)
@@ -425,9 +425,9 @@ func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
 
 	// Bind queues with different routing keys
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue3", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue3", &QueueProperties{Durable: false}, nil)
 
 	vh.BindQueue(exchangeName, "queue1", "logs.error", nil)
 	vh.BindQueue(exchangeName, "queue2", "logs.info", nil)
@@ -470,7 +470,7 @@ func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
 
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "existing.key", nil)
 
 	msg := &amqp.Message{
@@ -500,8 +500,8 @@ func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
 		AutoDelete: true,
 	})
 
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
 
 	// Bind both queues to same routing key
 	vh.BindQueue(exchangeName, "queue1", "test.key", nil)
@@ -534,8 +534,8 @@ func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
 		AutoDelete: true,
 	})
 
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
 
 	// Bind to different routing keys
 	vh.BindQueue(exchangeName, "queue1", "key1", nil)
@@ -577,7 +577,7 @@ func TestHasRoutingForMessage_Fanout(t *testing.T) {
 	}
 
 	// Add a binding
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "", nil)
 
 	// Should return true regardless of routing key
@@ -600,7 +600,7 @@ func TestHasRoutingForMessage_Direct(t *testing.T) {
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
 
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "logs.error", nil)
 
 	// Should return true for bound key

@@ -30,7 +30,7 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 
 	// Create exchange and queue
 	vh.CreateExchange("test-exchange", vhost.DIRECT, &vhost.ExchangeProperties{Durable: false})
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false})
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
 	vh.BindQueue("test-exchange", "test-queue", "test.key", nil)
 
 	// Create unbind request
@@ -77,7 +77,7 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 	vh.SetFramer(b.framer)
 
 	// Create only queue, no exchange
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false})
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
 
 	conn := &mockConn{}
 

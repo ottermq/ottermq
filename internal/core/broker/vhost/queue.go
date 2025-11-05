@@ -3,6 +3,7 @@ package vhost
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 type QueueArgs map[string]any
 
 type Queue struct {
-	Name     string            `json:"name"`
-	Props    *QueueProperties  `json:"properties"`
-	messages chan amqp.Message `json:"-"`
-	count    int               `json:"-"`
-	mu       sync.Mutex        `json:"-"`
+	Name      string            `json:"name"`
+	Props     *QueueProperties  `json:"properties"`
+	messages  chan amqp.Message `json:"-"`
+	count     int               `json:"-"`
+	mu        sync.Mutex        `json:"-"`
+	OwnerConn net.Conn          `json:"-"`
 	/* Delivery */
 	deliveryCtx    context.Context    `json:"-"`
 	deliveryCancel context.CancelFunc `json:"-"`
@@ -157,7 +159,7 @@ func (q *Queue) stopDeliveryLoop() {
 	q.delivering = false
 }
 
-func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {
+func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -194,6 +196,14 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	}
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
+	if props.Exclusive {
+		// Exclusive queues are tied to the connection that declared them
+		// This is a placeholder; actual connection should be set during declaration
+		queue.OwnerConn = nil
+	}
+	if props.Exclusive {
+		queue.OwnerConn = conn
+	}
 	vh.Queues[name] = queue
 
 	if props.Durable {

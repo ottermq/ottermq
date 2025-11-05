@@ -18,7 +18,7 @@ func TestUnbindQueue_Success(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind queue to exchange
 	err := vh.BindQueue(exchangeName, queueName, routingKey, nil)
@@ -54,7 +54,7 @@ func TestUnbindQueue_ExchangeNotFound(t *testing.T) {
 	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
 
 	queueName := "test-queue"
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	err := vh.UnbindQueue("ghost-exchange", queueName, "test.key", nil)
 
@@ -111,7 +111,7 @@ func TestUnbindQueue_BindingNotFound(t *testing.T) {
 	queueName := "test-queue"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Try to unbind without creating a binding first
 	err := vh.UnbindQueue(exchangeName, queueName, "nonexistent.key", nil)
@@ -142,9 +142,9 @@ func TestUnbindQueue_MultipleBindings(t *testing.T) {
 	routingKey := "shared.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue3", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue3", &QueueProperties{Durable: false}, nil)
 
 	// Bind all queues to same routing key
 	vh.BindQueue(exchangeName, "queue1", routingKey, nil)
@@ -202,7 +202,7 @@ func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, queueName, routingKey, nil)
 
 	exchange := vh.Exchanges[exchangeName]
@@ -230,7 +230,7 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	queueName := "test-queue"
 
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind queue to fanout exchange
 	err := vh.BindQueue(exchangeName, queueName, "", nil)
@@ -282,7 +282,7 @@ func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
 		Durable:    false,
 		AutoDelete: true,
 	})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, queueName, routingKey, nil)
 
 	// Verify exchange exists
@@ -313,8 +313,8 @@ func TestUnbindQueue_NoAutoDeleteWhenOtherBindingsExist(t *testing.T) {
 		Durable:    false,
 		AutoDelete: true,
 	})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false})
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false})
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
 
 	vh.BindQueue(exchangeName, "queue1", routingKey, nil)
 	vh.BindQueue(exchangeName, "queue2", routingKey, nil)
@@ -384,7 +384,7 @@ func TestUnbindQueue_AlreadyUnbound(t *testing.T) {
 	routingKey := "test.key"
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false})
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
 
 	// Bind and then unbind
 	vh.BindQueue(exchangeName, queueName, routingKey, nil)
