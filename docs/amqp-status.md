@@ -20,7 +20,7 @@ Status levels:
 | connection | 100% | Handshake and basic lifecycle supported |
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
 | exchange | 80% | direct/fanout declare implemented; missing topic pattern matching |
-| queue | 60% | declare/bind/delete implemented; unbind/purge planned |
+| queue | 85% | declare/bind/unbind/delete with argument validation; purge planned |
 | basic | 100% | All methods fully implemented and tested |
 | tx | 0% | Transaction support planned |
 
@@ -75,10 +75,17 @@ Status levels:
 **queue.unbind Implementation Notes:**
 
 - Returns 404 NOT_FOUND if exchange, queue, or binding doesn't exist
+- ✅ **Argument matching implemented** - Bindings are uniquely identified by queue+exchange+routingKey+arguments
+- Returns 404 NOT_FOUND if binding with matching arguments doesn't exist during unbind
 - Supports DIRECT and FANOUT exchange types
 - Triggers exchange auto-delete if `auto-delete=true` and no bindings remain
-- **TODO**: Argument matching for unique binding identification (will raise 406 PRECONDITION_FAILED)
+- Treats `nil` and empty `{}` arguments as equivalent (AMQP standard behavior)
 - **TODO**: Queue exclusivity validation (will raise 403 ACCESS_REFUSED)
+
+**queue.bind Implementation Notes:**
+
+- ✅ **Duplicate binding prevention** - Returns 406 PRECONDITION_FAILED when attempting to create an identical binding (same queue+exchange+routingKey+arguments)
+- Supports binding arguments for future headers exchange support
 
 ## basic
 

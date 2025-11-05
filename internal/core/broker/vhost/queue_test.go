@@ -50,14 +50,14 @@ func TestDeleteQueue_AutoDeleteDirectExchange(t *testing.T) {
 	ex := &Exchange{
 		Name:     "ex_direct",
 		Typ:      DIRECT,
-		Bindings: make(map[string][]*Queue),
+		Bindings: make(map[string][]*Binding),
 		Props:    &ExchangeProperties{AutoDelete: true},
 	}
 	vh.Exchanges["ex_direct"] = ex
 	// Create queue and bind (use NewQueue to avoid nil channel)
 	q := NewQueue("q_direct", 10)
 	vh.Queues["q_direct"] = q
-	ex.Bindings["rk"] = []*Queue{q}
+	ex.Bindings["rk"] = []*Binding{{Queue: q}}
 
 	// Delete the queue
 	err := vh.DeleteQueue("q_direct")
@@ -78,16 +78,16 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 	}
 	// Create auto-delete fanout exchange
 	ex := &Exchange{
-		Name:   "ex_fanout",
-		Typ:    FANOUT,
-		Queues: make(map[string]*Queue),
-		Props:  &ExchangeProperties{AutoDelete: true},
+		Name:     "ex_fanout",
+		Typ:      FANOUT,
+		Bindings: make(map[string][]*Binding),
+		Props:    &ExchangeProperties{AutoDelete: true},
 	}
 	vh.Exchanges["ex_fanout"] = ex
 	// Create queue and bind (use NewQueue to avoid nil channel)
 	q := NewQueue("q_fanout", 10)
 	vh.Queues["q_fanout"] = q
-	ex.Queues["q_fanout"] = q
+	ex.Bindings[""] = []*Binding{{Queue: q}}
 
 	// Delete the queue
 	err := vh.DeleteQueue("q_fanout")

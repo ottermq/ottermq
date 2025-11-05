@@ -189,10 +189,10 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 	switch exchange.Typ {
 	case vhost.DIRECT:
 		bindings := make(map[string][]string)
-		for routingKey, queues := range exchange.Bindings {
+		for routingKey, bs := range exchange.Bindings {
 			var queuesStr []string
-			for _, queue := range queues {
-				queuesStr = append(queuesStr, queue.Name)
+			for _, binding := range bs {
+				queuesStr = append(queuesStr, binding.Queue.Name)
 			}
 			bindings[routingKey] = queuesStr
 		}
@@ -200,10 +200,10 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 	case vhost.FANOUT:
 		bindings := make(map[string][]string)
 		var queues []string
-		for queueName := range exchange.Queues {
-			queues = append(queues, queueName)
+		for _, b := range exchange.Bindings[""] {
+			queues = append(queues, b.Queue.Name)
 		}
-		bindings["fanout"] = queues
+		bindings[""] = queues
 		return bindings
 	case vhost.TOPIC:
 		// not implemented

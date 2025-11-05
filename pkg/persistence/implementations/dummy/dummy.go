@@ -25,7 +25,7 @@ func (d *DummyPersistence) SaveBindingState(vhost, exchange, queue, routingKey s
 func (d *DummyPersistence) LoadExchangeBindings(vhost, exchange string) ([]persistence.BindingData, error) {
 	return nil, nil
 }
-func (d *DummyPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+func (d *DummyPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
 	return nil
 }
 func (d *DummyPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {

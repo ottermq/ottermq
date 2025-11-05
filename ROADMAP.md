@@ -46,7 +46,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Channel-wide prefetch control (global=true)
   - [x] Message throttling and flow control
 
-### � **Recently Completed**
+### ⚡ **Recently Completed**
 
 - [x] Consumer management system refactoring
 - [x] **`BASIC_CONSUME`** - Start consuming messages from queue
@@ -57,6 +57,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Proper error handling with channel exceptions
   - [x] Auto-delete exchange when last binding is removed
   - [x] Comprehensive unit test coverage
+- [x] **Binding Structure Refactoring** (Phase 2 completion)
+  - [x] Unified `Binding` struct with queue, routing key, and arguments
+  - [x] Argument-based binding identification and validation
+  - [x] Duplicate binding detection with 406 PRECONDITION_FAILED
+  - [x] Support for multiple bindings with different arguments
+  - [x] Fanout exchange bindings unified under empty routing key
+  - [x] Foundation for future headers exchange support
 
 ### ❌ **Missing Features**
 
@@ -69,8 +76,10 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 #### **Phase 2: Advanced Queue Operations (Medium Priority)**
 
-- [ ] **`QUEUE_UNBIND` enhancements** - Argument validation and exclusivity checks
-  - [ ] Binding argument matching (406 PRECONDITION_FAILED on mismatch)
+- [x] **`QUEUE_UNBIND` enhancements** - Argument validation ✅ COMPLETED
+  - [x] Binding argument matching (404 NOT_FOUND when args don't match)
+  - [x] Duplicate binding prevention (406 PRECONDITION_FAILED)
+  - [x] Unified binding structure across DIRECT and FANOUT exchanges
   - [ ] Queue exclusivity validation (403 ACCESS_REFUSED for wrong connection)
 - [ ] **`QUEUE_PURGE`** - Clear queue contents
 - [ ] **`QUEUE_DELETE` improvements** - Support if-unused and if-empty flags

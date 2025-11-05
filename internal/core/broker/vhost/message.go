@@ -62,12 +62,13 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 	}
 	switch exchange.Typ {
 	case DIRECT:
-		queues, ok := exchange.Bindings[routingKey]
+		bindings, ok := exchange.Bindings[routingKey]
 		if !ok {
 			log.Error().Str("routing_key", routingKey).Str("exchange", exchangeName).Msg("Routing key not found for exchange")
 			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
-		for _, queue := range queues {
+		for _, binding := range bindings {
+			queue := binding.Queue
 			err := vh.saveMessageIfDurable(SaveMessageRequest{
 				Props:      &msg.Properties,
 				Queue:      queue,
@@ -85,7 +86,14 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		return msg.ID, nil
 
 	case FANOUT:
-		for _, queue := range exchange.Queues {
+		routingKey = ""
+		bindings, ok := exchange.Bindings[routingKey]
+		if !ok {
+			log.Error().Str("routing_key", routingKey).Str("exchange", exchangeName).Msg("Routing key not found for exchange")
+			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
+		}
+		for _, binding := range bindings {
+			queue := binding.Queue
 			err := vh.saveMessageIfDurable(SaveMessageRequest{
 				Props:      &msg.Properties,
 				Queue:      queue,
@@ -97,6 +105,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 			if err != nil {
 				return "", err
 			}
+
 			queue.Push(*msg)
 		}
 		return msg.ID, nil
@@ -173,7 +182,8 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 		return ok && len(queues) > 0, nil
 	case FANOUT:
 		// For fanout exchanges, check if there are any bound queues
-		return len(exchange.Queues) > 0, nil
+		// Use unlocked version since we already hold the lock
+		return len(vh.listFanoutQueuesUnlocked(exchange)) > 0, nil
 	case TOPIC:
 		// TODO: Implement topic routing check (needs pattern matching)
 		return false, nil

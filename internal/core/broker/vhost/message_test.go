@@ -80,8 +80,8 @@ func TestPublishToDirectExchangeWithBinding(t *testing.T) {
 		Name:  exchangeName,
 		Typ:   DIRECT,
 		Props: &ExchangeProperties{Internal: false},
-		Bindings: map[string][]*Queue{
-			routingKey: {queue},
+		Bindings: map[string][]*Binding{
+			routingKey: {{Queue: queue}},
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestPublishToDirectExchangeWithoutBinding(t *testing.T) {
 		Name:     exchangeName,
 		Typ:      DIRECT,
 		Props:    &ExchangeProperties{Internal: false},
-		Bindings: make(map[string][]*Queue),
+		Bindings: make(map[string][]*Binding),
 	}
 	msg := &amqp.Message{
 		Body:       []byte("test"),
@@ -155,13 +155,15 @@ func TestPublishToFanoutExchange(t *testing.T) {
 	// Create fanout exchange
 	exchangeName := "fanout-ex"
 	vh.Exchanges[exchangeName] = &Exchange{
-		Name:  exchangeName,
-		Typ:   FANOUT,
-		Props: &ExchangeProperties{Internal: false},
-		Queues: map[string]*Queue{
-			"queue1": queue1,
-			"queue2": queue2,
-		},
+		Name:     exchangeName,
+		Typ:      FANOUT,
+		Props:    &ExchangeProperties{Internal: false},
+		Bindings: map[string][]*Binding{},
+	}
+	// Bind queues to fanout exchange
+	vh.Exchanges[exchangeName].Bindings[""] = []*Binding{
+		{Queue: queue1},
+		{Queue: queue2},
 	}
 
 	msg := &amqp.Message{
@@ -246,8 +248,8 @@ func TestHasRoutingForMessage_DirectExchange_WithBinding(t *testing.T) {
 	vh.Exchanges["direct-ex"] = &Exchange{
 		Name: "direct-ex",
 		Typ:  DIRECT,
-		Bindings: map[string][]*Queue{
-			"test.key": {queue},
+		Bindings: map[string][]*Binding{
+			"test.key": {{Queue: queue}},
 		},
 	}
 
@@ -269,7 +271,7 @@ func TestHasRoutingForMessage_DirectExchange_WithoutBinding(t *testing.T) {
 	vh.Exchanges["direct-ex"] = &Exchange{
 		Name:     "direct-ex",
 		Typ:      DIRECT,
-		Bindings: make(map[string][]*Queue),
+		Bindings: make(map[string][]*Binding),
 	}
 
 	hasRouting, err := vh.HasRoutingForMessage("direct-ex", "unbound.key")
@@ -290,8 +292,8 @@ func TestHasRoutingForMessage_DirectExchange_EmptyQueueList(t *testing.T) {
 	vh.Exchanges["direct-ex"] = &Exchange{
 		Name: "direct-ex",
 		Typ:  DIRECT,
-		Bindings: map[string][]*Queue{
-			"test.key": {}, // Empty queue list
+		Bindings: map[string][]*Binding{
+			"test.key": {},
 		},
 	}
 
@@ -316,9 +318,8 @@ func TestHasRoutingForMessage_FanoutExchange_WithQueues(t *testing.T) {
 	vh.Exchanges["fanout-ex"] = &Exchange{
 		Name: "fanout-ex",
 		Typ:  FANOUT,
-		Queues: map[string]*Queue{
-			"queue1": queue1,
-			"queue2": queue2,
+		Bindings: map[string][]*Binding{
+			"": {{Queue: queue1}, {Queue: queue2}},
 		},
 	}
 
@@ -346,9 +347,9 @@ func TestHasRoutingForMessage_FanoutExchange_WithoutQueues(t *testing.T) {
 	}
 
 	vh.Exchanges["fanout-ex"] = &Exchange{
-		Name:   "fanout-ex",
-		Typ:    FANOUT,
-		Queues: make(map[string]*Queue),
+		Name:     "fanout-ex",
+		Typ:      FANOUT,
+		Bindings: make(map[string][]*Binding),
 	}
 	hasRouting, err := vh.HasRoutingForMessage("fanout-ex", "any.key")
 	if err != nil {

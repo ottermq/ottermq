@@ -9,11 +9,10 @@ import (
 )
 
 type Exchange struct {
-	Name     string              `json:"name"`
-	Queues   map[string]*Queue   `json:"queues"` // Queues bound directly to this exchange using queue name (e.g., for fanout)
-	Typ      ExchangeType        `json:"type"`
-	Bindings map[string][]*Queue `json:"bindings"` // RoutingKey to Queues bindings
-	Props    *ExchangeProperties `json:"properties"`
+	Name     string                `json:"name"`
+	Typ      ExchangeType          `json:"type"`
+	Bindings map[string][]*Binding `json:"bindings"`
+	Props    *ExchangeProperties   `json:"properties"`
 }
 
 type ExchangeProperties struct {
@@ -68,8 +67,7 @@ func NewExchange(name string, typ ExchangeType, props *ExchangeProperties) *Exch
 	return &Exchange{
 		Name:     name,
 		Typ:      typ,
-		Queues:   make(map[string]*Queue),
-		Bindings: make(map[string][]*Queue),
+		Bindings: make(map[string][]*Binding),
 		Props:    props,
 	}
 }
@@ -200,7 +198,7 @@ func (vh *VHost) checkAutoDeleteExchangeUnlocked(name string) (bool, error) {
 		return false, fmt.Errorf("exchange %s not found", name)
 	}
 
-	if exchange.Props.AutoDelete && len(exchange.Bindings) == 0 && len(exchange.Queues) == 0 {
+	if exchange.Props.AutoDelete && len(exchange.Bindings) == 0 {
 		log.Debug().Str("exchange", name).Msg("Auto-deleting exchange")
 		if err := vh.deleteExchangeUnlocked(name); err != nil {
 			return false, fmt.Errorf("failed to auto-delete exchange %s: %v", name, err)

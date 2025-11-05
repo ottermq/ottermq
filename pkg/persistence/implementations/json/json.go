@@ -215,7 +215,7 @@ func (jp *JsonPersistence) LoadExchangeBindings(vhost string, exchange string) (
 }
 
 // DeleteBindingState deletes a binding between an exchange and a queue
-func (jp *JsonPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+func (jp *JsonPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
 	exchangeType, props, err := jp.LoadExchangeMetadata(vhost, exchange)
 	if err != nil {
 		return fmt.Errorf("failed to load exchange for binding: %v", err)
@@ -228,7 +228,7 @@ func (jp *JsonPersistence) DeleteBindingState(vhost, exchange, queue, routingKey
 	// Filter out the binding to be deleted
 	var updatedBindings []persistence.BindingData
 	for _, b := range existingBindings {
-		if !(b.QueueName == queue && b.RoutingKey == routingKey) {
+		if !(b.QueueName == queue && b.RoutingKey == routingKey && equalArgs(b.Arguments, arguments)) {
 			updatedBindings = append(updatedBindings, b)
 		}
 	}
