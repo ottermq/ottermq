@@ -319,8 +319,7 @@ func TestHasRoutingForMessage_FanoutExchange_WithQueues(t *testing.T) {
 		Name: "fanout-ex",
 		Typ:  FANOUT,
 		Bindings: map[string][]*Binding{
-			"queue1": {{Queue: queue1}},
-			"queue2": {{Queue: queue2}},
+			"": {{Queue: queue1}, {Queue: queue2}},
 		},
 	}
 

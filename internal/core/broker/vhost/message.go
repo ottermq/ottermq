@@ -182,7 +182,8 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 		return ok && len(queues) > 0, nil
 	case FANOUT:
 		// For fanout exchanges, check if there are any bound queues
-		return len(vh.listFanoutQueues(exchangeName)) > 0, nil
+		// Use unlocked version since we already hold the lock
+		return len(vh.listFanoutQueuesUnlocked(exchange)) > 0, nil
 	case TOPIC:
 		// TODO: Implement topic routing check (needs pattern matching)
 		return false, nil

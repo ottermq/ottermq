@@ -50,7 +50,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
 
 	case FANOUT:
-		routingKey = "" // ignore routing key for fanout exchanges
+		routingKey = "" // Fanout exchanges ignore routing keys; store all bindings under empty key
 		for _, b := range exchange.Bindings[routingKey] {
 			// verify binding uniqueness
 			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
@@ -94,8 +94,8 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_UNBIND))
 	}
 
-	// TODO: use args to identify the binding uniquely
-	// if they didn't match, raise 406 (PRECONDITION_FAILED)
+	// Note: Binding arguments are already used to identify bindings uniquely in DeleteBindingUnlocked
+	// Returns 404 NOT_FOUND if binding with matching args doesn't exist
 
 	// TODO: deal with queue exclusivity and raise 403 (ACCESS_REFUSED) if needed
 
@@ -115,7 +115,7 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 	}
 
 	if exchange.Props.Durable && queue.Props.Durable {
-		// it is ignoring the args. TODO: use args to identify the binding uniquely
+		// Persist the binding removal with arguments
 		err := vh.persist.DeleteBindingState(vh.Name, exchangeName, queueName, routingKey, args)
 		if err != nil {
 			log.Printf("Failed to delete binding state: %v", err)
@@ -166,6 +166,10 @@ func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey
 }
 
 func bindingArgumentsMatch(a, b map[string]interface{}) bool {
+	// For AMQP purposes, nil and empty maps are equivalent (no arguments)
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
 	if len(a) != len(b) {
 		return false
 	}
@@ -177,6 +181,15 @@ func bindingArgumentsMatch(a, b map[string]interface{}) bool {
 	return true
 }
 
+// listFanoutQueuesUnlocked is an internal helper that assumes vh.mu is already locked
+func (vh *VHost) listFanoutQueuesUnlocked(exchange *Exchange) []string {
+	var queues []string
+	for _, binding := range exchange.Bindings[""] {
+		queues = append(queues, binding.Queue.Name)
+	}
+	return queues
+}
+
 func (vh *VHost) listFanoutQueues(exchangeName string) []string {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -186,9 +199,5 @@ func (vh *VHost) listFanoutQueues(exchangeName string) []string {
 		return nil
 	}
 
-	var queues []string
-	for _, binding := range exchange.Bindings[""] {
-		queues = append(queues, binding.Queue.Name)
-	}
-	return queues
+	return vh.listFanoutQueuesUnlocked(exchange)
 }
