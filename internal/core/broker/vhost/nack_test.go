@@ -33,7 +33,7 @@ func (s *stubPersistence) SaveBindingState(vhost, exchange, queue, routingKey st
 func (s *stubPersistence) LoadExchangeBindings(vhost, exchange string) ([]p.BindingData, error) {
 	return nil, nil
 }
-func (s *stubPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+func (s *stubPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, args map[string]any) error {
 	return nil
 }
 func (s *stubPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps p.MessageProperties) error {

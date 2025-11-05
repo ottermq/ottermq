@@ -7,10 +7,10 @@ import (
 
 func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties, bindings []persistence.BindingData) {
 	ex := &Exchange{
-		Name:     name,
-		Typ:      ExchangeType(typ),
-		Queues:   make(map[string]*Queue),
-		Bindings: make(map[string][]*Queue),
+		Name: name,
+		Typ:  ExchangeType(typ),
+		// Queues:   make(map[string]*Queue),
+		Bindings: make(map[string][]*Binding),
 		Props: &ExchangeProperties{
 			Durable:    props.Durable,
 			AutoDelete: props.AutoDelete,
@@ -24,7 +24,12 @@ func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangePro
 		if !ok {
 			continue
 		}
-		ex.Bindings[binding.RoutingKey] = append(ex.Bindings[binding.RoutingKey], queue)
+		ex.Bindings[binding.RoutingKey] = append(ex.Bindings[binding.RoutingKey], &Binding{
+			Queue:      queue,
+			RoutingKey: binding.RoutingKey,
+			Args:       binding.Arguments,
+		})
+		// ex.Queues[binding.QueueName] = queue
 	}
 
 	vh.Exchanges[ex.Name] = ex

@@ -350,7 +350,7 @@ func TestBindings_SaveLoad_Deduplicate_Delete(t *testing.T) {
 	}
 
 	// Delete the second binding
-	if err := jsonPersistence.DeleteBindingState(vhostName, exchangeName, "q2", "rk2"); err != nil {
+	if err := jsonPersistence.DeleteBindingState(vhostName, exchangeName, "q2", "rk2", nil); err != nil {
 		t.Fatalf("DeleteBindingState failed: %v", err)
 	}
 	bindings, err = jsonPersistence.LoadExchangeBindings(vhostName, exchangeName)

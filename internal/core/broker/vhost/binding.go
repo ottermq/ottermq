@@ -2,11 +2,18 @@ package vhost
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
+
+type Binding struct {
+	Queue      *Queue
+	RoutingKey string
+	Args       map[string]any
+}
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
@@ -14,7 +21,7 @@ func (vh *VHost) BindToDefaultExchange(queueName string) error {
 }
 
 // BindQueue binds a queue to an exchange with a given routing key.
-func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}) error {
+func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]any) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -27,19 +34,31 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 	if !ok {
 		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
-
+	newBinding := &Binding{
+		Queue:      queue,
+		RoutingKey: routingKey,
+		Args:       args,
+	}
 	switch exchange.Typ {
 	case DIRECT:
-		for _, q := range exchange.Bindings[routingKey] {
-			if q.Name == queueName {
-				log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Str("routing_key", routingKey).Msg("Queue already bound to exchange")
-				return nil
+		for _, b := range exchange.Bindings[routingKey] {
+			// verify binding uniqueness
+			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
+				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s' with routing key '%s'", queueName, exchangeName, routingKey), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 			}
 		}
-		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
+		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
 
 	case FANOUT:
-		exchange.Queues[queueName] = queue
+		routingKey = "" // ignore routing key for fanout exchanges
+		for _, b := range exchange.Bindings[routingKey] {
+			// verify binding uniqueness
+			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
+				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s'", queueName, exchangeName), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+			}
+		}
+
+		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
 	}
 
 	if exchange.Props.Durable && queue.Props.Durable {
@@ -49,6 +68,16 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		}
 	}
 	return nil
+}
+
+func (*VHost) bindingExist(b *Binding, queueName string, routingKey string, args map[string]interface{}, exchangeName string) bool {
+	if b.Queue.Name == queueName &&
+		b.RoutingKey == routingKey &&
+		bindingArgumentsMatch(b.Args, args) {
+		log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Str("routing_key", routingKey).Msg("Queue already bound to exchange")
+		return true
+	}
+	return false
 }
 
 func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}) error {
@@ -72,18 +101,22 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 
 	switch exchange.Typ {
 	case DIRECT:
-		err := vh.DeleteBindingUnlocked(exchange, queueName, routingKey)
+		err := vh.DeleteBindingUnlocked(exchange, queueName, routingKey, args)
 		if err != nil {
 			return err
 		}
 
 	case FANOUT:
-		delete(exchange.Queues, queueName)
+		routingKey = "" // ignore routing key for fanout exchanges
+		err := vh.DeleteBindingUnlocked(exchange, queueName, routingKey, args)
+		if err != nil {
+			return err
+		}
 	}
 
 	if exchange.Props.Durable && queue.Props.Durable {
 		// it is ignoring the args. TODO: use args to identify the binding uniquely
-		err := vh.persist.DeleteBindingState(vh.Name, exchangeName, queueName, routingKey /*, exchange.Props.Arguments*/)
+		err := vh.persist.DeleteBindingState(vh.Name, exchangeName, queueName, routingKey, args)
 		if err != nil {
 			log.Printf("Failed to delete binding state: %v", err)
 		}
@@ -92,7 +125,7 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 	return nil
 }
 
-func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey string) error {
+func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey string, args map[string]interface{}) error {
 	queues, ok := exchange.Bindings[routingKey]
 	if !ok {
 		log.Printf("No bindings found for routing key '%s' in exchange '%s'", routingKey, exchange.Name)
@@ -102,8 +135,9 @@ func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey
 	// Find queue in the bindings
 	var index int
 	found := false
-	for i, q := range queues {
-		if q.Name == queueName {
+	for i, b := range queues {
+		if b.Queue.Name == queueName &&
+			bindingArgumentsMatch(b.Args, args) {
 			index = i
 			found = true
 			break
@@ -129,4 +163,32 @@ func (vh *VHost) DeleteBindingUnlocked(exchange *Exchange, queueName, routingKey
 		}
 	}
 	return nil
+}
+
+func bindingArgumentsMatch(a, b map[string]interface{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || !reflect.DeepEqual(v, bv) {
+			return false
+		}
+	}
+	return true
+}
+
+func (vh *VHost) listFanoutQueues(exchangeName string) []string {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	exchange, ok := vh.Exchanges[exchangeName]
+	if !ok {
+		return nil
+	}
+
+	var queues []string
+	for _, binding := range exchange.Bindings[""] {
+		queues = append(queues, binding.Queue.Name)
+	}
+	return queues
 }

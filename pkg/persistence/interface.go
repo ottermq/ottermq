@@ -25,7 +25,7 @@ type Persistence interface {
 	// LoadExchangeBindings loads a binding between an exchange and a queue
 	LoadExchangeBindings(vhost, exchange string) ([]BindingData, error)
 	// DeleteBindingState deletes a binding between an exchange and a queue
-	DeleteBindingState(vhost, exchange, queue, routingKey string) error
+	DeleteBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error
 
 	// Message operations (to be defined)
 	SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps MessageProperties) error

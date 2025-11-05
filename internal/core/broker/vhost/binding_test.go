@@ -168,19 +168,19 @@ func TestUnbindQueue_MultipleBindings(t *testing.T) {
 	}
 
 	// Verify queue1 and queue3 are still bound
-	boundQueues := exchange.Bindings[routingKey]
+	bindings := exchange.Bindings[routingKey]
 	hasQueue1 := false
 	hasQueue3 := false
 	hasQueue2 := false
 
-	for _, q := range boundQueues {
-		if q.Name == "queue1" {
+	for _, b := range bindings {
+		if b.Queue.Name == "queue1" {
 			hasQueue1 = true
 		}
-		if q.Name == "queue3" {
+		if b.Queue.Name == "queue3" {
 			hasQueue3 = true
 		}
-		if q.Name == "queue2" {
+		if b.Queue.Name == "queue2" {
 			hasQueue2 = true
 		}
 	}
@@ -239,8 +239,22 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	}
 
 	exchange := vh.Exchanges[exchangeName]
-	if _, exists := exchange.Queues[queueName]; !exists {
-		t.Fatal("Expected queue to be in fanout exchange")
+	// if _, exists := exchange.Bindings[queueName]; !exists {
+	// 	t.Fatal("Expected queue to be in fanout exchange")
+	// }
+	// Verify binding exists
+	if _, exists := exchange.Bindings[""]; !exists {
+		t.Fatal("Expected routing key '' to exist for fanout exchange")
+	}
+	found := false
+	for _, b := range exchange.Bindings[""] {
+		if b.Queue.Name == queueName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("Expected queue to be in fanout exchange bindings")
 	}
 
 	// Unbind queue
@@ -250,8 +264,15 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	}
 
 	// Verify queue removed from fanout exchange
-	if _, exists := exchange.Queues[queueName]; exists {
-		t.Error("Expected queue to be removed from fanout exchange")
+	// if _, exists := exchange.Queues[queueName]; exists {
+	// 	t.Error("Expected queue to be removed from fanout exchange")
+	// }
+	if _, exists := exchange.Bindings[""]; exists {
+		for _, b := range exchange.Bindings[""] {
+			if b.Queue.Name == queueName {
+				t.Error("Expected queue to be removed from fanout exchange")
+			}
+		}
 	}
 }
 
@@ -323,7 +344,7 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 	exchange := &Exchange{
 		Name:     "test-exchange",
 		Typ:      DIRECT,
-		Bindings: make(map[string][]*Queue),
+		Bindings: make(map[string][]*Binding),
 		Props:    &ExchangeProperties{},
 	}
 
@@ -331,10 +352,17 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 	_ = &Queue{Name: "queue2"}
 
 	// Add queue1 to binding
-	exchange.Bindings["test.key"] = []*Queue{queue1}
+	// exchange.Bindings["test.key"] = []*Queue{queue1}
+	exchange.Bindings["test.key"] = []*Binding{
+		{
+			Queue:      queue1,
+			RoutingKey: "test.key",
+			Args:       nil,
+		},
+	}
 
 	// Try to remove queue2 which is not in the binding list
-	err := vh.DeleteBindingUnlocked(exchange, "queue2", "test.key")
+	err := vh.DeleteBindingUnlocked(exchange, "queue2", "test.key", nil)
 
 	if err == nil {
 		t.Fatal("Expected error when queue not in binding list")

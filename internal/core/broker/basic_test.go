@@ -498,7 +498,7 @@ func TestBasicPublishHandler_WithMandatoryFlag_NoRouting(t *testing.T) {
 	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
 		Name:     "no-route-ex",
 		Typ:      vhost.DIRECT,
-		Bindings: make(map[string][]*vhost.Queue),
+		Bindings: make(map[string][]*vhost.Binding),
 		Props:    &vhost.ExchangeProperties{Internal: false},
 	}
 
@@ -557,8 +557,10 @@ func TestBasicPublishHandler_WithMandatoryFlag_WithRouting(t *testing.T) {
 	vh.Exchanges["routed-ex"] = &vhost.Exchange{
 		Name: "routed-ex",
 		Typ:  vhost.DIRECT,
-		Bindings: map[string][]*vhost.Queue{
-			"routed.key": {queue},
+		Bindings: map[string][]*vhost.Binding{
+			"routed.key": {{
+				Queue: queue,
+			}},
 		},
 		Props: &vhost.ExchangeProperties{Internal: false},
 	}
@@ -618,7 +620,7 @@ func TestBasicPublishHandler_WithoutMandatoryFlag_NoRouting(t *testing.T) {
 	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
 		Name:     "no-route-ex",
 		Typ:      vhost.DIRECT,
-		Bindings: make(map[string][]*vhost.Queue),
+		Bindings: make(map[string][]*vhost.Binding),
 		Props:    &vhost.ExchangeProperties{Internal: false},
 	}
 

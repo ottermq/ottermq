@@ -233,10 +233,10 @@ func (vh *VHost) deleteQueueUnlocked(name string) error {
 		// Routing keys to bindings
 		switch exchange.Typ {
 		case DIRECT:
-			for rk, queues := range exchange.Bindings {
-				for i, q := range queues {
-					if q.Name == name {
-						exchange.Bindings[rk] = append(queues[:i], queues[i+1:]...)
+			for rk, bindings := range exchange.Bindings {
+				for i, b := range bindings {
+					if b.Queue.Name == name {
+						exchange.Bindings[rk] = append(bindings[:i], bindings[i+1:]...)
 						break
 					}
 				}
@@ -251,8 +251,24 @@ func (vh *VHost) deleteQueueUnlocked(name string) error {
 				}
 			}
 		case FANOUT:
-			if _, ok := exchange.Queues[name]; ok {
-				delete(exchange.Queues, name)
+			// if _, ok := exchange.Queues[name]; ok {
+			// 	delete(exchange.Queues, name)
+			// 	// Check if the exchange can be auto-deleted
+			// 	if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
+			// 		log.Printf("Failed to check auto-delete exchange: %v", err)
+			// 	} else if deleted {
+			// 		log.Printf("Exchange %s was auto-deleted", exchange.Name)
+			// 	}
+			// }
+			bindings := exchange.Bindings[""]
+			for i, b := range bindings {
+				if b.Queue.Name == name {
+					exchange.Bindings[""] = append(bindings[:i], bindings[i+1:]...)
+					break
+				}
+			}
+			if len(exchange.Bindings[""]) == 0 {
+				delete(exchange.Bindings, "")
 				// Check if the exchange can be auto-deleted
 				if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
 					log.Printf("Failed to check auto-delete exchange: %v", err)
