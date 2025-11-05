@@ -251,15 +251,6 @@ func (vh *VHost) deleteQueueUnlocked(name string) error {
 				}
 			}
 		case FANOUT:
-			// if _, ok := exchange.Queues[name]; ok {
-			// 	delete(exchange.Queues, name)
-			// 	// Check if the exchange can be auto-deleted
-			// 	if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
-			// 		log.Printf("Failed to check auto-delete exchange: %v", err)
-			// 	} else if deleted {
-			// 		log.Printf("Exchange %s was auto-deleted", exchange.Name)
-			// 	}
-			// }
 			bindings := exchange.Bindings[""]
 			for i, b := range bindings {
 				if b.Queue.Name == name {

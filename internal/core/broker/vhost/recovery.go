@@ -7,9 +7,8 @@ import (
 
 func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties, bindings []persistence.BindingData) {
 	ex := &Exchange{
-		Name: name,
-		Typ:  ExchangeType(typ),
-		// Queues:   make(map[string]*Queue),
+		Name:     name,
+		Typ:      ExchangeType(typ),
 		Bindings: make(map[string][]*Binding),
 		Props: &ExchangeProperties{
 			Durable:    props.Durable,
@@ -29,7 +28,6 @@ func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangePro
 			RoutingKey: binding.RoutingKey,
 			Args:       binding.Arguments,
 		})
-		// ex.Queues[binding.QueueName] = queue
 	}
 
 	vh.Exchanges[ex.Name] = ex

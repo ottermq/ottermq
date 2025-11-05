@@ -239,9 +239,6 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	}
 
 	exchange := vh.Exchanges[exchangeName]
-	// if _, exists := exchange.Bindings[queueName]; !exists {
-	// 	t.Fatal("Expected queue to be in fanout exchange")
-	// }
 	// Verify binding exists
 	if _, exists := exchange.Bindings[""]; !exists {
 		t.Fatal("Expected routing key '' to exist for fanout exchange")
@@ -264,9 +261,6 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	}
 
 	// Verify queue removed from fanout exchange
-	// if _, exists := exchange.Queues[queueName]; exists {
-	// 	t.Error("Expected queue to be removed from fanout exchange")
-	// }
 	if _, exists := exchange.Bindings[""]; exists {
 		for _, b := range exchange.Bindings[""] {
 			if b.Queue.Name == queueName {
@@ -352,7 +346,6 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 	_ = &Queue{Name: "queue2"}
 
 	// Add queue1 to binding
-	// exchange.Bindings["test.key"] = []*Queue{queue1}
 	exchange.Bindings["test.key"] = []*Binding{
 		{
 			Queue:      queue1,

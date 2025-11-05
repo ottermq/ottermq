@@ -87,7 +87,6 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 	// Create queue and bind (use NewQueue to avoid nil channel)
 	q := NewQueue("q_fanout", 10)
 	vh.Queues["q_fanout"] = q
-	// ex.Bindings["q_fanout"] = []*Binding{{Queue: q}}
 	ex.Bindings[""] = []*Binding{{Queue: q}}
 
 	// Delete the queue
