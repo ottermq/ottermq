@@ -90,6 +90,34 @@ func createQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
 	return frame
 }
 
+func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
+	switch methodID {
+	case uint16(QUEUE_DECLARE):
+		log.Debug().Msg("Received QUEUE_DECLARE frame")
+		return parseQueueDeclareFrame(payload)
+
+	case uint16(QUEUE_DECLARE_OK):
+		log.Debug().Msg("Received QUEUE_DECLARE_OK frame \n")
+		// TODO: return the appropriate exception
+		return nil, fmt.Errorf("server should not receive QUEUE_DECLARE_OK frames from clients")
+
+	case uint16(QUEUE_BIND):
+		log.Debug().Msg("Received QUEUE_BIND frame")
+		return parseQueueBindFrame(payload)
+
+	case uint16(QUEUE_DELETE):
+		log.Debug().Msg("Received QUEUE_DELETE frame")
+		return parseQueueDeleteFrame(payload)
+
+	case uint16(QUEUE_UNBIND):
+		log.Debug().Msg("Received QUEUE_UNBIND frame")
+		return parseQueueUnbindFrame(payload)
+	default:
+		return nil, fmt.Errorf("unknown method ID: %d", methodID)
+	}
+}
+
+// parseQueueDeclareFrame parses a QUEUE_DECLARE frame payload and returns a RequestMethodMessage.
 func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
@@ -146,33 +174,62 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	return request, nil
 }
 
-func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
-	switch methodID {
-	case uint16(QUEUE_DECLARE):
-		log.Debug().Msg("Received QUEUE_DECLARE frame")
-		return parseQueueDeclareFrame(payload)
-
-	case uint16(QUEUE_DECLARE_OK):
-		log.Debug().Msg("Received QUEUE_DECLARE_OK frame \n")
-		// TODO: return the appropriate exception
-		return nil, fmt.Errorf("server should not receive QUEUE_DECLARE_OK frames from clients")
-
-	case uint16(QUEUE_BIND):
-		log.Debug().Msg("Received QUEUE_BIND frame")
-		return parseQueueBindFrame(payload)
-
-	case uint16(QUEUE_DELETE):
-		log.Debug().Msg("Received QUEUE_DELETE frame")
-		return parseQueueDeleteFrame(payload)
-
-	case uint16(QUEUE_UNBIND):
-		log.Debug().Msg("Received QUEUE_UNBIND frame")
-		return parseQueueUnbindFrame(payload)
-	default:
-		return nil, fmt.Errorf("unknown method ID: %d", methodID)
+// parseQueueBindFrame parses a QUEUE_BIND frame payload and returns a RequestMethodMessage.
+func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
+	if len(payload) < 6 {
+		return nil, fmt.Errorf("payload too short")
 	}
+	log.Printf("[DEBUG] Received QUEUE_BIND frame %x \n", payload)
+	buf := bytes.NewReader(payload)
+	reserverd1, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	if reserverd1 != 0 {
+		return nil, fmt.Errorf("reserved1 must be 0")
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue name: %v", err)
+	}
+	exchange, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
+	}
+	log.Printf("[DEBUG] Exchange name: %s\n", exchange)
+	routingKey, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode routing key: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"noWait"}, true)
+	noWait := flags["noWait"]
+	arguments := make(map[string]any)
+	if buf.Len() > 4 {
+		argumentsStr, _ := DecodeLongStr(buf)
+		arguments, err = DecodeTable([]byte(argumentsStr))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read arguments: %v", err)
+		}
+	}
+	msg := &QueueBindMessage{
+		Queue:      queue,
+		Exchange:   exchange,
+		RoutingKey: routingKey,
+		NoWait:     noWait,
+		Arguments:  arguments,
+	}
+	request := &RequestMethodMessage{
+		Content: msg,
+	}
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
+	return request, nil
 }
 
+// parseQueueUnbindFrame parses a QUEUE_UNBIND frame payload and returns a RequestMethodMessage.
 func parseQueueUnbindFrame(payload []byte) (any, error) {
 	// Expected fields:
 	// reserved1(shortint),
@@ -222,11 +279,7 @@ func parseQueueUnbindFrame(payload []byte) (any, error) {
 
 }
 
-// Fields:
-// 0-1: reserved short int
-// 2: exchange name - length (short)
-// 3: if-unused - (bit)
-// 4: no-wait - (bit)
+// parseQueueBindFrame parses a QUEUE_BIND frame payload and returns a RequestMethodMessage.
 func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
@@ -257,60 +310,6 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 		QueueName: exchangeName,
 		IfUnused:  ifUnused,
 		NoWait:    noWait,
-	}
-	request := &RequestMethodMessage{
-		Content: msg,
-	}
-	log.Debug().Interface("queue", msg).Msg("Queue formatted")
-	return request, nil
-}
-
-func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 6 {
-		return nil, fmt.Errorf("payload too short")
-	}
-	log.Printf("[DEBUG] Received QUEUE_BIND frame %x \n", payload)
-	buf := bytes.NewReader(payload)
-	reserverd1, err := DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserverd1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
-	}
-	queue, err := DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode queue name: %v", err)
-	}
-	exchange, err := DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
-	}
-	log.Printf("[DEBUG] Exchange name: %s\n", exchange)
-	routingKey, err := DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode routing key: %v", err)
-	}
-	octet, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read octet: %v", err)
-	}
-	flags := DecodeFlags(octet, []string{"noWait"}, true)
-	noWait := flags["noWait"]
-	arguments := make(map[string]any)
-	if buf.Len() > 4 {
-		argumentsStr, _ := DecodeLongStr(buf)
-		arguments, err = DecodeTable([]byte(argumentsStr))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read arguments: %v", err)
-		}
-	}
-	msg := &QueueBindMessage{
-		Queue:      queue,
-		Exchange:   exchange,
-		RoutingKey: routingKey,
-		NoWait:     noWait,
-		Arguments:  arguments,
 	}
 	request := &RequestMethodMessage{
 		Content: msg,
