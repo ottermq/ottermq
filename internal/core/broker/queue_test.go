@@ -49,7 +49,7 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 	conn := &mockConn{}
 
 	// Execute handler
-	_, err := queueUnbindHandler(request, vh, b, conn)
+	_, err := b.queueUnbindHandler(request, vh, conn)
 
 	if err != nil {
 		t.Fatalf("queueUnbindHandler failed: %v", err)
@@ -104,7 +104,7 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 	}
 
 	// Execute handler - should send channel.close
-	_, err := queueUnbindHandler(request, vh, b, conn)
+	_, err := b.queueUnbindHandler(request, vh, conn)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -149,7 +149,7 @@ func TestQueueUnbindHandler_InvalidContentType(t *testing.T) {
 	conn := &mockConn{}
 
 	// Execute handler
-	_, err := queueUnbindHandler(request, vh, b, conn)
+	_, err := b.queueUnbindHandler(request, vh, conn)
 
 	if err == nil {
 		t.Fatal("Expected error for invalid content type")

@@ -13,7 +13,7 @@ import (
 func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.QUEUE_DECLARE):
-		return queueDeclareHandler(request, vh, b, conn)
+		return b.queueDeclareHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_BIND):
 		return b.queueBindHandler(request, vh, conn)
@@ -64,7 +64,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		return nil, nil
 
 	case uint16(amqp.QUEUE_UNBIND):
-		return queueUnbindHandler(request, vh, b, conn)
+		return b.queueUnbindHandler(request, vh, conn)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
@@ -94,7 +94,7 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	return nil, nil
 }
 
-func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+func (b *Broker) queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	content, ok := request.Content.(*amqp.QueueUnbindMessage)
 	if !ok {
 		log.Error().Msg("Invalid content type for QueueUnbindMessage")
@@ -116,7 +116,7 @@ func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *
 	return nil, nil
 }
 
-func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	log.Debug().Interface("request", request).Msg("Received queue declare request")
 	content, ok := request.Content.(*amqp.QueueDeclareMessage)
 	if !ok {
