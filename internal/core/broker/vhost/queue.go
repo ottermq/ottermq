@@ -197,11 +197,6 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
 	if props.Exclusive {
-		// Exclusive queues are tied to the connection that declared them
-		// This is a placeholder; actual connection should be set during declaration
-		queue.OwnerConn = nil
-	}
-	if props.Exclusive {
 		queue.OwnerConn = conn
 	}
 	vh.Queues[name] = queue
@@ -226,13 +221,13 @@ func NewQueueProperties() *QueueProperties {
 	}
 }
 
-func (vh *VHost) DeleteQueue(name string) error {
+func (vh *VHost) DeleteQueuebyName(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	return vh.deleteQueueUnlocked(name)
+	return vh.deleteQueuebyNameUnlocked(name)
 }
 
-func (vh *VHost) deleteQueueUnlocked(name string) error {
+func (vh *VHost) deleteQueuebyNameUnlocked(name string) error {
 	queue, exists := vh.Queues[name]
 	if !exists {
 		return fmt.Errorf("queue %s not found", name)

@@ -49,9 +49,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		// 	return nil, fmt.Errorf("queue %s is in use", queueName)
 		// }
 
-		err := vh.DeleteQueue(queueName)
+		err := vh.DeleteQueuebyName(queueName)
 		if err != nil {
-			return nil, err
+			return sendChannelErrorResponse(err, b, conn, request)
 		}
 
 		// Honor no-wait flag
@@ -83,10 +83,9 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.BindQueue(exchange, queue, routingKey, args)
+	err := vh.BindQueue(exchange, queue, routingKey, args, conn)
 	if err != nil {
-		log.Debug().Err(err).Msg("Error binding to exchange")
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 	frame := b.framer.CreateQueueBindOkFrame(request.Channel)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
@@ -106,19 +105,9 @@ func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.UnbindQueue(exchange, queue, routingKey, args)
+	err := vh.UnbindQueue(exchange, queue, routingKey, args, conn)
 	if err != nil {
-		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendChannelClosing(conn,
-				request.Channel,
-				amqpErr.ReplyCode(),
-				amqpErr.ClassID(),
-				amqpErr.MethodID(),
-				amqpErr.ReplyText(),
-			)
-			return nil, nil
-		}
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 	frame := b.framer.CreateQueueUnbindOkFrame(request.Channel)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
@@ -145,17 +134,7 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 		Arguments:  content.Arguments,
 	}, conn)
 	if err != nil {
-		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendChannelClosing(conn,
-				request.Channel,
-				amqpErr.ReplyCode(),
-				amqpErr.ClassID(),
-				amqpErr.MethodID(),
-				amqpErr.ReplyText(),
-			)
-			return nil, nil
-		}
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 
 	err = vh.BindToDefaultExchange(queueName)
@@ -173,4 +152,18 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 		}
 	}
 	return nil, nil
+}
+
+func sendChannelErrorResponse(err error, b *Broker, conn net.Conn, request *amqp.RequestMethodMessage) (any, error) {
+	if amqpErr, ok := err.(errors.AMQPError); ok {
+		b.sendChannelClosing(conn,
+			request.Channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.ReplyText(),
+		)
+		return nil, nil
+	}
+	return nil, err
 }

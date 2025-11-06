@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -60,7 +61,7 @@ func TestDeleteQueue_AutoDeleteDirectExchange(t *testing.T) {
 	ex.Bindings["rk"] = []*Binding{{Queue: q}}
 
 	// Delete the queue
-	err := vh.DeleteQueue("q_direct")
+	err := vh.DeleteQueuebyName("q_direct")
 	if err != nil {
 		t.Fatalf("DeleteQueue failed: %v", err)
 	}
@@ -90,12 +91,39 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 	ex.Bindings[""] = []*Binding{{Queue: q}}
 
 	// Delete the queue
-	err := vh.DeleteQueue("q_fanout")
+	err := vh.DeleteQueuebyName("q_fanout")
 	if err != nil {
 		t.Fatalf("DeleteQueue failed: %v", err)
 	}
 	// Exchange should be auto-deleted
 	if _, exists := vh.Exchanges["ex_fanout"]; exists {
 		t.Errorf("Expected fanout exchange to be auto-deleted, but it still exists")
+	}
+}
+
+func TestExclusiveQueueDeletedOnConnectionClose(t *testing.T) {
+	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	// conn := &mockConn{}
+	conn := net.Conn(nil)
+
+	// Create exclusive queue
+	queue, err := vh.CreateQueue("exclusive-q", &QueueProperties{
+		Exclusive: true,
+	}, conn)
+	if err != nil {
+		t.Fatalf("Failed to create exclusive queue: %v", err)
+	}
+
+	// Verify owner is set
+	if queue.OwnerConn != conn {
+		t.Error("Expected OwnerConn to be set")
+	}
+
+	// Close connection
+	vh.CleanupConnection(conn)
+
+	// Verify queue was deleted
+	if _, exists := vh.Queues["exclusive-q"]; exists {
+		t.Error("Expected exclusive queue to be deleted on connection close")
 	}
 }

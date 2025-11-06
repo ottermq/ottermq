@@ -31,7 +31,7 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 	// Create exchange and queue
 	vh.CreateExchange("test-exchange", vhost.DIRECT, &vhost.ExchangeProperties{Durable: false})
 	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
-	vh.BindQueue("test-exchange", "test-queue", "test.key", nil)
+	vh.BindQueue("test-exchange", "test-queue", "test.key", nil, nil)
 
 	// Create unbind request
 	request := &amqp.RequestMethodMessage{

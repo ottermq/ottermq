@@ -138,7 +138,7 @@ func (a DefaultManagerApi) DeleteQueue(vhostName, queueName string) error {
 	if vh == nil {
 		return fmt.Errorf("vhost %s not found", vhostName)
 	}
-	return vh.DeleteQueue(queueName)
+	return vh.DeleteQueuebyName(queueName)
 }
 
 func (a DefaultManagerApi) GetTotalQueues() int {
