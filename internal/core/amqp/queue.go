@@ -20,6 +20,7 @@ type QueueDeclareMessage struct {
 type QueueDeleteMessage struct {
 	QueueName string
 	IfUnused  bool
+	IfEmpty   bool
 	NoWait    bool
 }
 
@@ -349,13 +350,15 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
+	flags := DecodeFlags(octet, []string{"ifUnused", "ifEmpty", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
+	ifEmpty := flags["ifEmpty"]
 	noWait := flags["noWait"]
 
 	msg := &QueueDeleteMessage{
 		QueueName: exchangeName,
 		IfUnused:  ifUnused,
+		IfEmpty:   ifEmpty,
 		NoWait:    noWait,
 	}
 	request := &RequestMethodMessage{
