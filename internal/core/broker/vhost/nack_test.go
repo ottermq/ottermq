@@ -55,14 +55,14 @@ func (s *stubPersistence) Close() error                                         
 
 func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	vh := NewVhost("test-vhost", 1000, nil)
+	var conn net.Conn = nil
 	// create queue
-	q, err := vh.CreateQueue("q1", nil)
+	q, err := vh.CreateQueue("q1", nil, conn)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// setup channel delivery state
-	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 1}
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
 	vh.mu.Lock()
@@ -107,12 +107,12 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	sp := &stubPersistence{}
 	vh := NewVhost("test-vhost", 1000, sp)
+	var conn net.Conn = nil
 	// ensure queue exists (name referenced in records)
-	if _, err := vh.CreateQueue("q1", nil); err != nil {
+	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
-	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 1}
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
 	vh.mu.Lock()
@@ -174,10 +174,10 @@ func TestHandleBasicNack_NoChannelState(t *testing.T) {
 
 func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 	vh := NewVhost("test-vhost", 1000, nil)
-	if _, err := vh.CreateQueue("q1", nil); err != nil {
+	var conn net.Conn = nil
+	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
-	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 1}
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
 	vh.mu.Lock()

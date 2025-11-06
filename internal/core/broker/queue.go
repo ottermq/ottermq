@@ -13,10 +13,13 @@ import (
 func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.QUEUE_DECLARE):
-		return queueDeclareHandler(request, vh, b, conn)
+		return b.queueDeclareHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_BIND):
 		return b.queueBindHandler(request, vh, conn)
+
+	case uint16(amqp.QUEUE_PURGE):
+		return b.queuePurgeHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_DELETE):
 		log.Debug().Interface("request", request).Msg("Received queue delete request")
@@ -49,26 +52,53 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		// 	return nil, fmt.Errorf("queue %s is in use", queueName)
 		// }
 
-		err := vh.DeleteQueue(queueName)
+		err := vh.DeleteQueuebyName(queueName)
 		if err != nil {
-			return nil, err
+			return sendChannelErrorResponse(err, b, conn, request)
 		}
 
 		// Honor no-wait flag
 		if !content.NoWait {
 			frame := b.framer.CreateQueueDeleteOkFrame(request.Channel, messageCount)
 			if err := b.framer.SendFrame(conn, frame); err != nil {
-				log.Error().Err(err).Msg("Failed to send queue delete ok frame")
+				log.Error().Err(err).Msg("Failed to send queue.delete-ok frame")
 			}
 		}
 		return nil, nil
 
 	case uint16(amqp.QUEUE_UNBIND):
-		return queueUnbindHandler(request, vh, b, conn)
+		return b.queueUnbindHandler(request, vh, conn)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) queuePurgeHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	content, ok := request.Content.(*amqp.QueuePurgeMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for QueuePurgeMessage")
+		return nil, fmt.Errorf("invalid content type for QueuePurgeMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	queueName := content.QueueName
+	var messageCount uint32 = 0
+	messageCount, err := vh.PurgeQueue(queueName, conn)
+	if err != nil {
+		return sendChannelErrorResponse(err, b, conn, request)
+	}
+
+	// Honor no-wait flag
+	if !content.NoWait {
+		frame := b.framer.CreateQueuePurgeOkFrame(request.Channel, messageCount)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue.purge-ok frame")
+			return nil, err
+		}
+		log.Debug().Str("queue_name", queueName).Uint32("message_count", messageCount).Msg("Sent Queue.PurgeOk frame")
+	}
+
+	return nil, nil
 }
 
 func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
@@ -83,10 +113,9 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.BindQueue(exchange, queue, routingKey, args)
+	err := vh.BindQueue(exchange, queue, routingKey, args, conn)
 	if err != nil {
-		log.Debug().Err(err).Msg("Error binding to exchange")
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 	frame := b.framer.CreateQueueBindOkFrame(request.Channel)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
@@ -95,7 +124,7 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	return nil, nil
 }
 
-func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+func (b *Broker) queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	content, ok := request.Content.(*amqp.QueueUnbindMessage)
 	if !ok {
 		log.Error().Msg("Invalid content type for QueueUnbindMessage")
@@ -106,19 +135,9 @@ func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.UnbindQueue(exchange, queue, routingKey, args)
+	err := vh.UnbindQueue(exchange, queue, routingKey, args, conn)
 	if err != nil {
-		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendChannelClosing(conn,
-				request.Channel,
-				amqpErr.ReplyCode(),
-				amqpErr.ClassID(),
-				amqpErr.MethodID(),
-				amqpErr.ReplyText(),
-			)
-			return nil, nil
-		}
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 	frame := b.framer.CreateQueueUnbindOkFrame(request.Channel)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
@@ -127,7 +146,7 @@ func queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *
 	return nil, nil
 }
 
-func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	log.Debug().Interface("request", request).Msg("Received queue declare request")
 	content, ok := request.Content.(*amqp.QueueDeclareMessage)
 	if !ok {
@@ -143,19 +162,9 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 		AutoDelete: content.AutoDelete,
 		Exclusive:  content.Exclusive,
 		Arguments:  content.Arguments,
-	})
+	}, conn)
 	if err != nil {
-		if amqpErr, ok := err.(errors.AMQPError); ok {
-			b.sendChannelClosing(conn,
-				request.Channel,
-				amqpErr.ReplyCode(),
-				amqpErr.ClassID(),
-				amqpErr.MethodID(),
-				amqpErr.ReplyText(),
-			)
-			return nil, nil
-		}
-		return nil, err
+		return sendChannelErrorResponse(err, b, conn, request)
 	}
 
 	err = vh.BindToDefaultExchange(queueName)
@@ -173,4 +182,18 @@ func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b 
 		}
 	}
 	return nil, nil
+}
+
+func sendChannelErrorResponse(err error, b *Broker, conn net.Conn, request *amqp.RequestMethodMessage) (any, error) {
+	if amqpErr, ok := err.(errors.AMQPError); ok {
+		b.sendChannelClosing(conn,
+			request.Channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.ReplyText(),
+		)
+		return nil, nil
+	}
+	return nil, err
 }

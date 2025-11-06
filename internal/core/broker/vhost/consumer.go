@@ -192,7 +192,7 @@ func (vh *VHost) checkAutoDeleteQueueUnlocked(name string) (bool, error) {
 		return false, nil
 	}
 
-	err := vh.deleteQueueUnlocked(name)
+	err := vh.deleteQueuebyNameUnlocked(name)
 	if err != nil {
 		return false, err
 	}
@@ -272,6 +272,27 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 		if err != nil {
 			log.Error().Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
 		}
+	}
+
+	// Clean up owned queues
+	// it is expected that some (if not all) exclusive queues was already deleted
+	// during consumer cancellation above
+	var queuesToDelete []string
+	for queueName, queue := range vh.Queues {
+		if queue.OwnerConn == connection {
+			if queue.Props.Exclusive {
+				queuesToDelete = append(queuesToDelete, queueName)
+			} else {
+				queue.OwnerConn = nil
+			}
+		}
+	}
+	for _, queueName := range queuesToDelete {
+		vh.mu.Unlock()
+		if err := vh.deleteQueuebyNameUnlocked(queueName); err != nil {
+			log.Error().Str("queue", queueName).Msg("Error deleting exclusive queue")
+		}
+		vh.mu.Lock()
 	}
 }
 

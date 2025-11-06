@@ -116,7 +116,14 @@ func (vh *VHost) loadPersistedState() {
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to load queues from persistence")
 	}
+	// create a map of skipped queues due to exclusivity
+	skippedQueues := make(map[string]bool)
 	for _, queue := range queues {
+		// if queue is exclusive, it should not be restored
+		if queue.Properties.Exclusive {
+			skippedQueues[queue.Name] = true
+			continue
+		}
 		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize)
 		vh.Queues[queue.Name].Props = &QueueProperties{
 			Durable:    queue.Properties.Durable,
@@ -164,7 +171,11 @@ func (vh *VHost) loadPersistedState() {
 		}
 		vh.Exchanges[exchange.Name] = NewExchange(exchange.Name, typ, props)
 		for _, bindingData := range exchange.Bindings {
-			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments)
+			// Skip bindings to skipped exclusive queues
+			if skippedQueues[bindingData.QueueName] {
+				continue
+			}
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments, nil)
 			if err != nil {
 				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
 			}

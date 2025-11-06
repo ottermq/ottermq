@@ -3,6 +3,7 @@ package vhost
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 type QueueArgs map[string]any
 
 type Queue struct {
-	Name     string            `json:"name"`
-	Props    *QueueProperties  `json:"properties"`
-	messages chan amqp.Message `json:"-"`
-	count    int               `json:"-"`
-	mu       sync.Mutex        `json:"-"`
+	Name      string            `json:"name"`
+	Props     *QueueProperties  `json:"properties"`
+	messages  chan amqp.Message `json:"-"`
+	count     int               `json:"-"`
+	mu        sync.Mutex        `json:"-"`
+	OwnerConn net.Conn          `json:"-"`
 	/* Delivery */
 	deliveryCtx    context.Context    `json:"-"`
 	deliveryCancel context.CancelFunc `json:"-"`
@@ -157,7 +159,7 @@ func (q *Queue) stopDeliveryLoop() {
 	q.delivering = false
 }
 
-func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {
+func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -194,6 +196,9 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	}
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
+	if props.Exclusive {
+		queue.OwnerConn = conn
+	}
 	vh.Queues[name] = queue
 
 	if props.Durable {
@@ -216,13 +221,13 @@ func NewQueueProperties() *QueueProperties {
 	}
 }
 
-func (vh *VHost) DeleteQueue(name string) error {
+func (vh *VHost) DeleteQueuebyName(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	return vh.deleteQueueUnlocked(name)
+	return vh.deleteQueuebyNameUnlocked(name)
 }
 
-func (vh *VHost) deleteQueueUnlocked(name string) error {
+func (vh *VHost) deleteQueuebyNameUnlocked(name string) error {
 	queue, exists := vh.Queues[name]
 	if !exists {
 		return fmt.Errorf("queue %s not found", name)
@@ -309,6 +314,10 @@ func (q *Queue) Push(msg amqp.Message) {
 func (q *Queue) Pop() *amqp.Message {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	return q.popUnlocked()
+}
+
+func (q *Queue) popUnlocked() *amqp.Message {
 	select {
 	case msg := <-q.messages:
 		q.count--
@@ -324,4 +333,50 @@ func (q *Queue) Len() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.count
+}
+
+func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
+	vh.mu.Lock()
+	queue, exists := vh.Queues[name]
+	vh.mu.Unlock()
+	if !exists {
+		text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
+		return 0, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_PURGE))
+	}
+
+	// Validate ownership for exclusive queues
+	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+		return 0, errors.NewChannelError(
+			fmt.Sprintf("queue '%s' is exclusive to another connection", name),
+			uint16(amqp.ACCESS_REFUSED),
+			uint16(amqp.QUEUE),
+			uint16(amqp.QUEUE_PURGE))
+	}
+	purged := queue.StreamPurge(func(msg *amqp.Message) {
+		if msg != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
+			if vh.persist != nil {
+				if err := vh.persist.DeleteMessage(vh.Name, name, msg.ID); err != nil {
+					log.Error().Err(err).Str("queue", name).Str("msg_id", msg.ID).Msg("Failed to delete persisted message during purge")
+				}
+			}
+		}
+	})
+	log.Debug().Str("queue", name).Uint32("purged_count", purged).Msg("Purged messages from queue")
+	return purged, nil
+}
+
+func (q *Queue) StreamPurge(process func(*amqp.Message)) uint32 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var purged uint32 = 0
+	for {
+		msg := q.popUnlocked()
+		if msg == nil {
+			break
+		}
+		process(msg)
+		purged++
+	}
+	return purged
 }

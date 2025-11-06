@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -17,11 +18,11 @@ type Binding struct {
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
-	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName, nil)
+	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName, nil, nil)
 }
 
 // BindQueue binds a queue to an exchange with a given routing key.
-func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]any) error {
+func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]any, conn net.Conn) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -33,6 +34,9 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 	queue, ok := vh.Queues[queueName]
 	if !ok {
 		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+	}
+	if err := vh.validateQueueOwnership(queue, conn, queueName); err != nil {
+		return err
 	}
 	newBinding := &Binding{
 		Queue:      queue,
@@ -80,7 +84,7 @@ func (*VHost) bindingExist(b *Binding, queueName string, routingKey string, args
 	return false
 }
 
-func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}) error {
+func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}, conn net.Conn) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -97,8 +101,9 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 	// Note: Binding arguments are already used to identify bindings uniquely in DeleteBindingUnlocked
 	// Returns 404 NOT_FOUND if binding with matching args doesn't exist
 
-	// TODO: deal with queue exclusivity and raise 403 (ACCESS_REFUSED) if needed
-
+	if err := vh.validateQueueOwnership(queue, conn, queueName); err != nil {
+		return err
+	}
 	switch exchange.Typ {
 	case DIRECT:
 		err := vh.DeleteBindingUnlocked(exchange, queueName, routingKey, args)
@@ -122,6 +127,17 @@ func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args ma
 		}
 	}
 	log.Debug().Str("queue", queueName).Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("Queue unbound from exchange")
+	return nil
+}
+
+func (*VHost) validateQueueOwnership(queue *Queue, conn net.Conn, queueName string) error {
+	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+		return errors.NewChannelError(
+			fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
+			uint16(amqp.ACCESS_REFUSED),
+			uint16(amqp.QUEUE),
+			uint16(amqp.QUEUE_UNBIND))
+	}
 	return nil
 }
 

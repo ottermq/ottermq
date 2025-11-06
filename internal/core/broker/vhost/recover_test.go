@@ -13,7 +13,7 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	var conn net.Conn = nil
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil)
+	q, err := vh.CreateQueue("q1", nil, conn)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	var conn net.Conn = nil
 
 	// Create queue
-	if _, err := vh.CreateQueue("q1", nil); err != nil {
+	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
@@ -149,7 +149,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 	var conn net.Conn = nil
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil)
+	q, err := vh.CreateQueue("q1", nil, conn)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	var conn net.Conn = nil
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil)
+	q, err := vh.CreateQueue("q1", nil, conn)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
