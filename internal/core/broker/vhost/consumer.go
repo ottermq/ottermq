@@ -275,7 +275,7 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 	}
 
 	// Clean up owned queues
-	// it is expected that some (if not all) exclusive queues was already deleted
+	// it is expected that some (if not all) exclusive queues were already deleted
 	// during consumer cancellation above
 	var queuesToDelete []string
 	for queueName, queue := range vh.Queues {
@@ -288,11 +288,9 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 		}
 	}
 	for _, queueName := range queuesToDelete {
-		vh.mu.Unlock()
 		if err := vh.deleteQueuebyNameUnlocked(queueName); err != nil {
 			log.Error().Str("queue", queueName).Msg("Error deleting exclusive queue")
 		}
-		vh.mu.Lock()
 	}
 }
 

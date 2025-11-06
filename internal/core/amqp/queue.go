@@ -326,7 +326,7 @@ func parseQueuePurgeFrame(payload []byte) (any, error) {
 	return request, nil
 }
 
-// parseQueueBindFrame parses a QUEUE_BIND frame payload and returns a RequestMethodMessage.
+// parseQueueDeleteFrame parses a QUEUE_DELETE frame payload and returns a RequestMethodMessage.
 func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
