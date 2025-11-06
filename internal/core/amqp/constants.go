@@ -25,6 +25,8 @@ const (
 	QUEUE_BIND_OK    QueueMethod = 21
 	QUEUE_UNBIND     QueueMethod = 50
 	QUEUE_UNBIND_OK  QueueMethod = 51
+	QUEUE_PURGE      QueueMethod = 30
+	QUEUE_PURGE_OK   QueueMethod = 31
 	QUEUE_DELETE     QueueMethod = 40
 	QUEUE_DELETE_OK  QueueMethod = 41
 )

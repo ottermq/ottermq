@@ -38,6 +38,11 @@ type QueueUnbindMessage struct {
 	Arguments  map[string]interface{}
 }
 
+type QueuePurgeMessage struct {
+	QueueName string
+	NoWait    bool
+}
+
 func createQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  channel,
@@ -63,6 +68,8 @@ func createQueueDeclareOkFrame(channel uint16, queueName string, messageCount, c
 	return frame
 }
 
+// createQueueAckFrame creates a method frame without additional content.
+// To be used for QueueBindOk and QueueUnbindOk responses.
 func createQueueAckFrame(channel, method uint16) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  channel,
@@ -73,11 +80,13 @@ func createQueueAckFrame(channel, method uint16) []byte {
 	return frame
 }
 
-func createQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
+// createQueueCountAckFrame creates a method frame with the message count.
+// To be used for QueueDeleteOk and QueuePurgeOk responses.
+func createQueueCountAckFrame(channel, methodID uint16, messageCount uint32) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(QUEUE),
-		MethodID: uint16(QUEUE_DELETE_OK),
+		MethodID: methodID,
 		Content: ContentList{
 			KeyValuePairs: []KeyValue{
 				{
@@ -104,6 +113,10 @@ func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
 	case uint16(QUEUE_BIND):
 		log.Debug().Msg("Received QUEUE_BIND frame")
 		return parseQueueBindFrame(payload)
+
+	case uint16(QUEUE_PURGE):
+		log.Debug().Msg("Received QUEUE_PURGE frame")
+		return parseQueuePurgeFrame(payload)
 
 	case uint16(QUEUE_DELETE):
 		log.Debug().Msg("Received QUEUE_DELETE frame")
@@ -277,6 +290,40 @@ func parseQueueUnbindFrame(payload []byte) (any, error) {
 	log.Debug().Interface("queue", msg).Msg("Queue formatted")
 	return request, nil
 
+}
+
+func parseQueuePurgeFrame(payload []byte) (any, error) {
+	// 2 (reserved1) => short int = 2 bytes
+	// 1+ (queue name) => short str = 1 (length) + 0+ bytes
+	// No-wait (bit) => octet = 1 byte
+	if len(payload) < 4 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	_, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	queueName, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue name: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"noWait"}, true)
+	noWait := flags["noWait"]
+
+	msg := &QueuePurgeMessage{
+		QueueName: queueName,
+		NoWait:    noWait,
+	}
+	request := &RequestMethodMessage{
+		Content: msg,
+	}
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
+	return request, nil
 }
 
 // parseQueueBindFrame parses a QUEUE_BIND frame payload and returns a RequestMethodMessage.

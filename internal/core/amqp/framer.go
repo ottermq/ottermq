@@ -30,6 +30,7 @@ type Framer interface {
 	CreateQueueBindOkFrame(channel uint16) []byte
 	CreateQueueUnbindOkFrame(channel uint16) []byte
 	CreateQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte
+	CreateQueuePurgeOkFrame(channel uint16, messageCount uint32) []byte
 
 	// Exchange Methods
 
@@ -88,8 +89,12 @@ func (d *DefaultFramer) CreateQueueUnbindOkFrame(channel uint16) []byte {
 	return createQueueAckFrame(channel, uint16(QUEUE_UNBIND_OK))
 }
 
+func (d *DefaultFramer) CreateQueuePurgeOkFrame(channel uint16, messageCount uint32) []byte {
+	return createQueueCountAckFrame(channel, uint16(QUEUE_PURGE_OK), messageCount)
+}
+
 func (d *DefaultFramer) CreateQueueDeleteOkFrame(channel uint16, messageCount uint32) []byte {
-	return createQueueDeleteOkFrame(channel, messageCount)
+	return createQueueCountAckFrame(channel, uint16(QUEUE_DELETE_OK), messageCount)
 }
 
 // ENDREGION

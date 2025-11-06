@@ -85,6 +85,10 @@ func (m *MockFramer) CreateQueueDeleteOkFrame(channel uint16, messageCount uint3
 	return []byte("queue-delete-ok")
 }
 
+func (m *MockFramer) CreateQueuePurgeOkFrame(channel uint16, messageCount uint32) []byte {
+	return []byte("queue-purge-ok")
+}
+
 func (m *MockFramer) CreateExchangeDeclareFrame(channel uint16) []byte {
 	return []byte("exchange-declare")
 }
