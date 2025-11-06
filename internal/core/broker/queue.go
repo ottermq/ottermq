@@ -55,12 +55,12 @@ func (b *Broker) queueDeleteHandler(request *amqp.RequestMethodMessage, vh *vhos
 		)
 	}
 
-	// Honor exclusive flag
-	if queue.Props.Exclusive && queue.OwnerConn == conn {
+	// Exclusive queues can only be deleted by their owning connection
+	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
 		return sendChannelErrorResponse(
 			errors.NewChannelError(
-				fmt.Sprintf("queue '%s' is exclusive and used by another connection", queueName),
-				uint16(amqp.PRECONDITION_FAILED),
+				fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
+				uint16(amqp.ACCESS_REFUSED),
 				uint16(amqp.QUEUE),
 				uint16(amqp.QUEUE_DELETE),
 			),
