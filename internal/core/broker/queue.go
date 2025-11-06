@@ -18,6 +18,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 	case uint16(amqp.QUEUE_BIND):
 		return b.queueBindHandler(request, vh, conn)
 
+	case uint16(amqp.QUEUE_PURGE):
+		return b.queuePurgeHandler(request, vh, conn)
+
 	case uint16(amqp.QUEUE_DELETE):
 		log.Debug().Interface("request", request).Msg("Received queue delete request")
 		content, ok := request.Content.(*amqp.QueueDeleteMessage)
@@ -58,7 +61,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		if !content.NoWait {
 			frame := b.framer.CreateQueueDeleteOkFrame(request.Channel, messageCount)
 			if err := b.framer.SendFrame(conn, frame); err != nil {
-				log.Error().Err(err).Msg("Failed to send queue delete ok frame")
+				log.Error().Err(err).Msg("Failed to send queue.delete-ok frame")
 			}
 		}
 		return nil, nil
@@ -69,6 +72,33 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) queuePurgeHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	content, ok := request.Content.(*amqp.QueuePurgeMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for QueuePurgeMessage")
+		return nil, fmt.Errorf("invalid content type for QueuePurgeMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	queueName := content.QueueName
+	var messageCount uint32 = 0
+	messageCount, err := vh.PurgeQueue(queueName)
+	if err != nil {
+		return sendChannelErrorResponse(err, b, conn, request)
+	}
+
+	// Honor no-wait flag
+	if !content.NoWait {
+		frame := b.framer.CreateQueuePurgeOkFrame(request.Channel, messageCount)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue.purge-ok frame")
+			return nil, err
+		}
+		log.Debug().Str("queue_name", queueName).Uint32("message_count", messageCount).Msg("Sent Queue.PurgeOk frame")
+	}
+
+	return nil, nil
 }
 
 func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {

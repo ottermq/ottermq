@@ -314,6 +314,10 @@ func (q *Queue) Push(msg amqp.Message) {
 func (q *Queue) Pop() *amqp.Message {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	return q.popUnlocked()
+}
+
+func (q *Queue) popUnlocked() *amqp.Message {
 	select {
 	case msg := <-q.messages:
 		q.count--
@@ -329,4 +333,44 @@ func (q *Queue) Len() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.count
+}
+
+func (vh *VHost) PurgeQueue(name string) (uint32, error) {
+	// fetch queue
+	// stream purge, handling persistent messages if needed
+	// return count of purged messages
+	vh.mu.Lock()
+	queue, exists := vh.Queues[name]
+	vh.mu.Unlock()
+	if !exists {
+		text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
+		return 0, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_PURGE))
+	}
+	purged := queue.StreamPurge(func(msg *amqp.Message) {
+		if msg != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
+			if vh.persist != nil {
+				if err := vh.persist.DeleteMessage(vh.Name, name, msg.ID); err != nil {
+					log.Error().Err(err).Str("queue", name).Str("msg_id", msg.ID).Msg("Failed to delete persisted message during purge")
+				}
+			}
+		}
+	})
+	log.Debug().Str("queue", name).Uint32("purged_count", purged).Msg("Purged messages from queue")
+	return purged, nil
+}
+
+func (q *Queue) StreamPurge(process func(*amqp.Message)) uint32 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var purged uint32 = 0
+	for {
+		msg := q.popUnlocked()
+		if msg == nil {
+			break
+		}
+		process(msg)
+		purged++
+	}
+	return purged
 }
