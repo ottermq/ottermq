@@ -229,9 +229,15 @@ func (vh *VHost) DeleteQueuebyName(name string) error {
 
 func (vh *VHost) deleteQueuebyNameUnlocked(name string) error {
 	queue, exists := vh.Queues[name]
-	if !exists {
-		return fmt.Errorf("queue %s not found", name)
+	if !exists { // double check
+		return errors.NewChannelError(
+			fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name),
+			uint16(amqp.NOT_FOUND),
+			uint16(amqp.QUEUE),
+			uint16(amqp.QUEUE_DELETE),
+		)
 	}
+
 	close(queue.messages)
 	// verify if there are any bindings to this queue and remove them
 	for _, exchange := range vh.Exchanges {
