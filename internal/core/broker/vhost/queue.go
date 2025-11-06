@@ -335,16 +335,22 @@ func (q *Queue) Len() int {
 	return q.count
 }
 
-func (vh *VHost) PurgeQueue(name string) (uint32, error) {
-	// fetch queue
-	// stream purge, handling persistent messages if needed
-	// return count of purged messages
+func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 	vh.mu.Lock()
 	queue, exists := vh.Queues[name]
 	vh.mu.Unlock()
 	if !exists {
 		text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
 		return 0, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_PURGE))
+	}
+
+	// Validate ownership for exclusive queues
+	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+		return 0, errors.NewChannelError(
+			fmt.Sprintf("queue '%s' is exclusive to another connection", name),
+			uint16(amqp.ACCESS_REFUSED),
+			uint16(amqp.QUEUE),
+			uint16(amqp.QUEUE_PURGE))
 	}
 	purged := queue.StreamPurge(func(msg *amqp.Message) {
 		if msg != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {

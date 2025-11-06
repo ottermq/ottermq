@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -74,7 +75,7 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 		t.Fatalf("precondition: expected 3 messages in queue, got %d", got)
 	}
 
-	purged, err := vh.PurgeQueue("q1")
+	purged, err := vh.PurgeQueue("q1", nil)
 	if err != nil {
 		t.Fatalf("PurgeQueue returned error: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
 	vh := NewVhost("/", 100, &fakePersistence{})
 
-	_, err := vh.PurgeQueue("does-not-exist")
+	_, err := vh.PurgeQueue("does-not-exist", nil)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -117,4 +118,49 @@ func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
 	if amqpErr.MethodID() != uint16(amqp.QUEUE_PURGE) {
 		t.Errorf("expected method QUEUE_PURGE, got %d", amqpErr.MethodID())
 	}
+}
+
+func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing.T) {
+	vh := NewVhost("/", 100, &fakePersistence{})
+
+	// Mock connections
+	ownerConn := &mockConn{}
+	otherConn := &mockConn{}
+
+	// Create exclusive queue with owner connection
+	_, err := vh.CreateQueue("exclusive-q", &QueueProperties{Exclusive: true}, ownerConn)
+	if err != nil {
+		t.Fatalf("CreateQueue failed: %v", err)
+	}
+
+	// Try to purge from different connection
+	_, err = vh.PurgeQueue("exclusive-q", otherConn)
+	if err == nil {
+		t.Fatalf("expected error when purging exclusive queue from wrong connection")
+	}
+
+	amqpErr, ok := err.(amqperr.AMQPError)
+	if !ok {
+		t.Fatalf("expected AMQPError, got %T (%v)", err, err)
+	}
+	if amqpErr.ReplyCode() != uint16(amqp.ACCESS_REFUSED) {
+		t.Errorf("expected ACCESS_REFUSED, got %d", amqpErr.ReplyCode())
+	}
+	if amqpErr.ClassID() != uint16(amqp.QUEUE) {
+		t.Errorf("expected class QUEUE, got %d", amqpErr.ClassID())
+	}
+	if amqpErr.MethodID() != uint16(amqp.QUEUE_PURGE) {
+		t.Errorf("expected method QUEUE_PURGE, got %d", amqpErr.MethodID())
+	}
+
+	// Owner should be able to purge
+	_, err = vh.PurgeQueue("exclusive-q", ownerConn)
+	if err != nil {
+		t.Fatalf("owner connection should be able to purge: %v", err)
+	}
+}
+
+// mockConn for testing
+type mockConn struct {
+	net.Conn
 }

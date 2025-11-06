@@ -83,7 +83,7 @@ func (b *Broker) queuePurgeHandler(request *amqp.RequestMethodMessage, vh *vhost
 	log.Debug().Interface("content", content).Msg("Content")
 	queueName := content.QueueName
 	var messageCount uint32 = 0
-	messageCount, err := vh.PurgeQueue(queueName)
+	messageCount, err := vh.PurgeQueue(queueName, conn)
 	if err != nil {
 		return sendChannelErrorResponse(err, b, conn, request)
 	}
