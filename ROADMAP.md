@@ -48,22 +48,12 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
-- [x] Consumer management system refactoring
-- [x] **`BASIC_CONSUME`** - Start consuming messages from queue
-- [x] **`BASIC_DELIVER`** - Server-initiated message delivery
-- [x] **`BASIC_CANCEL`** - Cancel consumer subscription
-- [x] **`QUEUE_UNBIND`** - Remove queue bindings (Phase 2 completion)
-  - [x] Support for DIRECT and FANOUT exchanges
-  - [x] Proper error handling with channel exceptions
-  - [x] Auto-delete exchange when last binding is removed
-  - [x] Comprehensive unit test coverage
-- [x] **Binding Structure Refactoring** (Phase 2 completion)
-  - [x] Unified `Binding` struct with queue, routing key, and arguments
-  - [x] Argument-based binding identification and validation
-  - [x] Duplicate binding detection with 406 PRECONDITION_FAILED
-  - [x] Support for multiple bindings with different arguments
-  - [x] Fanout exchange bindings unified under empty routing key
-  - [x] Foundation for future headers exchange support
+- [x] **`QUEUE_DELETE` enhancements** - if-unused and if-empty flags
+- [x] **`QUEUE_PURGE`** - Clear queue contents with persistent message deletion
+- [x] **`QUEUE_UNBIND`** - Remove queue bindings with argument matching
+- [x] **Binding Structure Refactoring** - Unified binding with argument validation
+- [x] **Consumer management** - Push/pull consumption with QoS support
+- [x] **Message acknowledgments** - ACK, NACK, REJECT, and RECOVER
 
 ### ❌ **Missing Features**
 
@@ -74,23 +64,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [ ] **`TX_ROLLBACK`** - Rollback transaction
 - [ ] **Transactional publishing/consuming**
 
-#### **Phase 2: Advanced Queue Operations (Medium Priority)**
-
-- [x] **`QUEUE_UNBIND` enhancements** - Argument validation ✅ COMPLETED
-  - [x] Binding argument matching (404 NOT_FOUND when args don't match)
-  - [x] Duplicate binding prevention (406 PRECONDITION_FAILED)
-  - [x] Unified binding structure across DIRECT and FANOUT exchanges
-  - [x] Queue exclusivity validation (403 ACCESS_REFUSED for wrong connection) ✅ IMPLEMENTED
-- [x] **`QUEUE_PURGE`** - Clear queue contents ✅ IMPLEMENTED (in-memory + persistent deletion, returns purged count)
-- [ ] **`QUEUE_DELETE` improvements** - Support if-unused and if-empty flags
-
-#### **Phase 3: Flow Control (Medium Priority)**
+#### **Phase 2: Flow Control (Medium Priority)**
 
 - [ ] **`CHANNEL_FLOW`** - Channel-level flow control
 - [ ] **`CHANNEL_FLOW_OK`** - Flow control acknowledgment
 - [ ] Backpressure handling integration
 
-#### **Phase 4: Advanced Features (Lower Priority)**
+#### **Phase 3: Advanced Features (Lower Priority)**
 
 - [ ] **Message TTL and expiration**
 - [ ] **Dead letter exchanges**
@@ -165,17 +145,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - `internal/core/broker/tx.go` (create)
 - `internal/core/broker/vhost/transaction.go` (create)
 
-### **Phase 5: Advanced Queue Operations**
-
-**Goal**: Complete queue management
-
-**Tasks**:
-
-1. Implement `QUEUE_UNBIND`
-2. Add `QUEUE_PURGE` functionality ✅ DONE
-3. Enhance `QUEUE_DELETE` with conditional flags
-
-### **Phase 6: Flow Control & Performance**
+### **Phase 5: Flow Control & Performance**
 
 **Goal**: Channel flow control and optimization
 
@@ -237,9 +207,9 @@ The highest priority is **Phase 4: Transaction Support**. Contributors should fo
 
 ## Progress Tracking
 
-**Last Updated**: October 28, 2025  
+**Last Updated**: November 6, 2025  
 **Current Focus**: Phase 4 - Transaction Support  
-**Completed**: All basic class methods (consume, deliver, ack, nack, reject, recover, qos)  
+**Completed**: All BASIC, QUEUE, EXCHANGE, CHANNEL, and CONNECTION class methods  
 **Next Milestone**: Transaction support (`TX_SELECT`, `TX_COMMIT`, `TX_ROLLBACK`)
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.
