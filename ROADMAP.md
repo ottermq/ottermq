@@ -80,8 +80,8 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Binding argument matching (404 NOT_FOUND when args don't match)
   - [x] Duplicate binding prevention (406 PRECONDITION_FAILED)
   - [x] Unified binding structure across DIRECT and FANOUT exchanges
-  - [ ] Queue exclusivity validation (403 ACCESS_REFUSED for wrong connection)
-- [ ] **`QUEUE_PURGE`** - Clear queue contents
+  - [x] Queue exclusivity validation (403 ACCESS_REFUSED for wrong connection) ✅ IMPLEMENTED
+- [x] **`QUEUE_PURGE`** - Clear queue contents ✅ IMPLEMENTED (in-memory + persistent deletion, returns purged count)
 - [ ] **`QUEUE_DELETE` improvements** - Support if-unused and if-empty flags
 
 #### **Phase 3: Flow Control (Medium Priority)**
@@ -172,7 +172,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 **Tasks**:
 
 1. Implement `QUEUE_UNBIND`
-2. Add `QUEUE_PURGE` functionality
+2. Add `QUEUE_PURGE` functionality ✅ DONE
 3. Enhance `QUEUE_DELETE` with conditional flags
 
 ### **Phase 6: Flow Control & Performance**

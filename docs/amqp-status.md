@@ -20,7 +20,7 @@ Status levels:
 | connection | 100% | Handshake and basic lifecycle supported |
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
 | exchange | 80% | direct/fanout declare implemented; missing topic pattern matching |
-| queue | 85% | declare/bind/unbind/delete with argument validation; purge planned |
+| queue | 90% | declare/bind/unbind/delete with argument validation; purge supported |
 | basic | 100% | All methods fully implemented and tested |
 | tx | 0% | Transaction support planned |
 
@@ -67,8 +67,8 @@ Status levels:
 | queue.bind-ok | ✅ | |
 | queue.unbind | ✅ | Raises channel exception on errors; see notes below |
 | queue.unbind-ok | ✅ | |
-| queue.purge | ❌ | |
-| queue.purge-ok | ❌ | |
+| queue.purge | ✅ | Deletes in-memory and persisted messages; returns purged count |
+| queue.purge-ok | ✅ | |
 | queue.delete | ⚠️ | Basic deletion works; `if-unused`/`if-empty` flags TODO |
 | queue.delete-ok | ✅ | |
 
@@ -83,6 +83,13 @@ Status levels:
 - **TODO**: Queue exclusivity validation (will raise 403 ACCESS_REFUSED)
 
 **queue.bind Implementation Notes:**
+**queue.purge Implementation Notes:**
+
+- Removes all enqueued messages from the target queue
+- For persistent messages, also deletes records from the configured persistence backend
+- Returns the number of purged messages in `queue.purge-ok`
+- Returns 404 NOT_FOUND (channel-level) if the queue does not exist
+
 
 - ✅ **Duplicate binding prevention** - Returns 406 PRECONDITION_FAILED when attempting to create an identical binding (same queue+exchange+routingKey+arguments)
 - Supports binding arguments for future headers exchange support
