@@ -22,49 +22,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		return b.queuePurgeHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_DELETE):
-		log.Debug().Interface("request", request).Msg("Received queue delete request")
-		content, ok := request.Content.(*amqp.QueueDeleteMessage)
-		if !ok {
-			log.Error().Msg("Invalid content type for QueueDeleteMessage")
-			return nil, fmt.Errorf("invalid content type for QueueDeleteMessage")
-		}
-		log.Debug().Interface("content", content).Msg("Content")
-		queueName := content.QueueName
-
-		// Get queue object and message count before deletion
-		queue, exists := vh.Queues[queueName]
-		if !exists {
-			return nil, fmt.Errorf("queue %s does not exist", queueName)
-		}
-		messageCount := uint32(queue.Len())
-		// consumerCount := uint32(0)
-		// if cc, ok := interface{}(queue).(interface{ ConsumerCount() int }); ok {
-		// 	consumerCount = uint32(cc.ConsumerCount())
-		// }
-		// TODO: Implement the following flags: if-unused, if-empty
-
-		// // Honor if-empty flag
-		// if content.IfEmpty && messageCount > 0 {
-		// 	return nil, fmt.Errorf("queue %s not empty", queueName)
-		// }
-		// // Honor if-unused flag
-		// if content.IfUnused && consumerCount > 0 {
-		// 	return nil, fmt.Errorf("queue %s is in use", queueName)
-		// }
-
-		err := vh.DeleteQueuebyName(queueName)
-		if err != nil {
-			return sendChannelErrorResponse(err, b, conn, request)
-		}
-
-		// Honor no-wait flag
-		if !content.NoWait {
-			frame := b.framer.CreateQueueDeleteOkFrame(request.Channel, messageCount)
-			if err := b.framer.SendFrame(conn, frame); err != nil {
-				log.Error().Err(err).Msg("Failed to send queue.delete-ok frame")
-			}
-		}
-		return nil, nil
+		return b.queueDeleteHandler(request, vh, conn)
 
 	case uint16(amqp.QUEUE_UNBIND):
 		return b.queueUnbindHandler(request, vh, conn)
@@ -72,6 +30,86 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) queueDeleteHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	log.Debug().Interface("request", request).Msg("Received queue delete request")
+	content, ok := request.Content.(*amqp.QueueDeleteMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for QueueDeleteMessage")
+		return nil, fmt.Errorf("invalid content type for QueueDeleteMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	queueName := content.QueueName
+
+	queue, exists := vh.Queues[queueName]
+	if !exists {
+		return sendChannelErrorResponse(
+			errors.NewChannelError(
+				fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name),
+				uint16(amqp.NOT_FOUND),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DELETE),
+			),
+			b, conn, request,
+		)
+	}
+
+	// Exclusive queues can only be deleted by their owning connection
+	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+		return sendChannelErrorResponse(
+			errors.NewChannelError(
+				fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
+				uint16(amqp.ACCESS_REFUSED),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DELETE),
+			),
+			b, conn, request,
+		)
+	}
+
+	// Honor if-unused flag
+	activeConsumers := vh.GetActiveConsumersForQueue(queueName)
+	consumerCount := uint32(len(activeConsumers))
+	if content.IfUnused && consumerCount > 0 {
+		return sendChannelErrorResponse(
+			errors.NewChannelError(
+				fmt.Sprintf("queue '%s' in use - has %d consumers", queueName, consumerCount),
+				uint16(amqp.PRECONDITION_FAILED),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DELETE),
+			),
+			b, conn, request,
+		)
+	}
+
+	// Honor if-empty flag
+	messageCount := uint32(queue.Len())
+	if content.IfEmpty && messageCount > 0 {
+		return sendChannelErrorResponse(
+			errors.NewChannelError(
+				fmt.Sprintf("queue '%s' not empty - has %d messages", queueName, messageCount),
+				uint16(amqp.PRECONDITION_FAILED),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DELETE),
+			),
+			b, conn, request,
+		)
+	}
+
+	err := vh.DeleteQueuebyName(queueName)
+	if err != nil {
+		return sendChannelErrorResponse(err, b, conn, request)
+	}
+
+	// Honor no-wait flag
+	if !content.NoWait {
+		frame := b.framer.CreateQueueDeleteOkFrame(request.Channel, messageCount)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue.delete-ok frame")
+		}
+	}
+	return nil, nil
 }
 
 func (b *Broker) queuePurgeHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {

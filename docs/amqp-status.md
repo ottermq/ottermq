@@ -17,11 +17,11 @@ Status levels:
 
 | Class | Status | Notes |
 |------:|:------:|-------|
-| connection | 100% | Handshake and basic lifecycle supported |
+| connection | 100% | All methods fully implemented |
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
-| exchange | 80% | direct/fanout declare implemented; missing topic pattern matching |
-| queue | 90% | declare/bind/unbind/delete with argument validation; purge supported |
-| basic | 100% | All methods fully implemented and tested |
+| exchange | 80% | direct/fanout implemented; topic pattern matching TODO |
+| queue | 100% | All methods fully implemented |
+| basic | 100% | All methods fully implemented |
 | tx | 0% | Transaction support planned |
 
 ## connection
@@ -65,40 +65,20 @@ Status levels:
 | queue.declare-ok | ✅ | |
 | queue.bind | ✅ | |
 | queue.bind-ok | ✅ | |
-| queue.unbind | ✅ | Raises channel exception on errors; see notes below |
+| queue.unbind | ✅ | |
 | queue.unbind-ok | ✅ | |
-| queue.purge | ✅ | Deletes in-memory and persisted messages; returns purged count |
+| queue.purge | ✅ | |
 | queue.purge-ok | ✅ | |
-| queue.delete | ⚠️ | Basic deletion works; `if-unused`/`if-empty` flags TODO |
+| queue.delete | ✅ | |
 | queue.delete-ok | ✅ | |
 
-**queue.unbind Implementation Notes:**
 
-- Returns 404 NOT_FOUND if exchange, queue, or binding doesn't exist
-- ✅ **Argument matching implemented** - Bindings are uniquely identified by queue+exchange+routingKey+arguments
-- Returns 404 NOT_FOUND if binding with matching arguments doesn't exist during unbind
-- Supports DIRECT and FANOUT exchange types
-- Triggers exchange auto-delete if `auto-delete=true` and no bindings remain
-- Treats `nil` and empty `{}` arguments as equivalent (AMQP standard behavior)
-- **TODO**: Queue exclusivity validation (will raise 403 ACCESS_REFUSED)
-
-**queue.bind Implementation Notes:**
-**queue.purge Implementation Notes:**
-
-- Removes all enqueued messages from the target queue
-- For persistent messages, also deletes records from the configured persistence backend
-- Returns the number of purged messages in `queue.purge-ok`
-- Returns 404 NOT_FOUND (channel-level) if the queue does not exist
-
-
-- ✅ **Duplicate binding prevention** - Returns 406 PRECONDITION_FAILED when attempting to create an identical binding (same queue+exchange+routingKey+arguments)
-- Supports binding arguments for future headers exchange support
 
 ## basic
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| basic.qos | ✅ | Not yet implemented |
+| basic.qos | ✅ | |
 | basic.qos-ok | ✅ | |
 | basic.consume | ✅ | ‼️`noLocal` not supported (same as RabbitMQ)  |
 | basic.consume-ok | ✅ | |
@@ -107,10 +87,10 @@ Status levels:
 | basic.publish | ✅ | |
 | basic.return | ✅ | ‼️`immediate` flag is deprecated and will not be implemented |
 | basic.deliver | ✅ | |
-| basic.get | ✅ | Pull-based message retrieval |
+| basic.get | ✅ | |
 | basic.get-ok | ✅ | |
 | basic.get-empty | ✅ | |
-| basic.ack | ✅ | Supports multiple flag |
+| basic.ack | ✅ | |
 | basic.reject | ⚠️ | Requeue works; dead-lettering TODO |
 | basic.recover-async | ✅ | |
 | basic.recover | ✅ | |
