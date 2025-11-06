@@ -20,6 +20,111 @@ func (m *mockConn) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+func TestQueuePurgeHandler_Success(t *testing.T) {
+	b := &Broker{
+		framer: &amqp.DefaultFramer{},
+	}
+
+	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	vh.SetFramer(b.framer)
+	// Create queue and seed messages
+	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, nil)
+	vh.Queues["purge-q"].Push(amqp.Message{ID: "1", Body: []byte("a")})
+	vh.Queues["purge-q"].Push(amqp.Message{ID: "2", Body: []byte("b")})
+
+	request := &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  uint16(amqp.QUEUE),
+		MethodID: uint16(amqp.QUEUE_PURGE),
+		Content: &amqp.QueuePurgeMessage{
+			QueueName: "purge-q",
+			NoWait:    false,
+		},
+	}
+
+	conn := &mockConn{}
+
+	_, err := b.queuePurgeHandler(request, vh, conn)
+	if err != nil {
+		t.Fatalf("queuePurgeHandler failed: %v", err)
+	}
+
+	if len(conn.written) == 0 {
+		t.Error("Expected purge-ok frame to be sent")
+	}
+
+	if got := vh.Queues["purge-q"].Len(); got != 0 {
+		t.Errorf("Expected queue to be empty after purge, got %d", got)
+	}
+}
+
+func TestQueuePurgeHandler_QueueNotFound_SendsChannelClose(t *testing.T) {
+	b := &Broker{
+		framer:      &amqp.DefaultFramer{},
+		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+	}
+
+	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	vh.SetFramer(b.framer)
+
+	conn := &mockConn{}
+
+	// Register connection and channel so sendChannelErrorResponse can mark closing
+	b.mu.Lock()
+	b.Connections[conn] = &amqp.ConnectionInfo{Channels: make(map[uint16]*amqp.ChannelState)}
+	b.Connections[conn].Channels[1] = &amqp.ChannelState{}
+	b.mu.Unlock()
+
+	request := &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  uint16(amqp.QUEUE),
+		MethodID: uint16(amqp.QUEUE_PURGE),
+		Content:  &amqp.QueuePurgeMessage{QueueName: "ghost", NoWait: false},
+	}
+
+	_, err := b.queuePurgeHandler(request, vh, conn)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(conn.written) == 0 {
+		t.Error("Expected channel.close frame to be sent")
+	}
+
+	b.mu.Lock()
+	if !b.Connections[conn].Channels[1].ClosingChannel {
+		t.Error("Expected channel to be marked as closing")
+	}
+	b.mu.Unlock()
+}
+
+func TestQueuePurgeHandler_InvalidContentType(t *testing.T) {
+	b := &Broker{
+		framer: &amqp.DefaultFramer{},
+	}
+
+	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+
+	request := &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  uint16(amqp.QUEUE),
+		MethodID: uint16(amqp.QUEUE_PURGE),
+		Content:  &amqp.QueueBindMessage{}, // wrong type
+	}
+
+	conn := &mockConn{}
+
+	_, err := b.queuePurgeHandler(request, vh, conn)
+	if err == nil {
+		t.Fatal("Expected error for invalid content type")
+	}
+
+	expected := "invalid content type for QueuePurgeMessage"
+	if err.Error() != expected {
+		t.Errorf("Expected '%s', got '%s'", expected, err.Error())
+	}
+}
+
 func TestQueueUnbindHandler_Success(t *testing.T) {
 	b := &Broker{
 		framer: &amqp.DefaultFramer{},
