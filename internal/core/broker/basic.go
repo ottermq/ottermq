@@ -74,10 +74,10 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return nil, nil
 
 	case uint16(amqp.BASIC_ACK):
-		return b.basicAckHandler(request, conn, vh)
+		return b.basicAckHandler(newState, conn, vh)
 
 	case uint16(amqp.BASIC_REJECT):
-		return b.basicRejectHandler(request, conn, vh)
+		return b.basicRejectHandler(newState, conn, vh)
 
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
 		return b.basicRecoverHandler(request, conn, vh, true)
@@ -86,7 +86,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicRecoverHandler(request, conn, vh, false)
 
 	case uint16(amqp.BASIC_NACK):
-		return b.basicNackHandler(request, conn, vh)
+		return b.basicNackHandler(newState, conn, vh)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
@@ -187,6 +187,12 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			RoutingKey: routingKey,
 		}
 
+		// Check if in transaction
+		a, err, ok := b.bufferPublishInTransaction(vh, channel, conn, exchange, routingKey, msg, mandatory)
+		if ok {
+			return a, err
+		}
+
 		if !hasRouting {
 			if mandatory {
 				// Return message to the publisher
@@ -208,6 +214,39 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 
 	}
 	return nil, nil
+}
+
+func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, exchange string, routingKey string, msg *amqp.Message, mandatory bool) (any, error, bool) {
+	txState := vh.GetTransactionState(channel, conn)
+	if txState != nil && txState.InTransaction {
+		txState.Lock()
+		txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
+			ExchangeName: exchange,
+			RoutingKey:   routingKey,
+			Message:      *msg,
+			Mandatory:    mandatory,
+		})
+		txState.Unlock()
+		log.Debug().Uint16("channel", channel).Msg("Buffered publish in transaction")
+		return nil, nil, true
+	}
+	return nil, nil, false
+}
+
+func (*Broker) bufferAcknowledgeTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, deliveryTag uint64, multiple bool, requeue bool, operation vhost.AckOperation) (any, error, bool) {
+	txState := vh.GetTransactionState(channel, conn)
+	if txState != nil && txState.InTransaction {
+		txState.Lock()
+		txState.BufferedAcks = append(txState.BufferedAcks, vhost.BufferedAck{
+			Operation:   operation,
+			DeliveryTag: deliveryTag,
+			Multiple:    multiple,
+			Requeue:     requeue,
+		})
+		txState.Unlock()
+		return nil, nil, true
+	}
+	return nil, nil, false
 }
 
 func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
@@ -283,31 +322,55 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	return nil, nil
 }
 
-func (b *Broker) basicAckHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicAckHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicAckContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic ack content")
 	}
-	err := vh.HandleBasicAck(conn, request.Channel, content.DeliveryTag, content.Multiple)
+
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	multiple := content.Multiple
+
+	// Check if in transaction
+	// TODO:  verify if should requeue on ack in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, multiple, false, vhost.AckOperationAck)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicAck(conn, channel, deliveryTag, multiple)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to acknowledge message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Acknowledged message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Acknowledged message")
 	return nil, nil
 }
 
-func (b *Broker) basicRejectHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicRejectHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicRejectContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic reject content")
 	}
-	err := vh.HandleBasicReject(conn, request.Channel, content.DeliveryTag, content.Requeue)
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	requeue := content.Requeue
+
+	// Check if in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, false, requeue, vhost.AckOperationReject)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicReject(conn, request.Channel, deliveryTag, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Rejected message")
 	return nil, nil
 }
 
@@ -336,7 +399,6 @@ func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn ne
 }
 
 func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey string, msg *amqp.Message) (any, error) {
-	// TODO: implement basic.return
 	frame := b.framer.CreateBasicReturnFrame(channel, 312, "No route", exchange, routingKey)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
 		log.Error().Err(err).Msg("Failed to send basic return frame")
@@ -363,16 +425,28 @@ func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey
 	return nil, nil
 }
 
-func (b *Broker) basicNackHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicNackHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicNackContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic nack content")
 	}
-	err := vh.HandleBasicNack(conn, request.Channel, content.DeliveryTag, content.Multiple, content.Requeue)
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	multiple := content.Multiple
+	requeue := content.Requeue
+
+	// Check if in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, false, requeue, vhost.AckOperationReject)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicNack(conn, channel, deliveryTag, multiple, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Rejected message")
 	return nil, nil
 }
