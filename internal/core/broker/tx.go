@@ -9,13 +9,13 @@ import (
 // txHandler handles transaction-related commands
 func (*Broker) txHandler(request *amqp.RequestMethodMessage) (any, error) {
 	switch request.MethodID {
-	case uint16(amqp.SELECT):
+	case uint16(amqp.TX_SELECT):
 		// Handle transaction selection
 		return nil, fmt.Errorf("not implemented")
-	case uint16(amqp.COMMIT):
+	case uint16(amqp.TX_COMMIT):
 		// Handle transaction commit
 		return nil, fmt.Errorf("not implemented")
-	case uint16(amqp.ROLLBACK):
+	case uint16(amqp.TX_ROLLBACK):
 		// Handle transaction rollback
 		return nil, fmt.Errorf("not implemented")
 	default:
