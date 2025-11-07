@@ -12,6 +12,18 @@ type TxCommit struct{}
 
 type TxRollback struct{}
 
+// createTxAckFrame creates a TX method acknowledgment frame
+// to be used for TX_SELECT_OK, TX_COMMIT_OK, and TX_ROLLBACK_OK
+func createTxAckFrame(channel uint16, methodID uint16) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(TX),
+		MethodID: methodID,
+		Content:  ContentList{},
+	}.FormatMethodFrame()
+	return frame
+}
+
 func parseTxMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(TX_SELECT):

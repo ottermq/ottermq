@@ -47,6 +47,12 @@ type Framer interface {
 
 	CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
 	CreateConnectionCloseOkFrame(channel uint16) []byte
+
+	// Transaction Methods
+
+	CreateTxSelectOkFrame(channel uint16) []byte
+	CreateTxCommitOkFrame(channel uint16) []byte
+	CreateTxRollbackOkFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -172,3 +178,21 @@ func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, classID, 
 func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
 	return createConnectionCloseOkFrame(channel)
 }
+
+// ENDREGION
+
+// REGION Transaction Methods
+
+func (d *DefaultFramer) CreateTxSelectOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_SELECT_OK))
+}
+
+func (d *DefaultFramer) CreateTxCommitOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_COMMIT_OK))
+}
+
+func (d *DefaultFramer) CreateTxRollbackOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_ROLLBACK_OK))
+}
+
+// ENDREGION

@@ -116,3 +116,15 @@ func (m *MockFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
 func (m *MockFramer) CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
 	return []byte("connection-close")
 }
+
+func (m *MockFramer) CreateTxSelectOkFrame(channel uint16) []byte {
+	return []byte("tx-select-ok")
+}
+
+func (m *MockFramer) CreateTxCommitOkFrame(channel uint16) []byte {
+	return []byte("tx-commit-ok")
+}
+
+func (m *MockFramer) CreateTxRollbackOkFrame(channel uint16) []byte {
+	return []byte("tx-rollback-ok")
+}
