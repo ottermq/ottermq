@@ -225,6 +225,16 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 		}
 		delete(vh.ChannelDeliveries, channelKey)
 	}
+
+	if txState := vh.GetTransactionState(channel, connection); txState != nil {
+		txState.Lock()
+		// Discard buffered publishes
+		txState.BufferedPublishes = []BufferedPublish{}
+		txState.BufferedAcks = []BufferedAck{}
+		txState.InTransaction = false
+		txState.Unlock()
+		delete(vh.ChannelTransactions, channelKey)
+	}
 }
 
 func cancelAllConsumers(vh *VHost, channelKey ConnectionChannelKey) bool {

@@ -10,25 +10,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const MaxTransactionBufferSize = 10000
+
 // txHandler handles transaction-related commands
 func (b *Broker) txHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.TX_SELECT):
 		return b.txSelectHandler(request, vh, conn)
-	case uint16(amqp.TX_COMMIT):
-		// Handle commit asynchronously to avoid blocking the main loop
-		// the acknowledgment shall be sent immediately
-		if err := b.createTxCommitOkResponse(request.Channel, conn); err != nil {
-			return nil, err
-		}
 
-		go func() {
-			b.txCommitHandler(request, vh, conn)
-		}()
-		return nil, nil
+	case uint16(amqp.TX_COMMIT):
+		return b.txCommitHandler(request, vh, conn)
 
 	case uint16(amqp.TX_ROLLBACK):
 		return b.txRollbackHandler(request, vh, conn)
+
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
@@ -39,15 +34,17 @@ func (b *Broker) txSelectHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 
 	txState := vh.GetOrCreateTransactionState(channel, conn)
 	txState.Lock()
+	defer txState.Unlock()
+
 	if txState.InTransaction {
-		txState.Unlock()
+		log.Debug().Uint16("channel", channel).Msg("Channel already in transaction mode")
 		return nil, b.createTxSelectOkResponse(channel, conn)
 	}
 
+	// First time entering transaction mode
 	txState.InTransaction = true
 	txState.BufferedPublishes = []vhost.BufferedPublish{}
 	txState.BufferedAcks = []vhost.BufferedAck{}
-	txState.Unlock()
 
 	log.Debug().Uint16("channel", channel).Msg("Channel entered transaction mode")
 	return nil, b.createTxSelectOkResponse(channel, conn)
@@ -58,12 +55,43 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 
 	txState := vh.GetOrCreateTransactionState(channel, conn)
 	txState.Lock()
+	defer txState.Unlock()
 
 	if err := b.ensureInTransaction(txState); err != nil {
 		return nil, err
 	}
-	// Execute all buffered publishes atomically
+
+	// Dry run to check for errors before committing
 	publishErrors := []error{}
+	for _, pub := range txState.BufferedPublishes {
+		exchange := pub.ExchangeName
+		routingKey := pub.RoutingKey
+		mandatory := pub.Mandatory
+		// msg := &pub.Message
+		hasRouting, err := vh.HasRoutingForMessage(exchange, routingKey)
+		if err != nil {
+			publishErrors = append(publishErrors, err)
+			continue
+		}
+
+		if !hasRouting {
+			if mandatory {
+				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, would be returned to publisher")
+				publishErrors = append(publishErrors, fmt.Errorf("no route for message on exchange %s with routing key %s", exchange, routingKey))
+				continue
+			}
+			// No routing and not mandatory - silently drop the message
+			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, would be silently dropped (not mandatory)")
+			continue
+		}
+	}
+	if len(publishErrors) > 0 {
+		b.clearBufferedTransactionDataUnlocked(txState)
+		log.Error().Msgf("Transaction commit dry run encountered errors: %v", publishErrors)
+		return nil, fmt.Errorf("transaction commit failed")
+	}
+
+	// Execute all buffered publishes atomically
 	for _, pub := range txState.BufferedPublishes {
 		exchange := pub.ExchangeName
 		routingKey := pub.RoutingKey
@@ -88,7 +116,6 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			continue
 		}
 
-		// TODO: consider a dry-run publish to validate before actual publish
 		_, err = vh.Publish(pub.ExchangeName, pub.RoutingKey, msg)
 		if err != nil {
 			publishErrors = append(publishErrors, err)
@@ -114,27 +141,36 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 
 	// If there were any errors, we need to rollback the transaction
 	if len(publishErrors) > 0 || len(ackErrors) > 0 {
-		// Rollback: This is tricky - already published messages can't be unpublished
-		// For MVP: Log error and treat as partial commit (matches RabbitMQ behavior for some errors)
-		// For production: Use 2-phase commit or WAL
+		errMsg := fmt.Sprintf("Transaction commit failed: %d publish errors, %d ack errors",
+			len(publishErrors), len(ackErrors))
+		log.Error().
+			Errs("publish_errors", publishErrors).
+			Errs("ack_errors", ackErrors).
+			Msg(errMsg)
 
-		txState.Unlock()
-		log.Error().Msgf("Transaction commit encountered errors: %v %v", publishErrors, ackErrors)
-		return nil, fmt.Errorf("transaction commit failed")
+		return nil, errors.NewChannelError(
+			errMsg,
+			uint16(amqp.INTERNAL_ERROR),
+			uint16(amqp.TX),
+			uint16(amqp.TX_COMMIT),
+		)
 	}
 
 	// Clear buffered operations
+	b.clearBufferedTransactionDataUnlocked(txState)
+	return nil, b.createTxCommitOkResponse(channel, conn)
+}
+
+func (*Broker) clearBufferedTransactionDataUnlocked(txState *vhost.ChannelTransactionState) {
 	txState.BufferedPublishes = []vhost.BufferedPublish{}
 	txState.BufferedAcks = []vhost.BufferedAck{}
-	txState.InTransaction = false
-	txState.Unlock()
-	return nil, nil
 }
 
 func (b *Broker) txRollbackHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
 	txState := vh.GetOrCreateTransactionState(channel, conn)
 	txState.Lock()
+	defer txState.Unlock()
 
 	if err := b.ensureInTransaction(txState); err != nil {
 		return nil, err
@@ -142,8 +178,6 @@ func (b *Broker) txRollbackHandler(request *amqp.RequestMethodMessage, vh *vhost
 
 	txState.BufferedPublishes = []vhost.BufferedPublish{}
 	txState.BufferedAcks = []vhost.BufferedAck{}
-	txState.InTransaction = false
-	txState.Unlock()
 
 	log.Debug().Uint16("channel", channel).Msg("Channel transaction rolled back")
 	return nil, b.createTxRollbackOkResponse(channel, conn)
@@ -151,7 +185,6 @@ func (b *Broker) txRollbackHandler(request *amqp.RequestMethodMessage, vh *vhost
 
 func (*Broker) ensureInTransaction(txState *vhost.ChannelTransactionState) error {
 	if txState == nil || !txState.InTransaction {
-		txState.Unlock()
 		// raise channel exception
 		return errors.NewChannelError(
 			"not in transaction mode",

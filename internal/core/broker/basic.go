@@ -151,9 +151,14 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		log.Trace().Interface("state", currentState).Msg("All fields must be filled")
 		if len(currentState.Body) != int(currentState.BodySize) {
 			log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
-			// TODO: raise connection excepion (501 - Frame error)
-			// vide amqp.constants.go Exceptions
-			return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
+			return b.sendConnectionClosing(
+				conn,
+				channel,
+				uint16(amqp.FRAME_ERROR),
+				uint16(amqp.BASIC),
+				uint16(amqp.BASIC_PUBLISH),
+				"Frame error: body size is not correct",
+			)
 		}
 		publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishContent)
 		exchange := publishRequest.Exchange
@@ -166,14 +171,13 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		hasRouting, err := vh.HasRoutingForMessage(exchange, routingKey)
 		if err != nil {
 			if amqpErr, ok := err.(errors.AMQPError); ok {
-				b.sendChannelClosing(conn,
+				return nil, b.sendChannelClosing(conn,
 					request.Channel,
 					amqpErr.ReplyCode(),
 					amqpErr.ClassID(),
 					amqpErr.MethodID(),
 					amqpErr.ReplyText(),
 				)
-				return nil, nil
 			}
 			return nil, err
 		}
@@ -220,13 +224,24 @@ func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn 
 	txState := vh.GetTransactionState(channel, conn)
 	if txState != nil && txState.InTransaction {
 		txState.Lock()
+		defer txState.Unlock()
+
+		// Verify buffer size limit
+		if len(txState.BufferedAcks) >= MaxTransactionBufferSize {
+			return nil, errors.NewChannelError(
+				"transaction buffer size limit exceeded",
+				uint16(amqp.RESOURCE_ERROR),
+				uint16(amqp.TX),
+				uint16(amqp.TX_COMMIT),
+			), true
+		}
+
 		txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
 			ExchangeName: exchange,
 			RoutingKey:   routingKey,
 			Message:      *msg,
 			Mandatory:    mandatory,
 		})
-		txState.Unlock()
 		log.Debug().Uint16("channel", channel).Msg("Buffered publish in transaction")
 		return nil, nil, true
 	}
@@ -237,13 +252,24 @@ func (*Broker) bufferAcknowledgeTransaction(vh *vhost.VHost, channel uint16, con
 	txState := vh.GetTransactionState(channel, conn)
 	if txState != nil && txState.InTransaction {
 		txState.Lock()
+		defer txState.Unlock()
+
+		// Verify buffer size limit
+		if len(txState.BufferedAcks) >= MaxTransactionBufferSize {
+			return nil, errors.NewChannelError(
+				"transaction buffer size limit exceeded",
+				uint16(amqp.RESOURCE_ERROR),
+				uint16(amqp.TX),
+				uint16(amqp.TX_COMMIT),
+			), true
+		}
+
 		txState.BufferedAcks = append(txState.BufferedAcks, vhost.BufferedAck{
 			Operation:   operation,
 			DeliveryTag: deliveryTag,
 			Multiple:    multiple,
 			Requeue:     requeue,
 		})
-		txState.Unlock()
 		return nil, nil, true
 	}
 	return nil, nil, false
@@ -334,7 +360,6 @@ func (b *Broker) basicAckHandler(newState *amqp.ChannelState, conn net.Conn, vh 
 	multiple := content.Multiple
 
 	// Check if in transaction
-	// TODO:  verify if should requeue on ack in transaction
 	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, multiple, false, vhost.AckOperationAck)
 	if ok {
 		return a, err
@@ -437,7 +462,7 @@ func (b *Broker) basicNackHandler(newState *amqp.ChannelState, conn net.Conn, vh
 	requeue := content.Requeue
 
 	// Check if in transaction
-	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, false, requeue, vhost.AckOperationReject)
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, multiple, requeue, vhost.AckOperationNack)
 	if ok {
 		return a, err
 	}
