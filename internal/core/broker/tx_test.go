@@ -628,9 +628,10 @@ func TestCommit_KeepsTransactionMode(t *testing.T) {
 	// Verify channel is still in transaction mode (per AMQP spec)
 	txState := vh.GetTransactionState(1, conn)
 	txState.Lock()
-	defer txState.Unlock()
+	inTransaction := txState.InTransaction
+	txState.Unlock()
 
-	if !txState.InTransaction {
+	if !inTransaction {
 		t.Error("Channel should remain in transaction mode after commit (per AMQP spec)")
 	}
 
@@ -642,7 +643,6 @@ func TestCommit_KeepsTransactionMode(t *testing.T) {
 			ContentType: "text/plain",
 		},
 	}
-	txState.Unlock() // Unlock before calling buffer function
 
 	_, err, buffered := broker.bufferPublishInTransaction(vh, 1, conn, "test-exchange", "test.key", msg, false)
 	if err != nil {
