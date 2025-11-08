@@ -846,8 +846,8 @@ func TestParseBasicCancelFrame_WithNowaitFlag(t *testing.T) {
 }
 
 func TestParseBasicCancelFrame_PayloadTooShort(t *testing.T) {
-	// Payload with only 2 bytes (minimum is 3)
-	payload := []byte{0x01, 0x41} // length=1, 'A'
+	// Payload with only 1 byte (minimum is 1)
+	payload := []byte{0x00} // length=0
 
 	result, err := parseBasicCancelFrame(payload)
 
