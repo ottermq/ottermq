@@ -227,7 +227,7 @@ func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn 
 		defer txState.Unlock()
 
 		// Verify buffer size limit
-		if len(txState.BufferedAcks) >= MaxTransactionBufferSize {
+		if len(txState.BufferedPublishes) >= MaxTransactionBufferSize {
 			return nil, errors.NewChannelError(
 				"transaction buffer size limit exceeded",
 				uint16(amqp.RESOURCE_ERROR),
