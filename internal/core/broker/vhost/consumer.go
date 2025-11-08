@@ -226,9 +226,10 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 		delete(vh.ChannelDeliveries, channelKey)
 	}
 
-	if txState := vh.GetTransactionState(channel, connection); txState != nil {
+	// Clean up transaction state (already holding vh.mu, so access map directly)
+	if txState, exists := vh.ChannelTransactions[channelKey]; exists {
 		txState.Lock()
-		// Discard buffered publishes
+		// Discard buffered publishes and acks (implicit rollback)
 		txState.BufferedPublishes = []BufferedPublish{}
 		txState.BufferedAcks = []BufferedAck{}
 		txState.InTransaction = false
