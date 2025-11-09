@@ -47,7 +47,7 @@ func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, p
 	}
 }
 
-func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
+func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -62,8 +62,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	// Check if queue exists
 	_, ok := vh.Queues[consumer.QueueName]
 	if !ok {
-		// TODO: return a channel exception error - 404
-		return errors.NewChannelError(
+		return "", errors.NewChannelError(
 			fmt.Sprintf("no queue '%s' in vhost '%s'", consumer.QueueName, vh.Name),
 			uint16(amqp.NOT_FOUND),
 			uint16(amqp.BASIC),
@@ -83,15 +82,25 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 			}
 			retries++
 			if retries >= maxRetries {
-				return fmt.Errorf("failed to generate unique consumer tag after %d attempts", maxRetries)
+				// return fmt.Errorf("failed to generate unique consumer tag after %d attempts", maxRetries)
+				return "", errors.NewChannelError(
+					"failed to generate unique consumer tag",
+					uint16(amqp.INTERNAL_ERROR),
+					uint16(amqp.BASIC),
+					uint16(amqp.BASIC_CONSUME),
+				)
 			}
 		}
 	} else {
 		key = ConsumerKey{consumer.Channel, consumer.Tag}
 		// Check for duplicates
 		if _, exists := vh.Consumers[key]; exists {
-			// TODO: return a channel exception error
-			return fmt.Errorf("consumer with tag %s already exists on channel %d", key.Tag, key.Channel)
+			return "", errors.NewChannelError(
+				fmt.Sprintf("consumer tag '%s' already exists on channel %d", key.Tag, key.Channel),
+				uint16(amqp.PRECONDITION_FAILED),
+				uint16(amqp.BASIC),
+				uint16(amqp.BASIC_CONSUME),
+			)
 		}
 	}
 
@@ -100,13 +109,23 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	if existingConsumers, exists := vh.ConsumersByQueue[consumer.QueueName]; exists {
 		for _, c := range existingConsumers {
 			if c.Props.Exclusive {
-				// TODO: return a channel exception error - 405
-				return fmt.Errorf("exclusive consumer already exists for queue %s", consumer.QueueName)
+				return "", errors.NewChannelError(
+					fmt.Sprintf("exclusive consumer already exists for queue %s", consumer.QueueName),
+					uint16(amqp.PRECONDITION_FAILED),
+					uint16(amqp.BASIC),
+					uint16(amqp.BASIC_CONSUME),
+				)
 			}
 		}
 		if consumer.Props.Exclusive && len(existingConsumers) > 0 {
 			// TODO: return a channel exception error - 405
-			return fmt.Errorf("cannot add exclusive consumer when other consumers exist for queue %s", consumer.QueueName)
+			// return fmt.Errorf("cannot add exclusive consumer when other consumers exist for queue %s", consumer.QueueName)
+			return "", errors.NewChannelError(
+				fmt.Sprintf("cannot obtain exclusive access to queue '%s' because it is already in use", consumer.QueueName),
+				uint16(amqp.RESOURCE_LOCKED),
+				uint16(amqp.BASIC),
+				uint16(amqp.BASIC_CONSUME),
+			)
 		}
 	}
 
@@ -138,7 +157,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 		go queue.startDeliveryLoop(vh)
 	}
 
-	return nil
+	return consumer.Tag, nil
 }
 
 func (vh *VHost) CancelConsumer(channel uint16, tag string) error {

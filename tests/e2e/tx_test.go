@@ -299,9 +299,13 @@ func TestTxAckInTransaction(t *testing.T) {
 	}
 
 	deliveryTags := []uint64{}
+	var consumerTag string
 	for i := 0; i < 3; i++ {
 		select {
 		case msg := <-msgs:
+			if consumerTag == "" {
+				consumerTag = msg.ConsumerTag
+			}
 			t.Logf("Received message with delivery tag: %d", msg.DeliveryTag)
 			// ACK within transaction (should be buffered)
 			err = ch.Ack(msg.DeliveryTag, false)
@@ -315,9 +319,11 @@ func TestTxAckInTransaction(t *testing.T) {
 	}
 
 	// Cancel consumer
-	err = ch.Cancel("", false)
-	if err != nil {
-		t.Logf("Failed to cancel consumer (may not be an error): %v", err)
+	if consumerTag != "" {
+		err = ch.Cancel(consumerTag, false)
+		if err != nil {
+			t.Logf("Failed to cancel consumer (may not be an error): %v", err)
+		}
 	}
 
 	// Rollback the transaction - ACKs should be discarded, messages should reappear
@@ -325,21 +331,6 @@ func TestTxAckInTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to rollback transaction: %v", err)
 	}
-	// The following test is commented out because RabbitMQ server also fails it
-	// so this test is not valid for verifying OtterMQ behavior.
-	//----//
-	// Messages should still be in queue (ACKs were rolled back)
-	// time.Sleep(1000 * time.Millisecond) // Give broker time to requeue
-
-	// msg, ok, err := ch.Get(queue.Name, true)
-	// if err != nil {
-	// 	t.Fatalf("Failed to get message after rollback: %v", err)
-	// }
-	// if !ok {
-	// 	t.Error("Expected messages to be requeued after rollback of ACKs")
-	// } else {
-	// 	t.Logf("Successfully retrieved message after ACK rollback: %s", string(msg.Body))
-	// }
 }
 
 // TestTxNackInTransaction tests NACK buffering in transactions

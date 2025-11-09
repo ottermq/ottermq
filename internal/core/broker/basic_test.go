@@ -241,7 +241,7 @@ func TestBasicConsumeHandler_DuplicateConsumer(t *testing.T) {
 		Exclusive: false,
 		Arguments: nil,
 	})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register first consumer: %v", err)
 	}

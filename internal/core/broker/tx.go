@@ -148,12 +148,13 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			Errs("ack_errors", ackErrors).
 			Msg(errMsg)
 
-		return nil, errors.NewChannelError(
+		exception := errors.NewChannelError(
 			errMsg,
 			uint16(amqp.INTERNAL_ERROR),
 			uint16(amqp.TX),
 			uint16(amqp.TX_COMMIT),
 		)
+		return sendChannelErrorResponse(exception, b, conn, request)
 	}
 
 	// Clear buffered operations
