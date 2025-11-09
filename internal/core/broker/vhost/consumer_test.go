@@ -135,9 +135,9 @@ func TestRegisterConsumer_NonExistentQueue(t *testing.T) {
 		t.Error("Expected error for non-existent queue")
 	}
 
-	expectedError := "queue non-existent-queue does not exist"
-	if err.Error() != expectedError {
-		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	expectedSubstring := "non-existent-queue"
+	if err != nil && !strings.Contains(err.Error(), expectedSubstring) {
+		t.Errorf("Expected error to contain '%s', got '%s'", expectedSubstring, err.Error())
 	}
 
 	// Check that consumer was not registered

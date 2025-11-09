@@ -194,6 +194,8 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		// Check if in transaction
 		a, err, ok := b.bufferPublishInTransaction(vh, channel, conn, exchange, routingKey, msg, mandatory)
 		if ok {
+			// Reset channel state after buffering in transaction
+			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			return a, err
 		}
 
@@ -236,10 +238,15 @@ func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn 
 			), true
 		}
 
+		// Deep copy the message to avoid shared slice references
+		msgCopy := *msg
+		msgCopy.Body = make([]byte, len(msg.Body))
+		copy(msgCopy.Body, msg.Body)
+
 		txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
 			ExchangeName: exchange,
 			RoutingKey:   routingKey,
-			Message:      *msg,
+			Message:      msgCopy,
 			Mandatory:    mandatory,
 		})
 		log.Debug().Uint16("channel", channel).Msg("Buffered publish in transaction")
@@ -284,6 +291,16 @@ func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net
 	consumerTag := content.ConsumerTag
 	err := vh.CancelConsumer(request.Channel, consumerTag)
 	if err != nil {
+		// verify if it is a amqp error
+		if amqpErr, ok := err.(*errors.ChannelError); ok {
+			return nil, b.sendChannelClosing(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+		}
 		log.Error().Err(err).Str("consumer_tag", consumerTag).Msg("Failed to cancel consumer")
 		return nil, err
 	}
@@ -327,8 +344,17 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 
 	err := vh.RegisterConsumer(consumer)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to register consumer")
-		// It would be a 500-like error
+		// verify if it is a amqp error
+		if amqpErr, ok := err.(*errors.ChannelError); ok {
+			return nil, b.sendChannelClosing(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+		}
+		log.Error().Err(err).Str("queue", queueName).Str("consumer_tag", consumerTag).Msg("Failed to register consumer")
 		return nil, err
 	}
 
