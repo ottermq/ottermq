@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"net"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,7 +63,12 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	_, ok := vh.Queues[consumer.QueueName]
 	if !ok {
 		// TODO: return a channel exception error - 404
-		return fmt.Errorf("queue %s does not exist", consumer.QueueName)
+		return errors.NewChannelError(
+			fmt.Sprintf("no queue '%s' in vhost '%s'", consumer.QueueName, vh.Name),
+			uint16(amqp.NOT_FOUND),
+			uint16(amqp.BASIC),
+			uint16(amqp.BASIC_CONSUME),
+		)
 	}
 
 	var key ConsumerKey
@@ -140,7 +147,12 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	defer vh.mu.Unlock()
 	consumer, exists := vh.Consumers[key]
 	if !exists {
-		return fmt.Errorf("consumer with tag %s on channel %d does not exist", tag, channel)
+		return errors.NewChannelError(
+			fmt.Sprintf("no consumer '%s' on channel %d", tag, channel),
+			uint16(amqp.NOT_FOUND),
+			uint16(amqp.BASIC),
+			uint16(amqp.BASIC_CANCEL),
+		)
 	}
 
 	consumer.Active = false

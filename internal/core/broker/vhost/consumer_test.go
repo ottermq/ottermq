@@ -359,8 +359,8 @@ func TestCancelConsumer_NonExistentConsumer(t *testing.T) {
 		t.Error("Expected error for non-existent consumer")
 	}
 
-	expectedError := "consumer with tag non-existent-consumer on channel 1 does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no consumer 'non-existent-consumer' on channel 1"
+	if err != nil && !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -777,8 +777,8 @@ func TestConsumerRegistrationAndCancellation(t *testing.T) {
 		t.Error("Expected error when cancelling non-existent consumer")
 	}
 
-	expectedError := "consumer with tag non-existent on channel 1 does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no consumer 'non-existent' on channel 1"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -1112,8 +1112,8 @@ func TestConsumerEdgeCases(t *testing.T) {
 		t.Error("Expected error when registering consumer for non-existent queue")
 	}
 
-	expectedError := "queue non-existent-queue does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no queue 'non-existent-queue' in vhost 'test-vhost'"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 
