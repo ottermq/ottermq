@@ -95,7 +95,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 		key = ConsumerKey{consumer.Channel, consumer.Tag}
 		// Check for duplicates
 		if _, exists := vh.Consumers[key]; exists {
-			return "", errors.NewChannelError(
+			return consumer.Tag, errors.NewChannelError(
 				fmt.Sprintf("consumer tag '%s' already exists on channel %d", key.Tag, key.Channel),
 				uint16(amqp.PRECONDITION_FAILED),
 				uint16(amqp.BASIC),
@@ -120,7 +120,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 		if consumer.Props.Exclusive && len(existingConsumers) > 0 {
 			// TODO: return a channel exception error - 405
 			// return fmt.Errorf("cannot add exclusive consumer when other consumers exist for queue %s", consumer.QueueName)
-			return "", errors.NewChannelError(
+			return consumer.Tag, errors.NewChannelError(
 				fmt.Sprintf("cannot obtain exclusive access to queue '%s' because it is already in use", consumer.QueueName),
 				uint16(amqp.RESOURCE_LOCKED),
 				uint16(amqp.BASIC),
