@@ -30,6 +30,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_GET):
 		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
+
 		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {
 			log.Error().Err(err).Msg("Error getting message count")
@@ -43,10 +44,19 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			return nil, nil
 		}
 
-		// Send Basic.GetOk + header + body
+		// Get the message from the queue
 		msg := vh.GetMessage(queue)
 
-		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount))
+		// Get or create the channel delivery state
+		channelKey := vhost.ConnectionChannelKey{
+			Connection: conn,
+			Channel:    request.Channel,
+		}
+		ch := vh.GetOrCreateChannelDelivery(channelKey)
+		ch.LastDeliveryTag++
+		deliveryTag := ch.LastDeliveryTag
+
+		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag)
 		err = b.framer.SendFrame(conn, frame)
 		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 
@@ -342,7 +352,7 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 		Arguments: arguments,
 	})
 
-	err := vh.RegisterConsumer(consumer)
+	consumerTag, err := vh.RegisterConsumer(consumer)
 	if err != nil {
 		// verify if it is a amqp error
 		if amqpErr, ok := err.(*errors.ChannelError); ok {

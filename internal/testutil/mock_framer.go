@@ -53,7 +53,7 @@ func (m *MockFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
 	return []byte("basic-get-empty")
 }
 
-func (m *MockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
+func (m *MockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64) []byte {
 	return []byte("basic-get-ok")
 }
 

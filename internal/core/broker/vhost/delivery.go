@@ -36,16 +36,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
 	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
-	vh.mu.Lock()
-	ch := vh.ChannelDeliveries[channelKey]
-	if ch == nil {
-		ch = &ChannelDeliveryState{
-			Unacked:        make(map[uint64]*DeliveryRecord),
-			unackedChanged: make(chan struct{}, 1),
-		}
-		vh.ChannelDeliveries[channelKey] = ch
-	}
-	vh.mu.Unlock()
+	ch := vh.GetOrCreateChannelDelivery(channelKey)
 
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
@@ -114,6 +105,20 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		vh.clearRedeliveredMark(msg.ID)
 	}
 	return nil
+}
+
+func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *ChannelDeliveryState {
+	vh.mu.Lock()
+	ch := vh.ChannelDeliveries[channelKey]
+	if ch == nil {
+		ch = &ChannelDeliveryState{
+			Unacked:        make(map[uint64]*DeliveryRecord),
+			unackedChanged: make(chan struct{}, 1),
+		}
+		vh.ChannelDeliveries[channelKey] = ch
+	}
+	vh.mu.Unlock()
+	return ch
 }
 
 func (vh *VHost) shouldRedeliver(msgID string) bool {
