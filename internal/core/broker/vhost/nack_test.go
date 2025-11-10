@@ -99,7 +99,7 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	}
 
 	// Marked for redelivery
-	if !vh.shouldRedeliver("m5") {
+	if !vh.ShouldRedeliver("m5") {
 		t.Error("expected message m5 to be marked for redelivery")
 	}
 }

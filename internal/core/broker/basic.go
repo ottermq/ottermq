@@ -30,6 +30,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_GET):
 		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
+		noAck := getMsg.NoAck
 
 		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {
@@ -53,10 +54,13 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			Channel:    request.Channel,
 		}
 		ch := vh.GetOrCreateChannelDelivery(channelKey)
-		ch.LastDeliveryTag++
-		deliveryTag := ch.LastDeliveryTag
 
-		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag)
+		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+		// Check if message should be marked as redelivered
+		redelivered := vh.ShouldRedeliver(msg.ID)
+
+		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag, redelivered)
 		err = b.framer.SendFrame(conn, frame)
 		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 

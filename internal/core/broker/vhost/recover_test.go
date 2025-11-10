@@ -63,10 +63,10 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	}
 
 	// Verify messages marked as redelivered
-	if !vh.shouldRedeliver("msg1") {
+	if !vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should be marked for redelivery")
 	}
-	if !vh.shouldRedeliver("msg2") {
+	if !vh.ShouldRedeliver("msg2") {
 		t.Error("msg2 should be marked for redelivery")
 	}
 }
@@ -190,7 +190,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 	}
 
 	// Verify message marked as redelivered
-	if !vh.shouldRedeliver("msg1") {
+	if !vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should be marked for redelivery")
 	}
 }
@@ -260,7 +260,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	}
 
 	// Verify message marked as redelivered
-	if !vh.shouldRedeliver("msg1") {
+	if !vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should be marked for redelivery after failed delivery")
 	}
 }
@@ -283,7 +283,7 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 	vh.markAsRedelivered("msg1")
 
 	// Verify it's marked
-	if !vh.shouldRedeliver("msg1") {
+	if !vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should be marked for redelivery")
 	}
 
@@ -291,7 +291,7 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 	vh.clearRedeliveredMark("msg1")
 
 	// Verify it's cleared
-	if vh.shouldRedeliver("msg1") {
+	if vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should not be marked after clearing")
 	}
 }
