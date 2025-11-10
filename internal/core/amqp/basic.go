@@ -205,10 +205,10 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 }
 
 // createBasicGetOkFrame creates a Basic.GetOk (71) frame.
-func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64) []byte {
+func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64, redelivered bool) []byte {
 	msgGetOk := &BasicGetOkContent{
 		DeliveryTag:  deliveryTag,
-		Redelivered:  false,
+		Redelivered:  redelivered,
 		Exchange:     exchange,
 		RoutingKey:   routingkey,
 		MessageCount: msgCount,
