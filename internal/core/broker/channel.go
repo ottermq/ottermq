@@ -113,7 +113,31 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 }
 
 func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
-	panic("unimplemented")
+	channel := request.Channel
+	b.mu.Lock()
+	_, exists := b.Connections[conn].Channels[channel]
+	b.mu.Unlock()
+	if !exists {
+		log.Debug().Uint16("channel", channel).Msg("Channel not found for flow ok")
+		// raise 504 error if channel not found
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("channel '%d' not found", channel),
+			uint16(amqp.CHANNEL_ERROR),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW_OK),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+	log.Debug().Uint16("channel", channel).Msg("Channel flow ok received")
+	return nil, nil
 }
 
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {

@@ -230,6 +230,23 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 		}
+
+		// check the flow state of the channel
+		flowActive := vh.GetChannelFlowState(conn, channel)
+		if !flowActive {
+			log.Warn().
+				Uint16("channel", channel).
+				Msg("Client published message while flow is paused")
+			// Raise channel exception 406 - Precondition Failed
+			return nil, b.sendChannelClosing(
+				conn,
+				channel,
+				uint16(amqp.PRECONDITION_FAILED),
+				uint16(amqp.CHANNEL),
+				uint16(amqp.CHANNEL_FLOW),
+				"Precondition Failed: channel flow is paused",
+			)
+		}
 		return nil, err
 
 	}

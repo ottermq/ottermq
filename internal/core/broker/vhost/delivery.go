@@ -40,6 +40,16 @@ func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive boo
 	return nil
 }
 
+func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) bool {
+	channelState := vh.getChannelDeliveryState(conn, channel)
+	if channelState == nil {
+		return true // default to active if channel not found
+	}
+	channelState.mu.Lock()
+	defer channelState.mu.Unlock()
+	return channelState.FlowActive
+}
+
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
 	// If caller didn't force redelivered, consult the mark set during requeue/recover.
 	if !redelivered {
