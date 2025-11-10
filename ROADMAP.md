@@ -16,6 +16,8 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [x] **Channel Operations**
   - [x] Channel open/close lifecycle
   - [x] Multi-channel support per connection
+  - [x] Channel flow control (`CHANNEL_FLOW`, `CHANNEL_FLOW_OK`)
+  - [x] Backpressure handling with flow state
 - [x] **Exchange Management**
   - [x] Exchange declare/delete
   - [x] Direct, fanout, topic exchange types
@@ -57,6 +59,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Channel Flow Control** - Client and server-initiated flow control
+  - [x] `CHANNEL_FLOW` - Channel-level flow control with active flag
+  - [x] `CHANNEL_FLOW_OK` - Flow control acknowledgment
+  - [x] Per-channel flow state tracking
+  - [x] Integration with delivery throttling (shouldThrottle)
+  - [x] Thread-safe flow state management
+  - [x] Flow initiator tracking (client vs server)
 - [x] **Transaction Support (TX class)** - Full AMQP transaction implementation
   - [x] Transaction mode selection per channel
   - [x] Operation buffering (publish, ack, nack, reject)
@@ -72,20 +81,14 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ❌ **Missing Features**
 
-#### **Phase 1: Flow Control (High Priority)**
-
-- [ ] **`CHANNEL_FLOW`** - Channel-level flow control
-- [ ] **`CHANNEL_FLOW_OK`** - Flow control acknowledgment
-- [ ] Backpressure handling integration
-
-#### **Phase 2: Advanced Features (Medium Priority)**
+#### **Phase 1: Advanced Features (High Priority)**
 
 - [ ] **Message TTL and expiration**
 - [ ] **Dead letter exchanges**
 - [ ] **Priority queues**
 - [ ] **Topic exchange pattern matching**
 
-#### **Phase 3: Clustering (Lower Priority)**
+#### **Phase 2: Clustering (Lower Priority)**
 
 - [ ] **Cluster support**
 - [ ] **Queue mirroring**
@@ -151,15 +154,35 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - `internal/core/broker/basic.go` - Transaction-aware publishing/acking
 - `tests/e2e/tx_test.go` - Comprehensive transaction tests
 
-### **Phase 5: Flow Control & Performance (Current Focus)**
+### **Phase 5: Flow Control & Performance (COMPLETED)**
 
-**Goal**: Channel flow control and optimization
+**Completed implementations**:
+
+- Channel flow control (`CHANNEL_FLOW`, `CHANNEL_FLOW_OK`)
+- Client-initiated flow (client pauses message delivery)
+- Server-initiated flow (server pauses client publishing)
+- Per-channel flow state management
+- Integration with QoS throttling
+- Comprehensive test coverage
+
+**Key files**:
+
+- `internal/core/amqp/channel.go` - Channel flow parsing
+- `internal/core/broker/channel.go` - Flow handler implementation
+- `internal/core/broker/vhost/delivery.go` - Flow state management
+- `tests/internal/core/broker/vhost/channel_flow_test.go` - Flow tests
+
+### **Phase 6: Advanced Features & Performance (Current Focus)**
+
+**Goal**: Message lifecycle features and optimization
 
 **Tasks**:
 
-1. Implement `CHANNEL_FLOW` and `CHANNEL_FLOW_OK`
-2. Add backpressure handling
-3. Performance profiling and optimization
+1. Implement message TTL and expiration
+2. Add dead letter exchanges
+3. Implement priority queues
+4. Complete topic exchange pattern matching
+5. Performance profiling and optimization
 
 ## Testing Strategy
 
@@ -190,18 +213,20 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 5: Flow Control & Performance**. Contributors should focus on:
+The highest priority is **Phase 6: Advanced Features & Performance**. Contributors should focus on:
 
-1. `CHANNEL_FLOW` and `CHANNEL_FLOW_OK` implementation
-2. Backpressure handling integration
-3. Performance profiling and optimization
+1. Message TTL and expiration mechanisms
+2. Dead letter exchange implementation
+3. Priority queue support
+4. Topic exchange pattern matching completion
+5. Performance profiling and optimization
 
 ### **Getting Started**
 
-1. Review `internal/core/amqp/channel.go` for channel-related types
+1. Review `internal/core/amqp/` for protocol-level types
 2. Check existing handler patterns in `internal/core/broker/`
 3. See `.github/copilot-instructions.md` for architecture patterns
-4. Study existing channel state management in `internal/core/broker/vhost/`
+4. Study message lifecycle in `internal/core/broker/vhost/`
 
 ### **Code Guidelines**
 
@@ -215,9 +240,9 @@ The highest priority is **Phase 5: Flow Control & Performance**. Contributors sh
 
 ## Progress Tracking
 
-**Last Updated**: December 2024  
-**Current Focus**: Phase 5 - Flow Control & Performance  
-**Completed**: All CONNECTION, CHANNEL, EXCHANGE, QUEUE, BASIC, and TX class methods  
-**Next Milestone**: Channel flow control (`CHANNEL_FLOW`, `CHANNEL_FLOW_OK`)
+**Last Updated**: November 2024  
+**Current Focus**: Phase 6 - Advanced Features & Performance  
+**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE, QUEUE, BASIC, and TX class methods  
+**Next Milestone**: Message TTL, dead letter exchanges, and topic pattern matching
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

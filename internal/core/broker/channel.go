@@ -5,13 +5,19 @@ import (
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
-func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.CHANNEL_OPEN):
-		return b.openChannel(request, conn)
+		return b.handleOpenChannel(request, conn)
+	case uint16(amqp.CHANNEL_FLOW):
+		return b.handleChannelFlow(request, vh, conn)
+	case uint16(amqp.CHANNEL_FLOW_OK):
+		return b.handleChannelFlowOk(request, conn)
 	case uint16(amqp.CHANNEL_CLOSE):
 		return b.handleChannelClose(request, conn)
 	case uint16(amqp.CHANNEL_CLOSE_OK):
@@ -22,8 +28,8 @@ func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, conn net.Con
 	}
 }
 
-// openChannel executes the AMQP command CHANNEL_OPEN
-func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+// handleOpenChannel executes the AMQP command CHANNEL_OPEN
+func (b *Broker) handleOpenChannel(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	log.Debug().Interface("request", request).Msg("Received channel open request")
 
 	// Check if the channel is already open
@@ -38,6 +44,121 @@ func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) 
 	if err := b.framer.SendFrame(conn, frame); err != nil {
 		log.Error().Err(err).Msg("Failed to send channel open ok frame")
 	}
+	return nil, nil
+}
+
+func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	channel := request.Channel
+	content, ok := request.Content.(*amqp.ChannelFlowContent)
+	if !ok {
+		log.Error().Uint16("channel", channel).Msg("Invalid content for channel flow")
+		// Raise 501 error if content is invalid
+		amqpErr := errors.NewConnectionError(
+			"invalid content for channel flow",
+			uint16(amqp.FRAME_ERROR),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW),
+		)
+		b.sendConnectionClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+	flowActive := content.Active
+
+	b.mu.Lock()
+	_, exists := b.Connections[conn].Channels[channel]
+	b.mu.Unlock()
+	if !exists {
+		// Client tried to use a non-registered channel -- it should send a channel.open first
+		// Architecture decision: enforce that client must open the channel first
+		log.Debug().Uint16("channel", channel).Msg("Channel not open")
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("channel '%d' not found in vhost '%s'", channel, vh.Name),
+			uint16(amqp.CHANNEL_ERROR),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+	// Client-initiated flow control (flowInitiatedByBroker = false)
+	// This allows client to request flow pause/resume for delivery throttling
+	// Architecture decision: always honor flow change requested by client
+	// Further improvements may include broker policies to override client requests
+	flowInitiatedByBroker := false
+	err := vh.HandleChannelFlow(conn, channel, flowActive, flowInitiatedByBroker)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to handle channel flow in vhost")
+		// Should raise 541 error if vhost fails to handle flow
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("vhost '%s' failed to handle channel flow", vh.Name),
+			uint16(amqp.CHANNEL_FLOW),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+
+	log.Debug().Uint16("channel", channel).Bool("flow_active", flowActive).Msg("Channel flow state updated")
+	// send channel.flow-ok
+	frame := b.framer.CreateChannelFlowOkFrame(channel, flowActive)
+	err = b.framer.SendFrame(conn, frame)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send channel flow ok frame")
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+// handleChannelFlowOk executes the AMQP command CHANNEL_FLOW_OK. This is just an acknowledgment from the client.
+// Since there is no current implementation where the broker never initiates a flow control, this method just verifies if the channel exists.
+func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	channel := request.Channel
+	b.mu.Lock()
+	_, exists := b.Connections[conn].Channels[channel]
+	b.mu.Unlock()
+	if !exists {
+		log.Debug().Uint16("channel", channel).Msg("Channel not found for flow ok")
+		// raise 504 error if channel not found
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("channel '%d' not found", channel),
+			uint16(amqp.CHANNEL_ERROR),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW_OK),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+	log.Debug().Uint16("channel", channel).Msg("Channel flow ok received")
 	return nil, nil
 }
 

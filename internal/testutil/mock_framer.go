@@ -101,6 +101,14 @@ func (m *MockFramer) CreateChannelOpenOkFrame(channel uint16) []byte {
 	return []byte("channel-open-ok")
 }
 
+func (m *MockFramer) CreateChannelFlowFrame(channel uint16, active bool) []byte {
+	return []byte("channel-flow")
+}
+
+func (m *MockFramer) CreateChannelFlowOkFrame(channel uint16, active bool) []byte {
+	return []byte("channel-flow-ok")
+}
+
 func (m *MockFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
 	return []byte("channel-close")
 }

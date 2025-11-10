@@ -205,7 +205,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.CONNECTION):
 		return b.connectionHandler(request, conn)
 	case uint16(amqp.CHANNEL):
-		return b.channelHandler(request, conn)
+		return b.channelHandler(request, vh, conn)
 	case uint16(amqp.EXCHANGE):
 		return b.exchangeHandler(request, vh, conn)
 	case uint16(amqp.QUEUE):
