@@ -40,6 +40,8 @@ type Framer interface {
 	// Channel Methods
 
 	CreateChannelOpenOkFrame(channel uint16) []byte
+	CreateChannelFlowFrame(channel uint16, active bool) []byte
+	CreateChannelFlowOkFrame(channel uint16, active bool) []byte
 	CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
 	CreateChannelCloseOkFrame(channel uint16) []byte
 
@@ -121,6 +123,14 @@ func (d *DefaultFramer) CreateExchangeDeleteFrame(channel uint16) []byte {
 
 func (d *DefaultFramer) CreateChannelOpenOkFrame(channel uint16) []byte {
 	return createChannelOpenOkFrame(channel)
+}
+
+func (d *DefaultFramer) CreateChannelFlowFrame(channel uint16, active bool) []byte {
+	return createChannelFlowFrame(channel, active)
+}
+
+func (d *DefaultFramer) CreateChannelFlowOkFrame(channel uint16, active bool) []byte {
+	return createChannelFlowOkFrame(channel, active)
 }
 
 func (d *DefaultFramer) CreateChannelCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {

@@ -11,7 +11,11 @@ import (
 func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.CHANNEL_OPEN):
-		return b.openChannel(request, conn)
+		return b.handleOpenChannel(request, conn)
+	case uint16(amqp.CHANNEL_FLOW):
+		return b.handleChannelFlow(request, conn)
+	case uint16(amqp.CHANNEL_FLOW_OK):
+		return b.handleChannelFlowOk(request, conn)
 	case uint16(amqp.CHANNEL_CLOSE):
 		return b.handleChannelClose(request, conn)
 	case uint16(amqp.CHANNEL_CLOSE_OK):
@@ -22,8 +26,8 @@ func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, conn net.Con
 	}
 }
 
-// openChannel executes the AMQP command CHANNEL_OPEN
-func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+// handleOpenChannel executes the AMQP command CHANNEL_OPEN
+func (b *Broker) handleOpenChannel(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	log.Debug().Interface("request", request).Msg("Received channel open request")
 
 	// Check if the channel is already open
@@ -39,6 +43,14 @@ func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) 
 		log.Error().Err(err).Msg("Failed to send channel open ok frame")
 	}
 	return nil, nil
+}
+
+func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	panic("unimplemented")
+}
+
+func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	panic("unimplemented")
 }
 
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
