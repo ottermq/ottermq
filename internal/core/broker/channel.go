@@ -105,7 +105,7 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 		// Should raise 541 error if vhost fails to handle flow
 		amqpErr := errors.NewConnectionError(
 			fmt.Sprintf("vhost '%s' failed to handle channel flow", vh.Name),
-			uint16(amqp.CHANNEL_FLOW),
+			uint16(amqp.INTERNAL_ERROR),
 			uint16(amqp.CHANNEL),
 			uint16(amqp.CHANNEL_FLOW),
 		)
@@ -133,7 +133,7 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 }
 
 // handleChannelFlowOk executes the AMQP command CHANNEL_FLOW_OK. This is just an acknowledgment from the client.
-// Since there is no current implementation where the broker never initiates a flow control, this method just verifies if the channel exists.
+// Since the broker does not currently initiate flow control, this method just verifies if the channel exists.
 func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	channel := request.Channel
 	b.mu.Lock()

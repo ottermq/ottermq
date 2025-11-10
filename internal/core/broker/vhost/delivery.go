@@ -208,22 +208,6 @@ func (vh *VHost) shouldThrottle(consumer *Consumer, channelState *ChannelDeliver
 			return true
 		}
 	}
-	/// Previous implementation:
-	// if channelState.PrefetchGlobal {
-	// 	if channelState.GlobalPrefetchCount > 0 {
-	// 		unackedCount := vh.getUnackedCountChannel(channelState)
-	// 		if unackedCount >= channelState.GlobalPrefetchCount {
-	// 			return true
-	// 		}
-	// 	}
-	// } else {
-	// 	if consumer.PrefetchCount > 0 {
-	// 		unackedCount := vh.getUnackedCountConsumer(channelState, consumer)
-	// 		if unackedCount >= consumer.PrefetchCount {
-	// 			return true
-	// 		}
-	// 	}
-	// }
 	return false
 }
 
