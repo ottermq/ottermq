@@ -360,13 +360,14 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	if err != nil {
 		// verify if it is a amqp error
 		if amqpErr, ok := err.(*errors.ChannelError); ok {
-			return nil, b.sendChannelClosing(conn,
+			b.sendChannelClosing(conn,
 				request.Channel,
 				amqpErr.ReplyCode(),
 				amqpErr.ClassID(),
 				amqpErr.MethodID(),
 				amqpErr.ReplyText(),
 			)
+			return nil, err
 		}
 		log.Error().Err(err).Str("queue", queueName).Str("consumer_tag", consumerTag).Msg("Failed to register consumer")
 		return nil, err
