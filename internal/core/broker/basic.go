@@ -30,6 +30,8 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_GET):
 		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
+		noAck := getMsg.NoAck
+
 		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {
 			log.Error().Err(err).Msg("Error getting message count")
@@ -43,10 +45,22 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			return nil, nil
 		}
 
-		// Send Basic.GetOk + header + body
+		// Get the message from the queue
 		msg := vh.GetMessage(queue)
 
-		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount))
+		// Get or create the channel delivery state
+		channelKey := vhost.ConnectionChannelKey{
+			Connection: conn,
+			Channel:    request.Channel,
+		}
+		ch := vh.GetOrCreateChannelDelivery(channelKey)
+
+		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+		// Check if message should be marked as redelivered
+		redelivered := vh.ShouldRedeliver(msg.ID)
+
+		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag, redelivered)
 		err = b.framer.SendFrame(conn, frame)
 		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 
@@ -74,10 +88,10 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return nil, nil
 
 	case uint16(amqp.BASIC_ACK):
-		return b.basicAckHandler(request, conn, vh)
+		return b.basicAckHandler(newState, conn, vh)
 
 	case uint16(amqp.BASIC_REJECT):
-		return b.basicRejectHandler(request, conn, vh)
+		return b.basicRejectHandler(newState, conn, vh)
 
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
 		return b.basicRecoverHandler(request, conn, vh, true)
@@ -86,7 +100,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicRecoverHandler(request, conn, vh, false)
 
 	case uint16(amqp.BASIC_NACK):
-		return b.basicNackHandler(request, conn, vh)
+		return b.basicNackHandler(newState, conn, vh)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
@@ -151,9 +165,14 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		log.Trace().Interface("state", currentState).Msg("All fields must be filled")
 		if len(currentState.Body) != int(currentState.BodySize) {
 			log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
-			// TODO: raise connection excepion (501 - Frame error)
-			// vide amqp.constants.go Exceptions
-			return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
+			return b.sendConnectionClosing(
+				conn,
+				channel,
+				uint16(amqp.FRAME_ERROR),
+				uint16(amqp.BASIC),
+				uint16(amqp.BASIC_PUBLISH),
+				"Frame error: body size is not correct",
+			)
 		}
 		publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishContent)
 		exchange := publishRequest.Exchange
@@ -166,14 +185,13 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		hasRouting, err := vh.HasRoutingForMessage(exchange, routingKey)
 		if err != nil {
 			if amqpErr, ok := err.(errors.AMQPError); ok {
-				b.sendChannelClosing(conn,
+				return nil, b.sendChannelClosing(conn,
 					request.Channel,
 					amqpErr.ReplyCode(),
 					amqpErr.ClassID(),
 					amqpErr.MethodID(),
 					amqpErr.ReplyText(),
 				)
-				return nil, nil
 			}
 			return nil, err
 		}
@@ -185,6 +203,14 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			Properties: *props,
 			Exchange:   exchange,
 			RoutingKey: routingKey,
+		}
+
+		// Check if in transaction
+		a, err, ok := b.bufferPublishInTransaction(vh, channel, conn, exchange, routingKey, msg, mandatory)
+		if ok {
+			// Reset channel state after buffering in transaction
+			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+			return a, err
 		}
 
 		if !hasRouting {
@@ -210,6 +236,66 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 	return nil, nil
 }
 
+func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, exchange string, routingKey string, msg *amqp.Message, mandatory bool) (any, error, bool) {
+	txState := vh.GetTransactionState(channel, conn)
+	if txState != nil && txState.InTransaction {
+		txState.Lock()
+		defer txState.Unlock()
+
+		// Verify buffer size limit
+		if len(txState.BufferedPublishes) >= MaxTransactionBufferSize {
+			return nil, errors.NewChannelError(
+				"transaction buffer size limit exceeded",
+				uint16(amqp.RESOURCE_ERROR),
+				uint16(amqp.TX),
+				uint16(amqp.TX_COMMIT),
+			), true
+		}
+
+		// Deep copy the message to avoid shared slice references
+		msgCopy := *msg
+		msgCopy.Body = make([]byte, len(msg.Body))
+		copy(msgCopy.Body, msg.Body)
+
+		txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
+			ExchangeName: exchange,
+			RoutingKey:   routingKey,
+			Message:      msgCopy,
+			Mandatory:    mandatory,
+		})
+		log.Debug().Uint16("channel", channel).Msg("Buffered publish in transaction")
+		return nil, nil, true
+	}
+	return nil, nil, false
+}
+
+func (*Broker) bufferAcknowledgeTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, deliveryTag uint64, multiple bool, requeue bool, operation vhost.AckOperation) (any, error, bool) {
+	txState := vh.GetTransactionState(channel, conn)
+	if txState != nil && txState.InTransaction {
+		txState.Lock()
+		defer txState.Unlock()
+
+		// Verify buffer size limit
+		if len(txState.BufferedAcks) >= MaxTransactionBufferSize {
+			return nil, errors.NewChannelError(
+				"transaction buffer size limit exceeded",
+				uint16(amqp.RESOURCE_ERROR),
+				uint16(amqp.TX),
+				uint16(amqp.TX_COMMIT),
+			), true
+		}
+
+		txState.BufferedAcks = append(txState.BufferedAcks, vhost.BufferedAck{
+			Operation:   operation,
+			DeliveryTag: deliveryTag,
+			Multiple:    multiple,
+			Requeue:     requeue,
+		})
+		return nil, nil, true
+	}
+	return nil, nil, false
+}
+
 func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
 	content, ok := request.Content.(*amqp.BasicCancelContent)
 	if !ok || content == nil {
@@ -219,6 +305,16 @@ func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net
 	consumerTag := content.ConsumerTag
 	err := vh.CancelConsumer(request.Channel, consumerTag)
 	if err != nil {
+		// verify if it is a amqp error
+		if amqpErr, ok := err.(*errors.ChannelError); ok {
+			return nil, b.sendChannelClosing(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+		}
 		log.Error().Err(err).Str("consumer_tag", consumerTag).Msg("Failed to cancel consumer")
 		return nil, err
 	}
@@ -260,10 +356,20 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 		Arguments: arguments,
 	})
 
-	err := vh.RegisterConsumer(consumer)
+	consumerTag, err := vh.RegisterConsumer(consumer)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to register consumer")
-		// It would be a 500-like error
+		// verify if it is a amqp error
+		if amqpErr, ok := err.(*errors.ChannelError); ok {
+			b.sendChannelClosing(conn,
+				request.Channel,
+				amqpErr.ReplyCode(),
+				amqpErr.ClassID(),
+				amqpErr.MethodID(),
+				amqpErr.ReplyText(),
+			)
+			return nil, err
+		}
+		log.Error().Err(err).Str("queue", queueName).Str("consumer_tag", consumerTag).Msg("Failed to register consumer")
 		return nil, err
 	}
 
@@ -283,31 +389,54 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	return nil, nil
 }
 
-func (b *Broker) basicAckHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicAckHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicAckContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic ack content")
 	}
-	err := vh.HandleBasicAck(conn, request.Channel, content.DeliveryTag, content.Multiple)
+
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	multiple := content.Multiple
+
+	// Check if in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, multiple, false, vhost.AckOperationAck)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicAck(conn, channel, deliveryTag, multiple)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to acknowledge message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Acknowledged message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Acknowledged message")
 	return nil, nil
 }
 
-func (b *Broker) basicRejectHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicRejectHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicRejectContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic reject content")
 	}
-	err := vh.HandleBasicReject(conn, request.Channel, content.DeliveryTag, content.Requeue)
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	requeue := content.Requeue
+
+	// Check if in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, false, requeue, vhost.AckOperationReject)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicReject(conn, request.Channel, deliveryTag, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Rejected message")
 	return nil, nil
 }
 
@@ -336,7 +465,6 @@ func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn ne
 }
 
 func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey string, msg *amqp.Message) (any, error) {
-	// TODO: implement basic.return
 	frame := b.framer.CreateBasicReturnFrame(channel, 312, "No route", exchange, routingKey)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
 		log.Error().Err(err).Msg("Failed to send basic return frame")
@@ -363,16 +491,28 @@ func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey
 	return nil, nil
 }
 
-func (b *Broker) basicNackHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+func (b *Broker) basicNackHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
 	content, ok := request.Content.(*amqp.BasicNackContent)
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic nack content")
 	}
-	err := vh.HandleBasicNack(conn, request.Channel, content.DeliveryTag, content.Multiple, content.Requeue)
+	channel := request.Channel
+	deliveryTag := content.DeliveryTag
+	multiple := content.Multiple
+	requeue := content.Requeue
+
+	// Check if in transaction
+	a, err, ok := b.bufferAcknowledgeTransaction(vh, channel, conn, deliveryTag, multiple, requeue, vhost.AckOperationNack)
+	if ok {
+		return a, err
+	}
+
+	err = vh.HandleBasicNack(conn, channel, deliveryTag, multiple, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err
 	}
-	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
+	log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Rejected message")
 	return nil, nil
 }

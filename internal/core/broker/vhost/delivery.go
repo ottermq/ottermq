@@ -30,22 +30,13 @@ type ChannelDeliveryState struct {
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
 	// If caller didn't force redelivered, consult the mark set during requeue/recover.
 	if !redelivered {
-		redelivered = vh.shouldRedeliver(msg.ID)
+		redelivered = vh.ShouldRedeliver(msg.ID)
 	}
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
 	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
-	vh.mu.Lock()
-	ch := vh.ChannelDeliveries[channelKey]
-	if ch == nil {
-		ch = &ChannelDeliveryState{
-			Unacked:        make(map[uint64]*DeliveryRecord),
-			unackedChanged: make(chan struct{}, 1),
-		}
-		vh.ChannelDeliveries[channelKey] = ch
-	}
-	vh.mu.Unlock()
+	ch := vh.GetOrCreateChannelDelivery(channelKey)
 
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
@@ -116,7 +107,21 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 	return nil
 }
 
-func (vh *VHost) shouldRedeliver(msgID string) bool {
+func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *ChannelDeliveryState {
+	vh.mu.Lock()
+	ch := vh.ChannelDeliveries[channelKey]
+	if ch == nil {
+		ch = &ChannelDeliveryState{
+			Unacked:        make(map[uint64]*DeliveryRecord),
+			unackedChanged: make(chan struct{}, 1),
+		}
+		vh.ChannelDeliveries[channelKey] = ch
+	}
+	vh.mu.Unlock()
+	return ch
+}
+
+func (vh *VHost) ShouldRedeliver(msgID string) bool {
 	vh.redeliveredMu.Lock()
 	_, exists := vh.redeliveredMessages[msgID]
 	vh.redeliveredMu.Unlock()
@@ -178,4 +183,25 @@ func (vh *VHost) getChannelDeliveryState(connection net.Conn, channel uint16) *C
 	defer vh.mu.Unlock()
 	key := ConnectionChannelKey{connection, channel}
 	return vh.ChannelDeliveries[key]
+}
+
+func (ch *ChannelDeliveryState) TrackDelivery(noAck bool, msg *amqp.Message, queue string) uint64 {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	ch.LastDeliveryTag++
+	deliveryTag := ch.LastDeliveryTag
+
+	// Track the delivery if manual ack is required
+	if !noAck {
+		record := &DeliveryRecord{
+			DeliveryTag: deliveryTag,
+			ConsumerTag: "",
+			Message:     *msg,
+			QueueName:   queue,
+			Persistent:  msg.Properties.DeliveryMode == amqp.PERSISTENT,
+		}
+		ch.Unacked[deliveryTag] = record
+		log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Tracking Basic.Get delivery for manual ack")
+	}
+	return deliveryTag
 }

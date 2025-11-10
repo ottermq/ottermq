@@ -166,6 +166,26 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		}
 		return nil, nil
 
+	case uint16(TX):
+		log.Debug().Uint16("channel", channel).Msg("Received TX frame")
+		request, err := parseTxMethod(methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			msg, ok := request.(*RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				msg.MethodID = methodID
+				state := &ChannelState{
+					MethodFrame: msg,
+				}
+				return state, nil
+			}
+		}
+		return nil, nil
+
 	default:
 		log.Warn().Uint16("class_id", classID).Msg("Unknown class ID")
 		return nil, fmt.Errorf("unknown class ID: %d", classID)

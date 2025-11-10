@@ -26,7 +26,7 @@ func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	// Register a consumer to make queue 'in use'
 	connOwner := &mockConn{}
 	consumer := vhost.NewConsumer(connOwner, 1, "qdel.ifunused", "ctag-1", &vhost.ConsumerProperties{})
-	if err := vh.RegisterConsumer(consumer); err != nil {
+	if _, err := vh.RegisterConsumer(consumer); err != nil {
 		t.Fatalf("RegisterConsumer failed: %v", err)
 	}
 

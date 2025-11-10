@@ -45,9 +45,24 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Per-consumer prefetch control (global=false)
   - [x] Channel-wide prefetch control (global=true)
   - [x] Message throttling and flow control
+- [x] **Transaction Support**
+  - [x] `TX_SELECT` - Enter transaction mode
+  - [x] `TX_COMMIT` - Commit buffered operations
+  - [x] `TX_ROLLBACK` - Rollback buffered operations
+  - [x] Transactional publishing with message buffering
+  - [x] Transactional acknowledgments (ACK/NACK/REJECT)
+  - [x] Multiple commits per transaction mode
+  - [x] Channel close implicit rollback
+  - [x] Mandatory message handling in transactions
 
 ### ⚡ **Recently Completed**
 
+- [x] **Transaction Support (TX class)** - Full AMQP transaction implementation
+  - [x] Transaction mode selection per channel
+  - [x] Operation buffering (publish, ack, nack, reject)
+  - [x] Atomic commit with delivery tracking
+  - [x] Rollback with proper state cleanup
+  - [x] Mixed operations in single transaction
 - [x] **`QUEUE_DELETE` enhancements** - if-unused and if-empty flags
 - [x] **`QUEUE_PURGE`** - Clear queue contents with persistent message deletion
 - [x] **`QUEUE_UNBIND`** - Remove queue bindings with argument matching
@@ -57,26 +72,24 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ❌ **Missing Features**
 
-#### **Phase 1: Transaction Support (High Priority)**
-
-- [ ] **`TX_SELECT`** - Enter transaction mode
-- [ ] **`TX_COMMIT`** - Commit transaction
-- [ ] **`TX_ROLLBACK`** - Rollback transaction
-- [ ] **Transactional publishing/consuming**
-
-#### **Phase 2: Flow Control (Medium Priority)**
+#### **Phase 1: Flow Control (High Priority)**
 
 - [ ] **`CHANNEL_FLOW`** - Channel-level flow control
 - [ ] **`CHANNEL_FLOW_OK`** - Flow control acknowledgment
 - [ ] Backpressure handling integration
 
-#### **Phase 3: Advanced Features (Lower Priority)**
+#### **Phase 2: Advanced Features (Medium Priority)**
 
 - [ ] **Message TTL and expiration**
 - [ ] **Dead letter exchanges**
 - [ ] **Priority queues**
 - [ ] **Topic exchange pattern matching**
+
+#### **Phase 3: Clustering (Lower Priority)**
+
 - [ ] **Cluster support**
+- [ ] **Queue mirroring**
+- [ ] **Federated exchanges**
 
 ## Architecture Improvements
 
@@ -118,7 +131,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ## Development Phases
 
-### ✅ **Phase 1-3: Core Messaging (COMPLETED)**
+### ✅ **Phase 1-4: Core Messaging & Transactions (COMPLETED)**
 
 **Completed implementations**:
 
@@ -127,25 +140,18 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - Quality of Service (QoS) with prefetch limits
 - Consumer lifecycle management
 - Delivery tracking and flow control
+- Full transaction support (TX class)
+- Atomic commit/rollback of operations
+- Transaction mode per channel
 
-### **Phase 4: Transactions (Current Focus)**
+**Key files**:
 
-**Goal**: ACID message operations
+- `internal/core/amqp/tx.go` - TX protocol parsing
+- `internal/core/broker/tx.go` - TX handler implementation
+- `internal/core/broker/basic.go` - Transaction-aware publishing/acking
+- `tests/e2e/tx_test.go` - Comprehensive transaction tests
 
-**Tasks**:
-
-1. Implement transaction state tracking
-2. Add transactional publishing
-3. Implement commit/rollback logic
-4. Add transaction mode per channel
-
-**Files to modify**:
-
-- `internal/core/amqp/tx.go` (create)
-- `internal/core/broker/tx.go` (create)
-- `internal/core/broker/vhost/transaction.go` (create)
-
-### **Phase 5: Flow Control & Performance**
+### **Phase 5: Flow Control & Performance (Current Focus)**
 
 **Goal**: Channel flow control and optimization
 
@@ -159,16 +165,17 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Compatibility Testing**
 
-- [ ] Test with official RabbitMQ clients
-  - [ ] `rabbitmq/amqp091-go` (already working)
+- [x] Test with official RabbitMQ clients
+  - [x] `rabbitmq/amqp091-go` (working with all TX features)
   - [ ] RabbitMQ .NET Client
   - [ ] Python `pika` library
   - [ ] Node.js `amqplib`
 
 ### **Integration Testing**
 
-- [ ] End-to-end message flow tests
-- [ ] Multi-consumer scenarios
+- [x] End-to-end message flow tests
+- [x] Multi-consumer scenarios
+- [x] Transaction commit/rollback tests
 - [ ] High-throughput stress testing
 - [ ] Failure recovery testing
 
@@ -177,21 +184,22 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [ ] Message throughput comparison with RabbitMQ
 - [ ] Memory usage under load
 - [ ] Connection handling capacity
+- [ ] Transaction overhead measurement
 
 ## Contributing
 
 ### **Current Priority**
 
-The highest priority is **Phase 4: Transaction Support**. Contributors should focus on:
+The highest priority is **Phase 5: Flow Control & Performance**. Contributors should focus on:
 
-1. Transaction state management per channel
-2. `TX_SELECT`, `TX_COMMIT`, `TX_ROLLBACK` implementation
-3. Transactional message publishing and consumption
+1. `CHANNEL_FLOW` and `CHANNEL_FLOW_OK` implementation
+2. Backpressure handling integration
+3. Performance profiling and optimization
 
 ### **Getting Started**
 
-1. Review `internal/core/amqp/tx.go` for transaction-related types
-2. Check `internal/core/broker/tx.go` for transaction handler implementation patterns
+1. Review `internal/core/amqp/channel.go` for channel-related types
+2. Check existing handler patterns in `internal/core/broker/`
 3. See `.github/copilot-instructions.md` for architecture patterns
 4. Study existing channel state management in `internal/core/broker/vhost/`
 
@@ -201,15 +209,15 @@ The highest priority is **Phase 4: Transaction Support**. Contributors should fo
 - Add comprehensive error handling
 - Include unit tests for new parsers
 - Test with RabbitMQ clients for compatibility
-- Ensure transaction state is properly isolated per channel
+- Ensure proper state isolation per channel
 
 ---
 
 ## Progress Tracking
 
-**Last Updated**: November 6, 2025  
-**Current Focus**: Phase 4 - Transaction Support  
-**Completed**: All BASIC, QUEUE, EXCHANGE, CHANNEL, and CONNECTION class methods  
-**Next Milestone**: Transaction support (`TX_SELECT`, `TX_COMMIT`, `TX_ROLLBACK`)
+**Last Updated**: December 2024  
+**Current Focus**: Phase 5 - Flow Control & Performance  
+**Completed**: All CONNECTION, CHANNEL, EXCHANGE, QUEUE, BASIC, and TX class methods  
+**Next Milestone**: Channel flow control (`CHANNEL_FLOW`, `CHANNEL_FLOW_OK`)
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

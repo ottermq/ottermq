@@ -19,7 +19,7 @@ type Framer interface {
 	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte
 	CreateBasicGetEmptyFrame(channel uint16) []byte
-	CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte
+	CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte
 	CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte
 	CreateBasicRecoverOkFrame(channel uint16) []byte
@@ -47,6 +47,12 @@ type Framer interface {
 
 	CreateConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte
 	CreateConnectionCloseOkFrame(channel uint16) []byte
+
+	// Transaction Methods
+
+	CreateTxSelectOkFrame(channel uint16) []byte
+	CreateTxCommitOkFrame(channel uint16) []byte
+	CreateTxRollbackOkFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -153,8 +159,8 @@ func (d *DefaultFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
 	return createBasicGetEmptyFrame(channel)
 }
 
-func (d *DefaultFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
-	return createBasicGetOkFrame(channel, exchange, routingkey, msgCount)
+func (d *DefaultFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64, redelivered bool) []byte {
+	return createBasicGetOkFrame(channel, exchange, routingkey, msgCount, deliveryTag, redelivered)
 }
 
 func (d *DefaultFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
@@ -172,3 +178,21 @@ func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, classID, 
 func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
 	return createConnectionCloseOkFrame(channel)
 }
+
+// ENDREGION
+
+// REGION Transaction Methods
+
+func (d *DefaultFramer) CreateTxSelectOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_SELECT_OK))
+}
+
+func (d *DefaultFramer) CreateTxCommitOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_COMMIT_OK))
+}
+
+func (d *DefaultFramer) CreateTxRollbackOkFrame(channel uint16) []byte {
+	return createTxAckFrame(channel, uint16(TX_ROLLBACK_OK))
+}
+
+// ENDREGION

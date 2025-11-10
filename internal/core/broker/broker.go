@@ -213,7 +213,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.BASIC):
 		return b.basicHandler(newState, vh, conn)
 	case uint16(amqp.TX):
-		return b.txHandler(request)
+		return b.txHandler(request, vh, conn)
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}

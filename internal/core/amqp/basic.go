@@ -205,10 +205,10 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 }
 
 // createBasicGetOkFrame creates a Basic.GetOk (71) frame.
-func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
+func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32, deliveryTag uint64, redelivered bool) []byte {
 	msgGetOk := &BasicGetOkContent{
-		DeliveryTag:  1,
-		Redelivered:  false,
+		DeliveryTag:  deliveryTag,
+		Redelivered:  redelivered,
 		Exchange:     exchange,
 		RoutingKey:   routingkey,
 		MessageCount: msgCount,
@@ -576,10 +576,10 @@ func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
 }
 
 func parseBasicCancelFrame(payload []byte) (*RequestMethodMessage, error) {
-	// the payload must be at least 3 bytes long
+	// the payload must be at least 2 bytes long
 	// 1+ (consumer-tag) => short str = 1 (length) + 1+ bytes -- i don't accept empty consumer tags
 	// 1 (flags) => octet = 1 byte
-	if len(payload) < 3 {
+	if len(payload) < 2 {
 		return nil, fmt.Errorf("payload too short")
 	}
 

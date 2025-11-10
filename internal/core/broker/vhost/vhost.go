@@ -38,6 +38,9 @@ type VHost struct {
 	// next successful delivery.
 	redeliveredMessages map[string]struct{} // message ID -> mark
 	redeliveredMu       sync.Mutex
+
+	// Transactions per channel
+	ChannelTransactions map[ConnectionChannelKey]*ChannelTransactionState
 }
 
 func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
@@ -56,6 +59,7 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		activeDeliveries:    make(map[string]context.CancelFunc),
 		ChannelDeliveries:   make(map[ConnectionChannelKey]*ChannelDeliveryState),
 		redeliveredMessages: make(map[string]struct{}),
+		ChannelTransactions: make(map[ConnectionChannelKey]*ChannelTransactionState),
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state

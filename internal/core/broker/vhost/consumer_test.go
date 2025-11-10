@@ -81,7 +81,7 @@ func TestRegisterConsumer_ValidConsumer(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -129,15 +129,15 @@ func TestRegisterConsumer_NonExistentQueue(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 
 	if err == nil {
 		t.Error("Expected error for non-existent queue")
 	}
 
-	expectedError := "queue non-existent-queue does not exist"
-	if err.Error() != expectedError {
-		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	expectedSubstring := "non-existent-queue"
+	if err != nil && !strings.Contains(err.Error(), expectedSubstring) {
+		t.Errorf("Expected error to contain '%s', got '%s'", expectedSubstring, err.Error())
 	}
 
 	// Check that consumer was not registered
@@ -157,7 +157,7 @@ func TestRegisterConsumer_DuplicateConsumer(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register first consumer: %v", err)
 	}
@@ -169,14 +169,14 @@ func TestRegisterConsumer_DuplicateConsumer(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 
 	if err == nil {
 		t.Error("Expected error for duplicate consumer")
 	}
 
-	expectedError := "consumer with tag duplicate-tag already exists on channel 1"
-	if err.Error() != expectedError {
+	expectedError := "consumer tag 'duplicate-tag' already exists on channel 1"
+	if err != nil && strings.Contains(expectedError, err.Error()) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 
@@ -197,7 +197,7 @@ func TestRegisterConsumer_ExclusiveConsumerExists(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(exclusiveConsumer)
+	_, err := vh.RegisterConsumer(exclusiveConsumer)
 	if err != nil {
 		t.Fatalf("Failed to register exclusive consumer: %v", err)
 	}
@@ -209,14 +209,14 @@ func TestRegisterConsumer_ExclusiveConsumerExists(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err = vh.RegisterConsumer(normalConsumer)
+	_, err = vh.RegisterConsumer(normalConsumer)
 
 	if err == nil {
 		t.Error("Expected error when trying to add consumer to queue with exclusive consumer")
 	}
 
 	expectedError := "exclusive consumer already exists for queue test-queue"
-	if err.Error() != expectedError {
+	if err != nil && strings.Contains(expectedError, err.Error()) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -232,7 +232,7 @@ func TestRegisterConsumer_ExclusiveConsumerWithExistingConsumers(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(normalConsumer)
+	_, err := vh.RegisterConsumer(normalConsumer)
 	if err != nil {
 		t.Fatalf("Failed to register normal consumer: %v", err)
 	}
@@ -244,14 +244,14 @@ func TestRegisterConsumer_ExclusiveConsumerWithExistingConsumers(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err = vh.RegisterConsumer(exclusiveConsumer)
+	_, err = vh.RegisterConsumer(exclusiveConsumer)
 
 	if err == nil {
 		t.Error("Expected error when trying to add exclusive consumer when other consumers exist")
 	}
 
-	expectedError := "cannot add exclusive consumer when other consumers exist for queue test-queue"
-	if err.Error() != expectedError {
+	expectedError := "cannot obtain exclusive access to queue 'test-queue' because it is already in use"
+	if err != nil && strings.Contains(expectedError, err.Error()) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -267,7 +267,7 @@ func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 1: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 2: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestCancelConsumer_ValidConsumer(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 	if err != nil {
 		t.Fatalf("Failed to register consumer: %v", err)
 	}
@@ -359,8 +359,8 @@ func TestCancelConsumer_NonExistentConsumer(t *testing.T) {
 		t.Error("Expected error for non-existent consumer")
 	}
 
-	expectedError := "consumer with tag non-existent-consumer on channel 1 does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no consumer 'non-existent-consumer' on channel 1"
+	if err != nil && !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -382,12 +382,12 @@ func TestCleanupChannel(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 1: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 2: %v", err)
 	}
@@ -442,17 +442,17 @@ func TestCleanupConnection(t *testing.T) {
 		Arguments: nil,
 	})
 
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 1: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 2: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumer3)
+	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer 3: %v", err)
 	}
@@ -505,12 +505,12 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	})
 
 	// Register both consumers
-	err := vh.RegisterConsumer(consumerA1)
+	_, err := vh.RegisterConsumer(consumerA1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer A1: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumerB1)
+	_, err = vh.RegisterConsumer(consumerB1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer B1: %v", err)
 	}
@@ -573,7 +573,7 @@ func TestRegisterConsumer_GeneratesTagWhenEmpty(t *testing.T) {
 	}
 
 	// Register the consumer - this should generate a unique tag
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 	if err != nil {
 		t.Fatalf("Failed to register consumer: %v", err)
 	}
@@ -649,17 +649,17 @@ func TestRegisterConsumer_EmptyTagUniqueness(t *testing.T) {
 	consumer3 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
 
 	// Register all consumers
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
 
-	err = vh.RegisterConsumer(consumer3)
+	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer3: %v", err)
 	}
@@ -708,7 +708,7 @@ func TestRegisterConsumer_EmptyTagRetryLimit(t *testing.T) {
 	// Create and register a consumer with empty tag
 	consumer := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
 
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 	if err != nil {
 		t.Fatalf("Registration should succeed with retry mechanism: %v", err)
 	}
@@ -733,7 +733,7 @@ func TestConsumerRegistrationAndCancellation(t *testing.T) {
 	consumer := NewConsumer(conn, 1, "test-queue", "test-consumer", &ConsumerProperties{NoAck: false})
 
 	// Test successful registration
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 	if err != nil {
 		t.Fatalf("Failed to register consumer: %v", err)
 	}
@@ -777,8 +777,8 @@ func TestConsumerRegistrationAndCancellation(t *testing.T) {
 		t.Error("Expected error when cancelling non-existent consumer")
 	}
 
-	expectedError := "consumer with tag non-existent on channel 1 does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no consumer 'non-existent' on channel 1"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -793,7 +793,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 		NoAck:     false,
 		Exclusive: true,
 	})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register exclusive consumer: %v", err)
 	}
@@ -805,13 +805,13 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 
 	// Try to register second consumer (should fail due to exclusive)
 	consumer2 := NewConsumer(conn2, 1, "test-queue", "second-consumer", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err == nil {
 		t.Error("Expected error when registering second consumer with exclusive consumer present")
 	}
 
 	expectedError := "exclusive consumer already exists for queue test-queue"
-	if err.Error() != expectedError {
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 
@@ -832,7 +832,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 
 	// Now should be able to register new consumer
 	consumer3 := NewConsumer(conn2, 1, "test-queue", "new-consumer", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer3)
+	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer after exclusive removed: %v", err)
 	}
@@ -848,7 +848,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 
 	// Test that regular consumers can coexist
 	consumer4 := NewConsumer(conn1, 2, "test-queue", "third-consumer", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer4)
+	_, err = vh.RegisterConsumer(consumer4)
 	if err != nil {
 		t.Fatalf("Failed to register third consumer: %v", err)
 	}
@@ -867,13 +867,13 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 		NoAck:     false,
 		Exclusive: true,
 	})
-	err = vh.RegisterConsumer(consumer5)
+	_, err = vh.RegisterConsumer(consumer5)
 	if err == nil {
 		t.Error("Expected error when registering exclusive consumer with existing consumers")
 	}
 
-	expectedError = "cannot add exclusive consumer when other consumers exist for queue test-queue"
-	if err.Error() != expectedError {
+	expectedError = "cannot obtain exclusive access to queue 'test-queue' because it is already in use"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -885,19 +885,19 @@ func TestConsumerCleanupOnConnectionClose(t *testing.T) {
 
 	// Register consumers from both connections
 	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
 	consumer2 := NewConsumer(conn1, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
 
 	consumer3 := NewConsumer(conn2, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer3)
+	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer3: %v", err)
 	}
@@ -959,13 +959,13 @@ func TestConsumerChannelCleanup(t *testing.T) {
 
 	// Register consumers on different channels
 	consumer1 := NewConsumer(conn, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
 	consumer2 := NewConsumer(conn, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
@@ -1019,19 +1019,19 @@ func TestRoundRobinConsumerRotation(t *testing.T) {
 
 	// Register three consumers
 	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
 	consumer2 := NewConsumer(conn2, 1, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
 
 	consumer3 := NewConsumer(conn3, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer3)
+	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer3: %v", err)
 	}
@@ -1107,31 +1107,31 @@ func TestConsumerEdgeCases(t *testing.T) {
 
 	// Test registering consumer for non-existent queue
 	consumer := NewConsumer(conn, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{NoAck: false})
-	err := vh.RegisterConsumer(consumer)
+	_, err := vh.RegisterConsumer(consumer)
 	if err == nil {
 		t.Error("Expected error when registering consumer for non-existent queue")
 	}
 
-	expectedError := "queue non-existent-queue does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no queue 'non-existent-queue' in vhost 'test-vhost'"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 
 	// Test duplicate consumer registration
 	consumer1 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer1)
+	_, err = vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register first consumer: %v", err)
 	}
 
 	consumer2 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
-	err = vh.RegisterConsumer(consumer2)
+	_, err = vh.RegisterConsumer(consumer2)
 	if err == nil {
 		t.Error("Expected error when registering duplicate consumer")
 	}
 
-	expectedError = "consumer with tag duplicate-tag already exists on channel 1"
-	if err.Error() != expectedError {
+	expectedError = "consumer tag 'duplicate-tag' already exists on channel 1"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }

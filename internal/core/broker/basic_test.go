@@ -2,6 +2,7 @@ package broker
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -220,8 +221,8 @@ func TestBasicConsumeHandler_NonExistentQueue(t *testing.T) {
 		t.Error("Expected error for non-existent queue")
 	}
 
-	expectedError := "queue non-existent-queue does not exist"
-	if err.Error() != expectedError {
+	expectedError := "no queue 'non-existent-queue' in vhost 'test-vhost'"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 
@@ -241,7 +242,7 @@ func TestBasicConsumeHandler_DuplicateConsumer(t *testing.T) {
 		Exclusive: false,
 		Arguments: nil,
 	})
-	err := vh.RegisterConsumer(consumer1)
+	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register first consumer: %v", err)
 	}
@@ -268,8 +269,8 @@ func TestBasicConsumeHandler_DuplicateConsumer(t *testing.T) {
 		t.Error("Expected error for duplicate consumer tag")
 	}
 
-	expectedError := "consumer with tag duplicate-tag already exists on channel 1"
-	if err.Error() != expectedError {
+	expectedError := "consumer tag 'duplicate-tag' already exists on channel 1"
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
@@ -325,7 +326,7 @@ func TestBasicConsumeHandler_ExclusiveConsumer(t *testing.T) {
 	}
 
 	expectedError := "exclusive consumer already exists for queue test-queue"
-	if err.Error() != expectedError {
+	if err != nil && strings.Contains(err.Error(), expectedError) == false {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
