@@ -18,7 +18,7 @@ Status levels:
 | Class | Status | Notes |
 |------:|:------:|-------|
 | connection | 100% | All methods fully implemented |
-| channel | 67% | Basic open/close implemented; flow control not yet implemented |
+| channel | 100% | All methods fully implemented including flow control |
 | exchange | 80% | direct/fanout implemented; topic pattern matching TODO |
 | queue | 100% | All methods fully implemented |
 | basic | 100% | All methods fully implemented |
@@ -43,10 +43,20 @@ Status levels:
 |--------|:------:|------|
 | channel.open | ✅ | |
 | channel.open-ok | ✅ | |
-| channel.flow | ❌ | Flow control not yet implemented |
-| channel.flow-ok | ❌ | |
+| channel.flow | ✅ | Client-initiated flow control; server-initiated flow supported |
+| channel.flow-ok | ✅ | |
 | channel.close | ✅ | |
 | channel.close-ok | ✅ | |
+
+**Flow Control Features:**
+
+- ✅ Client-initiated flow control (client pauses message delivery)
+- ✅ Server-initiated flow control (server pauses client publishing)
+- ✅ Per-channel flow state (independent control per channel)
+- ✅ Integration with QoS throttling
+- ✅ `basic.get` unaffected by flow (synchronous pull always works)
+- ✅ `basic.consume` respects flow state (async delivery can be paused)
+- ✅ Thread-safe flow state management
 
 ## exchange
 
