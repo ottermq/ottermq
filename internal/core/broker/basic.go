@@ -231,9 +231,10 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 		}
 
-		// check the flow state of the channel
-		flowActive := vh.GetChannelFlowState(conn, channel)
-		if !flowActive {
+		// Check the flow state of the channel
+		// If the flow is paused, and was inactivated by the broker, raise a channel exception
+		flowState := vh.GetChannelFlowState(conn, channel)
+		if !flowState.FlowActive && flowState.FlowInitiatedByBroker {
 			log.Warn().
 				Uint16("channel", channel).
 				Msg("Client published message while flow is paused")

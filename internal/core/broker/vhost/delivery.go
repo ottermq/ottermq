@@ -18,36 +18,55 @@ type DeliveryRecord struct {
 }
 
 type ChannelDeliveryState struct {
-	mu                  sync.Mutex
-	LastDeliveryTag     uint64
-	Unacked             map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
-	GlobalPrefetchCount uint16
-	NextPrefetchCount   uint16 // to be applied on the next consumer start
-	PrefetchGlobal      bool
-	unackedChanged      chan struct{}
-	FlowActive          bool
+	mu                    sync.Mutex
+	LastDeliveryTag       uint64
+	Unacked               map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
+	GlobalPrefetchCount   uint16
+	NextPrefetchCount     uint16 // to be applied on the next consumer start
+	PrefetchGlobal        bool
+	unackedChanged        chan struct{}
+	FlowActive            bool
+	FlowInitiatedByBroker bool // default false
+}
+
+type FlowState struct {
+	FlowActive            bool
+	FlowInitiatedByBroker bool
 }
 
 // HandleChannelFlow processes a CHANNEL.FLOW request for the given channel
-func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive bool) error {
-	channelState := vh.getChannelDeliveryState(conn, channel)
-	if channelState == nil {
-		return fmt.Errorf("channel %d not found", channel)
-	}
+func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive bool, flowInitiatedByBroker bool) error {
+	channelKey := ConnectionChannelKey{conn, channel}
+	channelState := vh.GetOrCreateChannelDelivery(channelKey)
+
 	channelState.mu.Lock()
 	defer channelState.mu.Unlock()
 	channelState.FlowActive = flowActive
+	channelState.FlowInitiatedByBroker = flowInitiatedByBroker
+	log.Debug().
+		Uint16("channel", channel).
+		Bool("flow_active", flowActive).
+		Bool("flow_initiated_by_broker", flowInitiatedByBroker).
+		Msg("Channel flow state updated")
 	return nil
 }
 
-func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) bool {
+func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) FlowState {
 	channelState := vh.getChannelDeliveryState(conn, channel)
 	if channelState == nil {
-		return true // default to active if channel not found
+		return FlowState{
+			FlowActive:            true,
+			FlowInitiatedByBroker: false,
+		}
 	}
+
 	channelState.mu.Lock()
 	defer channelState.mu.Unlock()
-	return channelState.FlowActive
+
+	return FlowState{
+		FlowActive:            channelState.FlowActive,
+		FlowInitiatedByBroker: channelState.FlowInitiatedByBroker,
+	}
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
@@ -137,6 +156,7 @@ func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *Ch
 		ch = &ChannelDeliveryState{
 			Unacked:        make(map[uint64]*DeliveryRecord),
 			unackedChanged: make(chan struct{}, 1),
+			FlowActive:     true,
 		}
 		vh.ChannelDeliveries[channelKey] = ch
 	}
