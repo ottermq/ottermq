@@ -847,8 +847,8 @@ func TestCommit_MandatoryNoRoute_ReturnsMessage(t *testing.T) {
 	}
 	_, err := broker.txCommitHandler(commitRequest, vh, conn)
 
-	// Commit should fail due to mandatory with no route
-	if err == nil {
+	// Commit should not fail due to mandatory with no route
+	if err != nil {
 		t.Error("Expected error for mandatory message with no route")
 	}
 

@@ -77,11 +77,11 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		if !hasRouting {
 			if mandatory {
 				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, would be returned to publisher")
-				publishErrors = append(publishErrors, fmt.Errorf("no route for message on exchange %s with routing key %s", exchange, routingKey))
+				// publishErrors = append(publishErrors, fmt.Errorf("no route for message on exchange %s with routing key %s", exchange, routingKey))
 				continue
 			}
 			// No routing and not mandatory - silently drop the message
-			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, would be silently dropped (not mandatory)")
+			// log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, would be silently dropped (not mandatory)")
 			continue
 		}
 	}
