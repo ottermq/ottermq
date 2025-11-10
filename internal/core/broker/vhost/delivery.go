@@ -25,6 +25,19 @@ type ChannelDeliveryState struct {
 	NextPrefetchCount   uint16 // to be applied on the next consumer start
 	PrefetchGlobal      bool
 	unackedChanged      chan struct{}
+	FlowActive          bool
+}
+
+// HandleChannelFlow processes a CHANNEL.FLOW request for the given channel
+func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive bool) error {
+	channelState := vh.getChannelDeliveryState(conn, channel)
+	if channelState == nil {
+		return fmt.Errorf("channel %d not found", channel)
+	}
+	channelState.mu.Lock()
+	defer channelState.mu.Unlock()
+	channelState.FlowActive = flowActive
+	return nil
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
@@ -134,28 +147,53 @@ func (vh *VHost) clearRedeliveredMark(msgID string) {
 	vh.redeliveredMu.Unlock()
 }
 
+// shouldThrottle checks if the consumer should be throttled based on the channel's delivery state
 func (vh *VHost) shouldThrottle(consumer *Consumer, channelState *ChannelDeliveryState) bool {
 	if channelState == nil {
 		return false // No QoS set, no throttling
 	}
 	// It should throttle if:
 	// a) Prefetch is global AND total unacked on channel >= global prefetch AND global prefetch > 0
-	if channelState.PrefetchGlobal {
-		if channelState.GlobalPrefetchCount > 0 {
-			unackedCount := vh.getUnackedCountChannel(channelState)
-			if unackedCount >= channelState.GlobalPrefetchCount {
-				return true
-			}
-		}
-	} else {
-		// b) Prefetch is per-consumer AND total unacked on channel for this consumer >= consumer prefetch AND consumer prefetch > 0
-		if consumer.PrefetchCount > 0 {
-			unackedCount := vh.getUnackedCountConsumer(channelState, consumer)
-			if unackedCount >= consumer.PrefetchCount {
-				return true
-			}
+	// b) Prefetch is per-consumer AND total unacked on channel for this consumer >= consumer prefetch AND consumer prefetch > 0
+	// c) Flow is paused on the channel
+
+	reason := []struct {
+		name      string
+		condition bool
+	}{
+		{"flow paused", !channelState.FlowActive},
+		{"global qos", channelState.PrefetchGlobal &&
+			channelState.GlobalPrefetchCount > 0 &&
+			vh.getUnackedCountChannel(channelState) >= channelState.GlobalPrefetchCount},
+		{"consumer_qos", !channelState.PrefetchGlobal &&
+			consumer.PrefetchCount > 0 &&
+			vh.getUnackedCountConsumer(channelState, consumer) >= consumer.PrefetchCount},
+	}
+	for _, r := range reason {
+		if r.condition {
+			log.Trace().Str("reason", r.name).
+				Str("consumer", consumer.Tag).
+				Uint16("channel", consumer.Channel).
+				Msg("Throttling delivery")
+			return true
 		}
 	}
+	/// Previous implementation:
+	// if channelState.PrefetchGlobal {
+	// 	if channelState.GlobalPrefetchCount > 0 {
+	// 		unackedCount := vh.getUnackedCountChannel(channelState)
+	// 		if unackedCount >= channelState.GlobalPrefetchCount {
+	// 			return true
+	// 		}
+	// 	}
+	// } else {
+	// 	if consumer.PrefetchCount > 0 {
+	// 		unackedCount := vh.getUnackedCountConsumer(channelState, consumer)
+	// 		if unackedCount >= consumer.PrefetchCount {
+	// 			return true
+	// 		}
+	// 	}
+	// }
 	return false
 }
 

@@ -5,15 +5,17 @@ import (
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
-func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+func (b *Broker) channelHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.CHANNEL_OPEN):
 		return b.handleOpenChannel(request, conn)
 	case uint16(amqp.CHANNEL_FLOW):
-		return b.handleChannelFlow(request, conn)
+		return b.handleChannelFlow(request, vh, conn)
 	case uint16(amqp.CHANNEL_FLOW_OK):
 		return b.handleChannelFlowOk(request, conn)
 	case uint16(amqp.CHANNEL_CLOSE):
@@ -45,11 +47,72 @@ func (b *Broker) handleOpenChannel(request *amqp.RequestMethodMessage, conn net.
 	return nil, nil
 }
 
-func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
-	panic("unimplemented")
+func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	channel := request.Channel
+	content, ok := request.Content.(amqp.ChannelFlowContent)
+	if !ok {
+		log.Error().Uint16("channel", channel).Msg("Invalid content for channel flow")
+		// TODO: Realize which error code to raise here
+		return nil, fmt.Errorf("invalid content for channel flow")
+	}
+	flowActive := content.Active
+
+	b.mu.Lock()
+	_, exists := b.Connections[conn].Channels[channel]
+	b.mu.Unlock()
+	if !exists {
+		log.Debug().Uint16("channel", channel).Msg("Channel not found for flow control")
+		// raise 504 error if channel not found
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("channel '%d' not found in vhost '%s'", channel, vh),
+			uint16(amqp.CHANNEL_ERROR),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+	err := vh.HandleChannelFlow(conn, channel, flowActive)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to handle channel flow in vhost")
+		// Should raise 541 error if vhost fails to handle flow
+		amqpErr := errors.NewConnectionError(
+			fmt.Sprintf("vhost '%s' failed to handle channel flow", vh.Name),
+			uint16(amqp.CHANNEL_FLOW),
+			uint16(amqp.CHANNEL),
+			uint16(amqp.CHANNEL_FLOW),
+		)
+		b.sendChannelClosing(
+			conn,
+			channel,
+			amqpErr.ReplyCode(),
+			amqpErr.ClassID(),
+			amqpErr.MethodID(),
+			amqpErr.Error(),
+		)
+		return nil, amqpErr
+	}
+
+	log.Debug().Uint16("channel", channel).Bool("flow_active", flowActive).Msg("Channel flow state updated")
+	// send channel.flow-ok
+	frame := b.framer.CreateChannelFlowOkFrame(channel, flowActive)
+	err = b.framer.SendFrame(conn, frame)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send channel flow ok frame")
+		return nil, err
+	}
+
+	return nil, nil
 }
 
-func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	panic("unimplemented")
 }
 
