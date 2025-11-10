@@ -144,6 +144,7 @@ OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, s
 - Topic exchange routing (direct and fanout work)
 
 **All basic AMQP message operations are now fully implemented**, including:
+
 - Push-based consumption (`basic.consume`/`basic.deliver`)
 - Pull-based consumption (`basic.get`)
 - Message acknowledgments (`basic.ack`, `basic.nack`, `basic.reject`)

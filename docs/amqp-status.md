@@ -22,7 +22,7 @@ Status levels:
 | exchange | 80% | direct/fanout implemented; topic pattern matching TODO |
 | queue | 100% | All methods fully implemented |
 | basic | 100% | All methods fully implemented |
-| tx | 0% | Transaction support planned |
+| tx | 100% | All transaction methods fully implemented |
 
 ## connection
 
@@ -72,8 +72,6 @@ Status levels:
 | queue.delete | ✅ | |
 | queue.delete-ok | ✅ | |
 
-
-
 ## basic
 
 | Method | Status | Notes |
@@ -101,12 +99,21 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| tx.select | ❌ | Transaction support not yet implemented |
-| tx.select-ok | ❌ | |
-| tx.commit | ❌ | |
-| tx.commit-ok | ❌ | |
-| tx.rollback | ❌ | |
-| tx.rollback-ok | ❌ | |
+| tx.select | ✅ | Enter transaction mode (idempotent) |
+| tx.select-ok | ✅ | |
+| tx.commit | ✅ | Atomically commit buffered operations |
+| tx.commit-ok | ✅ | |
+| tx.rollback | ✅ | Discard buffered operations |
+| tx.rollback-ok | ✅ | |
+
+**Transaction Features:**
+
+- ✅ Transactional publishing with buffering
+- ✅ Transactional acknowledgments (ACK/NACK/REJECT)
+- ✅ Multiple commits per transaction mode
+- ✅ Channel close implicit rollback
+- ✅ Mandatory message handling in transactions
+- ✅ Mixed operations (publish + ack) in single transaction
 
 ---
 
