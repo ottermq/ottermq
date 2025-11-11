@@ -47,7 +47,7 @@ func TestMatchTopic(t *testing.T) {
 		{"# and * match end", "a.b.c", "a.#.*", true},
 		{"# and * no match", "a.b", "#.*.d", false},
 		{"*.# pattern", "a.b.c", "*.#", true},
-		{"*.# single word", "a", "*.#", false},
+		{"*.# single word", "a", "*.#", false}, // * matches "a", # matches zero words
 		{"#.* pattern", "a.b.c", "#.*", true},
 		{"#.*.# complex", "a.b.c.d.e", "#.*.#", true},
 

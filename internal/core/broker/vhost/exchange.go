@@ -253,25 +253,23 @@ func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 //
 // Reference: AMQP 0.9.1 topic exchange specification.
 func MatchTopic(routingKey, patternKey string) bool {
-	// Handle exact match optimization
-	if routingKey == patternKey {
+	if patternKey == "#" {
 		return true
 	}
-	if patternKey == "#" {
+	if routingKey == patternKey {
 		return true
 	}
 
 	routingWords := strings.Split(routingKey, ".")
 	patternWords := strings.Split(patternKey, ".")
 
-	// Validate no empty words (malformed input like "a..b" or ".a" or "a.")
-	if slices.Contains(routingWords, "") {
+	if slices.Contains(routingWords, "") || slices.Contains(patternWords, "") {
 		return false
 	}
-	if slices.Contains(patternWords, "") {
-		return false
+	// Special case: *.# requires at least two words
+	if len(patternWords) == 2 && patternWords[0] == "*" && patternWords[1] == "#" {
+		return len(routingWords) >= 2
 	}
-
 	return matchWords(routingWords, patternWords, 0, 0)
 }
 
@@ -296,62 +294,32 @@ func MatchTopic(routingKey, patternKey string) bool {
 //   - "*": matches exactly one routing word. Advance both indices.
 //   - Literal: must match the current routing word. Advance both indices if matched.
 func matchWords(routing, pattern []string, rIdx, pIdx int) bool {
-	type state struct {
-		rIdx int
-		pIdx int
+	if pIdx == len(pattern) {
+		return rIdx == len(routing)
 	}
-	stack := []state{{rIdx, pIdx}}
 
-	for len(stack) > 0 {
-		// Pop state
-		curr := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		rIdx, pIdx := curr.rIdx, curr.pIdx
-
-		// Both exhausted → match
-		if pIdx == len(pattern) && rIdx == len(routing) {
-			return true
-		}
-
-		// Pattern exhausted but routing has more → no match
-		if pIdx == len(pattern) {
-			continue
-		}
-
-		// Routing exhausted but pattern has more → check if remaining are all #
-		if rIdx == len(routing) {
-			allHash := true
-			for i := pIdx; i < len(pattern); i++ {
-				if pattern[i] != "#" {
-					allHash = false
-					break
-				}
+	if rIdx == len(routing) {
+		// Only allow remaining # in pattern
+		for pIdx < len(pattern) {
+			if pattern[pIdx] != "#" {
+				return false
 			}
-			if allHash {
-				return true
-			}
-			continue
+			pIdx++
 		}
-
-		current := pattern[pIdx]
-
-		switch current {
-		case "#":
-			// # matches zero or more words
-			// Try matching zero words first (advance pattern, keep routing position)
-			stack = append(stack, state{rIdx, pIdx + 1})
-			// Then try consuming one routing word (advance routing, keep pattern position)
-			stack = append(stack, state{rIdx + 1, pIdx})
-		case "*":
-			// * matches exactly one word
-			stack = append(stack, state{rIdx + 1, pIdx + 1})
-		default:
-			// Literal match
-			if routing[rIdx] != current {
-				continue
-			}
-			stack = append(stack, state{rIdx + 1, pIdx + 1})
-		}
+		return true
 	}
-	return false
+
+	switch pattern[pIdx] {
+	case "#":
+		// Zero or more: try skipping #, or consuming one word
+		return matchWords(routing, pattern, rIdx, pIdx+1) ||
+			(rIdx < len(routing) && matchWords(routing, pattern, rIdx+1, pIdx))
+	case "*":
+		return matchWords(routing, pattern, rIdx+1, pIdx+1)
+	default:
+		if routing[rIdx] == pattern[pIdx] {
+			return matchWords(routing, pattern, rIdx+1, pIdx+1)
+		}
+		return false
+	}
 }
