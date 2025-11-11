@@ -6,6 +6,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/rs/zerolog/log"
 )
 
 type Alias map[string](string)
@@ -206,8 +207,17 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 		bindings[""] = queues
 		return bindings
 	case vhost.TOPIC:
-		// not implemented
-
+		bindings := make(map[string][]string)
+		for routingKey, bs := range exchange.Bindings {
+			var queuesStr []string
+			for _, binding := range bs {
+				queuesStr = append(queuesStr, binding.Queue.Name)
+			}
+			bindings[routingKey] = queuesStr
+		}
+		return bindings
+	default:
+		log.Debug().Str("exchange", exchangeName).Str("type", string(exchange.Typ)).Msg("Unsupported exchange type for listing bindings")
+		return nil
 	}
-	return nil
 }
