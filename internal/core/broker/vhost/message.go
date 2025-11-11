@@ -120,7 +120,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 			}
 		}
 
-		// It should not happen, since we check for bindings before publishing
+		// This should not occur, as bindings are checked before publishing
 		if len(matchedQueues) == 0 {
 			log.Error().Str("routing_key", routingKey).
 				Str("exchange", exchangeName).

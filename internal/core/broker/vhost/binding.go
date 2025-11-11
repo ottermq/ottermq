@@ -35,7 +35,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 	if !ok {
 		return errors.NewChannelError(fmt.Sprintf("no queue '%s' in vhost '%s'", queueName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
 	}
-	// If conn is null, it means this is a server-side binding (e.g., default exchange on queue creation)
+	// If conn is nil, it means this is a server-side binding (e.g., default exchange on queue creation)
 	if conn != nil {
 		if err := vh.validateQueueOwnership(queue, conn, queueName); err != nil {
 			return err
