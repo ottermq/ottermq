@@ -10,15 +10,16 @@ import (
 
 type Config struct {
 	// Core
-	BrokerPort           string
-	BrokerHost           string
+	BrokerPort string
+	BrokerHost string
+
+	// AMQP Settings
 	HeartbeatIntervalMax uint16
 	ChannelMax           uint16
 	FrameMax             uint32
 	Version              string
 	Ssl                  bool
 	QueueBufferSize      int
-	LogLevel             string
 
 	// Extensions
 	EnableDLX    bool
@@ -30,6 +31,9 @@ type Config struct {
 	Username  string
 	Password  string
 	JwtSecret string
+
+	// Logging
+	LogLevel string
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -39,14 +43,14 @@ func LoadConfig(version string) *Config {
 	_ = godotenv.Load()
 
 	return &Config{
-		BrokerPort:           getEnv("OTTERMQ_BROKER_PORT", "5672"),
-		BrokerHost:           getEnv("OTTERMQ_BROKER_HOST", ""),
+		BrokerPort: getEnv("OTTERMQ_BROKER_PORT", "5672"),
+		BrokerHost: getEnv("OTTERMQ_BROKER_HOST", ""),
+
 		HeartbeatIntervalMax: getEnvAsUint16("OTTERMQ_HEARTBEAT_INTERVAL", 60),
 		ChannelMax:           getEnvAsUint16("OTTERMQ_CHANNEL_MAX", 2048),
 		FrameMax:             getEnvAsUint32("OTTERMQ_FRAME_MAX", 131072),
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
-		LogLevel:             getEnv("LOG_LEVEL", "info"),
 
 		EnableDLX:    getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
 		EnableWebAPI: getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
@@ -57,6 +61,8 @@ func LoadConfig(version string) *Config {
 		Password:  getEnv("OTTERMQ_PASSWORD", "guest"),
 		JwtSecret: getEnv("OTTERMQ_JWT_SECRET", "secret"),
 		Version:   version,
+
+		LogLevel: getEnv("LOG_LEVEL", "info"),
 	}
 }
 
