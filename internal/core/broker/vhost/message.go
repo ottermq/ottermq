@@ -185,7 +185,14 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 		// Use unlocked version since we already hold the lock
 		return len(vh.listFanoutQueuesUnlocked(exchange)) > 0, nil
 	case TOPIC:
-		// TODO: Implement topic routing check (needs pattern matching)
+		for bindingKey := range exchange.Bindings {
+			if MatchTopic(routingKey, bindingKey) {
+				queues := exchange.Bindings[bindingKey]
+				if len(queues) > 0 {
+					return true, nil
+				}
+			}
+		}
 		return false, nil
 	default:
 		return false, nil
