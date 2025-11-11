@@ -196,10 +196,11 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 	}
 
 	// Create exchange with unsupported type
-	exchangeName := "topic-ex"
+	exchangeName := "headers-ex"
+	xType := HEADERS
 	vh.Exchanges[exchangeName] = &Exchange{
 		Name:  exchangeName,
-		Typ:   TOPIC, // Not yet implemented
+		Typ:   xType,
 		Props: &ExchangeProperties{Internal: false},
 	}
 	msg := &amqp.Message{
@@ -211,7 +212,7 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error for unsupported exchange type, got nil")
 	}
-	if err != nil && err.Error() != "topic exchange not yet implemented" {
+	if err != nil && err.Error() != fmt.Sprintf("exchange type '%s' not supported yet", xType) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }

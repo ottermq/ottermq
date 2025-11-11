@@ -120,7 +120,6 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 			}
 		}
 
-		// This should not occur, as bindings are checked before publishing
 		if len(matchedQueues) == 0 {
 			log.Error().Str("routing_key", routingKey).
 				Str("exchange", exchangeName).
@@ -145,7 +144,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		}
 		return msg.ID, nil
 	default:
-		return "", fmt.Errorf("unknown exchange type")
+		return "", fmt.Errorf("exchange type '%s' not supported yet", exchange.Typ)
 	}
 }
 

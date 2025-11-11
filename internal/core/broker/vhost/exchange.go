@@ -29,9 +29,10 @@ type ExchangeProperties struct {
 type ExchangeType string
 
 const (
-	DIRECT ExchangeType = "direct"
-	FANOUT ExchangeType = "fanout"
-	TOPIC  ExchangeType = "topic"
+	DIRECT  ExchangeType = "direct"
+	FANOUT  ExchangeType = "fanout"
+	TOPIC   ExchangeType = "topic"
+	HEADERS ExchangeType = "headers"
 )
 
 type MandatoryExchange struct {
@@ -295,47 +296,62 @@ func MatchTopic(routingKey, patternKey string) bool {
 //   - "*": matches exactly one routing word. Advance both indices.
 //   - Literal: must match the current routing word. Advance both indices if matched.
 func matchWords(routing, pattern []string, rIdx, pIdx int) bool {
-	// Both exhausted → match
-	if pIdx == len(pattern) && rIdx == len(routing) {
-		return true
+	type state struct {
+		rIdx int
+		pIdx int
 	}
+	stack := []state{{rIdx, pIdx}}
 
-	// Pattern exhausted but routing has more → no match
-	if pIdx == len(pattern) {
-		return false
-	}
+	for len(stack) > 0 {
+		// Pop state
+		curr := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		rIdx, pIdx := curr.rIdx, curr.pIdx
 
-	// Routing exhausted but pattern has more → check if remaining are all #
-	if rIdx == len(routing) {
-		for i := pIdx; i < len(pattern); i++ {
-			if pattern[i] != "#" {
-				return false
-			}
-		}
-		return true
-	}
-
-	current := pattern[pIdx]
-
-	switch current {
-	case "#":
-		// # matches zero or more words
-		// Try matching zero words first (advance pattern, keep routing position)
-		if matchWords(routing, pattern, rIdx, pIdx+1) {
+		// Both exhausted → match
+		if pIdx == len(pattern) && rIdx == len(routing) {
 			return true
 		}
-		// Then try consuming one routing word (advance routing, keep pattern position)
-		return matchWords(routing, pattern, rIdx+1, pIdx)
 
-	case "*":
-		// * matches exactly one word
-		return matchWords(routing, pattern, rIdx+1, pIdx+1)
-
-	default:
-		// Literal match
-		if routing[rIdx] != current {
-			return false
+		// Pattern exhausted but routing has more → no match
+		if pIdx == len(pattern) {
+			continue
 		}
-		return matchWords(routing, pattern, rIdx+1, pIdx+1)
+
+		// Routing exhausted but pattern has more → check if remaining are all #
+		if rIdx == len(routing) {
+			allHash := true
+			for i := pIdx; i < len(pattern); i++ {
+				if pattern[i] != "#" {
+					allHash = false
+					break
+				}
+			}
+			if allHash {
+				return true
+			}
+			continue
+		}
+
+		current := pattern[pIdx]
+
+		switch current {
+		case "#":
+			// # matches zero or more words
+			// Try matching zero words first (advance pattern, keep routing position)
+			stack = append(stack, state{rIdx, pIdx + 1})
+			// Then try consuming one routing word (advance routing, keep pattern position)
+			stack = append(stack, state{rIdx + 1, pIdx})
+		case "*":
+			// * matches exactly one word
+			stack = append(stack, state{rIdx + 1, pIdx + 1})
+		default:
+			// Literal match
+			if routing[rIdx] != current {
+				continue
+			}
+			stack = append(stack, state{rIdx + 1, pIdx + 1})
+		}
 	}
+	return false
 }
