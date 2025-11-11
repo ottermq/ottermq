@@ -188,8 +188,8 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 	log.Debug().Interface("request", request).Msg("Received queue declare request")
 	content, ok := request.Content.(*amqp.QueueDeclareMessage)
 	if !ok {
-		log.Error().Msg("Invalid content type for ExchangeDeclareMessage")
-		return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
+		log.Error().Msg("Invalid content type for QueueDeclareMessage")
+		return nil, fmt.Errorf("invalid content type for QueueDeclareMessage")
 	}
 	log.Debug().Interface("content", content).Msg("Content")
 	queueName := content.QueueName
