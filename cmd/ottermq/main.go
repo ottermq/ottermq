@@ -92,12 +92,12 @@ func main() {
 
 	// Initialize the web admin server
 	webConfig := &web.Config{
-		BrokerHost:    cfg.Host,
-		BrokerPort:    cfg.Port,
+		BrokerHost:    cfg.BrokerHost,
+		BrokerPort:    cfg.BrokerPort,
 		Username:      cfg.Username,
 		Password:      cfg.Password,
 		JwtKey:        cfg.JwtSecret,
-		WebServerPort: cfg.WebServerPort,
+		WebServerPort: cfg.WebPort,
 	}
 	conn, err := web.GetBrokerClient(webConfig)
 	if err != nil {
@@ -119,7 +119,7 @@ func main() {
 
 	// Start the web admin server in a goroutine
 	go func() {
-		addr := fmt.Sprintf(":%s", cfg.WebServerPort)
+		addr := fmt.Sprintf(":%s", cfg.WebPort)
 		log.Info().Str("addr", addr).Msg("Starting web server")
 		err := app.Listen(addr)
 		if err != nil {

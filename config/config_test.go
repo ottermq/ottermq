@@ -12,11 +12,11 @@ func TestLoadConfigWithDefaults(t *testing.T) {
 	config := LoadConfig("test-version")
 
 	// Check default values
-	if config.Port != "5672" {
-		t.Errorf("Expected Port to be '5672', got '%s'", config.Port)
+	if config.BrokerPort != "5672" {
+		t.Errorf("Expected Port to be '5672', got '%s'", config.BrokerPort)
 	}
-	if config.Host != "" {
-		t.Errorf("Expected Host to be empty, got '%s'", config.Host)
+	if config.BrokerHost != "" {
+		t.Errorf("Expected Host to be empty, got '%s'", config.BrokerHost)
 	}
 	if config.Username != "guest" {
 		t.Errorf("Expected Username to be 'guest', got '%s'", config.Username)
@@ -39,8 +39,8 @@ func TestLoadConfigWithDefaults(t *testing.T) {
 	if config.QueueBufferSize != 100000 {
 		t.Errorf("Expected QueueBufferSize to be 100000, got %d", config.QueueBufferSize)
 	}
-	if config.WebServerPort != "3000" {
-		t.Errorf("Expected WebServerPort to be '3000', got '%s'", config.WebServerPort)
+	if config.WebPort != "3000" {
+		t.Errorf("Expected WebServerPort to be '3000', got '%s'", config.WebPort)
 	}
 	if config.JwtSecret != "secret" {
 		t.Errorf("Expected JwtSecret to be 'secret', got '%s'", config.JwtSecret)
@@ -75,11 +75,11 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	config := LoadConfig("env-version")
 
 	// Check environment variable values
-	if config.Port != "15672" {
-		t.Errorf("Expected Port to be '15672', got '%s'", config.Port)
+	if config.BrokerPort != "15672" {
+		t.Errorf("Expected Port to be '15672', got '%s'", config.BrokerPort)
 	}
-	if config.Host != "localhost" {
-		t.Errorf("Expected Host to be 'localhost', got '%s'", config.Host)
+	if config.BrokerHost != "localhost" {
+		t.Errorf("Expected Host to be 'localhost', got '%s'", config.BrokerHost)
 	}
 	if config.Username != "admin" {
 		t.Errorf("Expected Username to be 'admin', got '%s'", config.Username)
@@ -102,8 +102,8 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	if config.QueueBufferSize != 50000 {
 		t.Errorf("Expected QueueBufferSize to be 50000, got %d", config.QueueBufferSize)
 	}
-	if config.WebServerPort != "8080" {
-		t.Errorf("Expected WebServerPort to be '8080', got '%s'", config.WebServerPort)
+	if config.WebPort != "8080" {
+		t.Errorf("Expected WebServerPort to be '8080', got '%s'", config.WebPort)
 	}
 	if config.JwtSecret != "my-secret-key" {
 		t.Errorf("Expected JwtSecret to be 'my-secret-key', got '%s'", config.JwtSecret)

@@ -72,7 +72,7 @@ func (b *Broker) Start() error {
 
 	configurations := b.setConfigurations()
 
-	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
+	addr := fmt.Sprintf("%s:%s", b.config.BrokerHost, b.config.BrokerPort)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {

@@ -70,14 +70,14 @@ func setupBroker() error {
 
 	// Configure the broker for tests
 	cfg := &config.Config{
-		Host:            "localhost",
-		Port:            "5672",
+		BrokerHost:      "localhost",
+		BrokerPort:      "5672",
 		Username:        "guest",
 		Password:        "guest",
 		LogLevel:        "warn",
 		QueueBufferSize: 100000,
 		JwtSecret:       "test-secret",
-		WebServerPort:   "3001", // Different port to avoid conflicts
+		WebPort:         "3001", // Different port to avoid conflicts
 	}
 
 	logger.Init(cfg.LogLevel)
