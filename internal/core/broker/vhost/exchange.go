@@ -3,6 +3,8 @@ package vhost
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
@@ -47,7 +49,7 @@ const (
 
 var mandatoryExchanges = []MandatoryExchange{
 	{Name: DEFAULT_EXCHANGE, Type: DIRECT},
-	{Name: MANDATORY_TOPIC, Type: DIRECT},
+	{Name: MANDATORY_TOPIC, Type: TOPIC},
 	{Name: MANDATORY_DIRECT, Type: DIRECT},
 	{Name: MANDATORY_FANOUT, Type: FANOUT},
 }
@@ -79,6 +81,8 @@ func ParseExchangeType(s string) (ExchangeType, error) {
 		return DIRECT, nil
 	case string(FANOUT):
 		return FANOUT, nil
+	case string(TOPIC):
+		return TOPIC, nil
 	default:
 		return "", fmt.Errorf("invalid exchange type: %s", s)
 	}
@@ -215,26 +219,6 @@ func (vh *VHost) CheckAutoDeleteExchange(name string) (bool, error) {
 	return vh.checkAutoDeleteExchangeUnlocked(name)
 }
 
-// ToPersistence convert Exchange to persistence format
-// func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
-// 	bindings := make([]persistence.PersistedBinding, 0)
-// 	for routingKey, queues := range e.Bindings {
-// 		for _, queue := range queues {
-// 			bindings = append(bindings, persistence.PersistedBinding{
-// 				QueueName:  queue.Name,
-// 				RoutingKey: routingKey,
-// 				Arguments:  nil, // TODO: Add support for binding arguments
-// 			})
-// 		}
-// 	}
-// 	return &persistence.PersistedExchange{
-// 		Name:       e.Name,
-// 		Type:       string(e.Typ),
-// 		Properties: e.Props.ToPersistence(),
-// 		Bindings:   bindings,
-// 	}
-// }
-
 // ToPersistence convert ExchangeProperties to persistence format
 func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 	return persistence.ExchangeProperties{
@@ -244,5 +228,74 @@ func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 		Internal:   ep.Internal,
 		// NoWait:     ep.NoWait, // Not needed in persistence
 		Arguments: ep.Arguments,
+	}
+}
+
+func MatchTopic(routingKey, patternKey string) bool {
+	// Handle exact match optimization
+	if routingKey == patternKey {
+		return true
+	}
+	if patternKey == "#" {
+		return true
+	}
+
+	routingWords := strings.Split(routingKey, ".")
+	patternWords := strings.Split(patternKey, ".")
+
+	// Validate no empty words (malformed input like "a..b" or ".a" or "a.")
+	if slices.Contains(routingWords, "") {
+		return false
+	}
+	if slices.Contains(patternWords, "") {
+		return false
+	}
+
+	return matchWords(routingWords, patternWords, 0, 0)
+}
+
+func matchWords(routing, pattern []string, rIdx, pIdx int) bool {
+	// Both exhausted → match
+	if pIdx == len(pattern) && rIdx == len(routing) {
+		return true
+	}
+
+	// Pattern exhausted but routing has more → no match
+	if pIdx == len(pattern) {
+		return false
+	}
+
+	// Routing exhausted but pattern has more → check if remaining are all #
+	if rIdx == len(routing) {
+		for i := pIdx; i < len(pattern); i++ {
+			if pattern[i] != "#" {
+				return false
+			}
+		}
+		return true
+	}
+
+	current := pattern[pIdx]
+
+	switch current {
+	case "#":
+		// # matches zero or more words
+		// Try matching zero words first (advance pattern, keep routing position)
+		if matchWords(routing, pattern, rIdx, pIdx+1) {
+			return true
+		}
+		// Then try consuming one routing word (advance routing, keep pattern position)
+		return matchWords(routing, pattern, rIdx+1, pIdx)
+
+	case "*":
+		// * matches exactly one word
+		return matchWords(routing, pattern, rIdx+1, pIdx+1)
+
+	default:
+		// Literal match
+		if routing[rIdx] != current {
+			return false
+		}
+		return matchWords(routing, pattern, rIdx+1, pIdx+1)
 	}
 }
