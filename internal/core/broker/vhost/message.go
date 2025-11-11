@@ -110,8 +110,40 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		}
 		return msg.ID, nil
 	case TOPIC:
-		// TODO: Implement topic exchange routing
-		return "", fmt.Errorf("topic exchange not yet implemented")
+		matchedQueues := make(map[*Queue]bool)
+
+		for bindingKey, bindings := range exchange.Bindings {
+			if MatchTopic(routingKey, bindingKey) {
+				for _, binding := range bindings {
+					matchedQueues[binding.Queue] = true
+				}
+			}
+		}
+
+		// It should not happen, since we check for bindings before publishing
+		if len(matchedQueues) == 0 {
+			log.Error().Str("routing_key", routingKey).
+				Str("exchange", exchangeName).
+				Msg("No matching bindings for routing key")
+			return "", fmt.Errorf("no matching bindings for routing key %s in exchange %s", routingKey, exchangeName)
+		}
+
+		for queue := range matchedQueues {
+			err := vh.saveMessageIfDurable(SaveMessageRequest{
+				Props:      &msg.Properties,
+				Queue:      queue,
+				RoutingKey: routingKey,
+				MsgID:      msg.ID,
+				Body:       msg.Body,
+				MsgProps:   msgProps,
+			})
+			if err != nil {
+				return "", err
+			}
+
+			queue.Push(*msg)
+		}
+		return msg.ID, nil
 	default:
 		return "", fmt.Errorf("unknown exchange type")
 	}
