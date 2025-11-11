@@ -24,7 +24,7 @@ type ExchangeDeleteMessage struct {
 	NoWait       bool
 }
 
-func createExchangeDeclareFrame(channel uint16) []byte {
+func createExchangeDeclareFrameOk(channel uint16) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(EXCHANGE),

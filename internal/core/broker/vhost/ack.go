@@ -110,6 +110,7 @@ func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uin
 		state = &ChannelDeliveryState{
 			Unacked:        make(map[uint64]*DeliveryRecord),
 			unackedChanged: make(chan struct{}, 1),
+			FlowActive:     true, // Default to flow active
 		}
 		vh.ChannelDeliveries[key] = state
 	}

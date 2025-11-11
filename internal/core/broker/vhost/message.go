@@ -110,10 +110,41 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		}
 		return msg.ID, nil
 	case TOPIC:
-		// TODO: Implement topic exchange routing
-		return "", fmt.Errorf("topic exchange not yet implemented")
+		matchedQueues := make(map[*Queue]struct{})
+
+		for bindingKey, bindings := range exchange.Bindings {
+			if MatchTopic(routingKey, bindingKey) {
+				for _, binding := range bindings {
+					matchedQueues[binding.Queue] = struct{}{}
+				}
+			}
+		}
+
+		if len(matchedQueues) == 0 {
+			log.Debug().Str("routing_key", routingKey).
+				Str("exchange", exchangeName).
+				Msg("No matching bindings for routing key")
+			return msg.ID, nil
+		}
+
+		for queue := range matchedQueues {
+			err := vh.saveMessageIfDurable(SaveMessageRequest{
+				Props:      &msg.Properties,
+				Queue:      queue,
+				RoutingKey: routingKey,
+				MsgID:      msg.ID,
+				Body:       msg.Body,
+				MsgProps:   msgProps,
+			})
+			if err != nil {
+				return "", err
+			}
+
+			queue.Push(*msg)
+		}
+		return msg.ID, nil
 	default:
-		return "", fmt.Errorf("unknown exchange type")
+		return "", fmt.Errorf("exchange type '%s' not supported yet", exchange.Typ)
 	}
 }
 
@@ -185,7 +216,14 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 		// Use unlocked version since we already hold the lock
 		return len(vh.listFanoutQueuesUnlocked(exchange)) > 0, nil
 	case TOPIC:
-		// TODO: Implement topic routing check (needs pattern matching)
+		for bindingKey := range exchange.Bindings {
+			if MatchTopic(routingKey, bindingKey) {
+				queues := exchange.Bindings[bindingKey]
+				if len(queues) > 0 {
+					return true, nil
+				}
+			}
+		}
 		return false, nil
 	default:
 		return false, nil

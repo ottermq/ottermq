@@ -3,6 +3,8 @@ package vhost
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
@@ -27,9 +29,10 @@ type ExchangeProperties struct {
 type ExchangeType string
 
 const (
-	DIRECT ExchangeType = "direct"
-	FANOUT ExchangeType = "fanout"
-	TOPIC  ExchangeType = "topic"
+	DIRECT  ExchangeType = "direct"
+	FANOUT  ExchangeType = "fanout"
+	TOPIC   ExchangeType = "topic"
+	HEADERS ExchangeType = "headers"
 )
 
 type MandatoryExchange struct {
@@ -47,7 +50,7 @@ const (
 
 var mandatoryExchanges = []MandatoryExchange{
 	{Name: DEFAULT_EXCHANGE, Type: DIRECT},
-	{Name: MANDATORY_TOPIC, Type: DIRECT},
+	{Name: MANDATORY_TOPIC, Type: TOPIC},
 	{Name: MANDATORY_DIRECT, Type: DIRECT},
 	{Name: MANDATORY_FANOUT, Type: FANOUT},
 }
@@ -79,6 +82,8 @@ func ParseExchangeType(s string) (ExchangeType, error) {
 		return DIRECT, nil
 	case string(FANOUT):
 		return FANOUT, nil
+	case string(TOPIC):
+		return TOPIC, nil
 	default:
 		return "", fmt.Errorf("invalid exchange type: %s", s)
 	}
@@ -215,26 +220,6 @@ func (vh *VHost) CheckAutoDeleteExchange(name string) (bool, error) {
 	return vh.checkAutoDeleteExchangeUnlocked(name)
 }
 
-// ToPersistence convert Exchange to persistence format
-// func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
-// 	bindings := make([]persistence.PersistedBinding, 0)
-// 	for routingKey, queues := range e.Bindings {
-// 		for _, queue := range queues {
-// 			bindings = append(bindings, persistence.PersistedBinding{
-// 				QueueName:  queue.Name,
-// 				RoutingKey: routingKey,
-// 				Arguments:  nil, // TODO: Add support for binding arguments
-// 			})
-// 		}
-// 	}
-// 	return &persistence.PersistedExchange{
-// 		Name:       e.Name,
-// 		Type:       string(e.Typ),
-// 		Properties: e.Props.ToPersistence(),
-// 		Bindings:   bindings,
-// 	}
-// }
-
 // ToPersistence convert ExchangeProperties to persistence format
 func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 	return persistence.ExchangeProperties{
@@ -244,5 +229,97 @@ func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 		Internal:   ep.Internal,
 		// NoWait:     ep.NoWait, // Not needed in persistence
 		Arguments: ep.Arguments,
+	}
+}
+
+// MatchTopic determines whether an AMQP topic exchange routing key matches a binding pattern.
+//
+// Parameters:
+//
+//	routingKey: The routing key of the published message (e.g., "foo.bar.baz").
+//	patternKey: The binding pattern to match against (e.g., "foo.*.baz", "foo.#").
+//
+// Returns:
+//
+//	true if the routingKey matches the patternKey according to AMQP topic exchange semantics; false otherwise.
+//
+// AMQP Topic Matching Semantics:
+//   - Words are dot-separated (e.g., "a.b.c").
+//   - '*' matches exactly one word (e.g., "a.*.c" matches "a.b.c" but not "a.b.d.c").
+//   - '#' matches zero or more words (e.g., "a.#" matches "a", "a.b", "a.b.c", etc.).
+//   - A pattern of "#" matches any routing key.
+//   - Empty words (e.g., "a..b", ".a", "a.") are considered invalid and do not match.
+//   - Matching is case-sensitive.
+//
+// Reference: AMQP 0.9.1 topic exchange specification.
+func MatchTopic(routingKey, patternKey string) bool {
+	if patternKey == "#" {
+		return true
+	}
+	if routingKey == patternKey {
+		return true
+	}
+
+	routingWords := strings.Split(routingKey, ".")
+	patternWords := strings.Split(patternKey, ".")
+
+	if slices.Contains(routingWords, "") || slices.Contains(patternWords, "") {
+		return false
+	}
+	// Special case: *.# requires at least two words
+	if len(patternWords) == 2 && patternWords[0] == "*" && patternWords[1] == "#" {
+		return len(routingWords) >= 2
+	}
+	return matchWords(routingWords, patternWords, 0, 0)
+}
+
+// matchWords recursively matches a routing key against a pattern key using AMQP topic wildcards.
+//
+// Parameters:
+//
+//	routing: slice of words from the routing key (e.g., "a.b.c" -> ["a", "b", "c"])
+//	pattern: slice of words from the pattern key (e.g., "a.*.c" -> ["a", "*", "c"])
+//	rIdx: current index in the routing slice
+//	pIdx: current index in the pattern slice
+//
+// Algorithm:
+//   - The function recursively advances through both slices, matching words according to the following rules:
+//   - If both indices reach the end, it's a match.
+//   - If the pattern is exhausted but routing remains, it's not a match.
+//   - If routing is exhausted but pattern remains, only matches if all remaining pattern words are "#".
+//   - For each pattern word:
+//   - "#": matches zero or more routing words. Recursively try both:
+//   - Advancing pattern index (zero words matched)
+//   - Advancing routing index (one word matched)
+//   - "*": matches exactly one routing word. Advance both indices.
+//   - Literal: must match the current routing word. Advance both indices if matched.
+func matchWords(routing, pattern []string, rIdx, pIdx int) bool {
+	if pIdx == len(pattern) {
+		return rIdx == len(routing)
+	}
+
+	if rIdx == len(routing) {
+		// Only allow remaining # in pattern
+		for pIdx < len(pattern) {
+			if pattern[pIdx] != "#" {
+				return false
+			}
+			pIdx++
+		}
+		return true
+	}
+
+	switch pattern[pIdx] {
+	case "#":
+		// Zero or more: try skipping #, or consuming one word
+		return matchWords(routing, pattern, rIdx, pIdx+1) ||
+			(rIdx < len(routing) && matchWords(routing, pattern, rIdx+1, pIdx))
+	case "*":
+		return matchWords(routing, pattern, rIdx+1, pIdx+1)
+	default:
+		if routing[rIdx] == pattern[pIdx] {
+			return matchWords(routing, pattern, rIdx+1, pIdx+1)
+		}
+		return false
 	}
 }

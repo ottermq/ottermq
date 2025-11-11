@@ -34,7 +34,7 @@ type Framer interface {
 
 	// Exchange Methods
 
-	CreateExchangeDeclareFrame(channel uint16) []byte
+	CreateExchangeDeclareFrameOk(channel uint16) []byte
 	CreateExchangeDeleteFrame(channel uint16) []byte
 
 	// Channel Methods
@@ -109,8 +109,8 @@ func (d *DefaultFramer) CreateQueueDeleteOkFrame(channel uint16, messageCount ui
 
 // REGION Exchange Methods
 
-func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16) []byte {
-	return createExchangeDeclareFrame(channel)
+func (d *DefaultFramer) CreateExchangeDeclareFrameOk(channel uint16) []byte {
+	return createExchangeDeclareFrameOk(channel)
 }
 
 func (d *DefaultFramer) CreateExchangeDeleteFrame(channel uint16) []byte {

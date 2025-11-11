@@ -89,7 +89,7 @@ func (m *MockFramer) CreateQueuePurgeOkFrame(channel uint16, messageCount uint32
 	return []byte("queue-purge-ok")
 }
 
-func (m *MockFramer) CreateExchangeDeclareFrame(channel uint16) []byte {
+func (m *MockFramer) CreateExchangeDeclareFrameOk(channel uint16) []byte {
 	return []byte("exchange-declare")
 }
 
