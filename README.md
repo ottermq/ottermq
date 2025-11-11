@@ -138,8 +138,10 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
 
+- Dead letter exchanges (RabbitMQ extension)
+- Message TTL and expiration
+- Priority queues
 - Memento WAL persistence engine (planned)
-- Topic exchange routing (direct and fanout work)
 
 **All core AMQP message operations are now fully implemented**, including:
 

@@ -20,7 +20,8 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Backpressure handling with flow state
 - [x] **Exchange Management**
   - [x] Exchange declare/delete
-  - [x] Direct, fanout, topic exchange types
+  - [x] Direct, fanout, topic exchange types with full pattern matching
+  - [x] Topic exchange wildcards (`*` and `#`)
   - [x] Mandatory exchanges (default, amq.*)
 - [x] **Queue Management**
   - [x] Queue declare/delete with properties
@@ -59,6 +60,14 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Topic Exchange Pattern Matching** - Full AMQP topic exchange implementation
+  - [x] `MatchTopic()` recursive pattern matching algorithm
+  - [x] `*` wildcard (matches exactly one word)
+  - [x] `#` wildcard (matches zero or more words)
+  - [x] Complex pattern support (e.g., `#.error.#`, `*.database.*`)
+  - [x] Input validation for malformed routing keys
+  - [x] Integration with message routing in `Publish()`
+  - [x] Comprehensive test coverage (70+ test cases)
 - [x] **Channel Flow Control** - Client and server-initiated flow control
   - [x] `CHANNEL_FLOW` - Channel-level flow control with active flag
   - [x] `CHANNEL_FLOW_OK` - Flow control acknowledgment
@@ -83,10 +92,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 #### **Phase 1: Advanced Features (High Priority)**
 
+- [ ] **Dead letter exchanges** (RabbitMQ extension)
+  - [ ] Queue-level dead letter exchange configuration
+  - [ ] Automatic routing of rejected/expired/maxlen messages
+  - [ ] Dead letter routing key override
+  - [ ] Death reason headers (rejected, expired, maxlen)
 - [ ] **Message TTL and expiration**
-- [ ] **Dead letter exchanges**
 - [ ] **Priority queues**
-- [ ] **Topic exchange pattern matching**
 
 #### **Phase 2: Clustering (Lower Priority)**
 
@@ -172,17 +184,34 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - `internal/core/broker/vhost/delivery.go` - Flow state management
 - `tests/internal/core/broker/vhost/channel_flow_test.go` - Flow tests
 
-### **Phase 6: Advanced Features & Performance (Current Focus)**
+### **Phase 6: Topic Exchange Implementation (COMPLETED)**
 
-**Goal**: Message lifecycle features and optimization
+**Completed implementations**:
+
+- Topic exchange pattern matching with `*` and `#` wildcards
+- Recursive matching algorithm for complex patterns
+- Integration with existing routing infrastructure
+- Comprehensive test suite (70+ test cases)
+- Input validation for malformed keys
+
+**Key files**:
+
+- `internal/core/broker/vhost/exchange.go` - MatchTopic implementation
+- `internal/core/broker/vhost/message.go` - Topic routing in Publish()
+- `internal/core/broker/vhost/topic_test.go` - Pattern matching tests
+
+### **Phase 7: Dead Letter Exchanges (Current Focus)**
+
+**Goal**: Implement RabbitMQ-compatible dead letter exchange functionality
 
 **Tasks**:
 
-1. Implement message TTL and expiration
-2. Add dead letter exchanges
-3. Implement priority queues
-4. Complete topic exchange pattern matching
-5. Performance profiling and optimization
+1. Add dead letter exchange configuration to queue properties
+2. Implement automatic routing of rejected messages
+3. Add death reason headers (x-death)
+4. Support dead letter routing key override
+5. Handle TTL expiration with dead lettering
+6. Test dead letter behavior with basic.reject and basic.nack
 
 ## Testing Strategy
 
@@ -213,13 +242,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 6: Advanced Features & Performance**. Contributors should focus on:
+The highest priority is **Phase 7: Dead Letter Exchanges**. Contributors should focus on:
 
-1. Message TTL and expiration mechanisms
-2. Dead letter exchange implementation
-3. Priority queue support
-4. Topic exchange pattern matching completion
-5. Performance profiling and optimization
+1. Dead letter exchange (DLX) configuration in queue properties
+2. Automatic message routing on rejection/expiration
+3. Death reason tracking and x-death headers
+4. Dead letter routing key override support
+5. Integration with basic.reject and basic.nack
 
 ### **Getting Started**
 
@@ -241,8 +270,8 @@ The highest priority is **Phase 6: Advanced Features & Performance**. Contributo
 ## Progress Tracking
 
 **Last Updated**: November 2025  
-**Current Focus**: Phase 6 - Advanced Features & Performance  
-**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE, QUEUE, BASIC, and TX class methods  
-**Next Milestone**: Message TTL, dead letter exchanges, and topic pattern matching
+**Current Focus**: Phase 7 - Dead Letter Exchanges  
+**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE, BASIC, and TX class methods  
+**Next Milestone**: Dead letter exchange implementation with x-death headers
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

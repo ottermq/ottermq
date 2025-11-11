@@ -19,7 +19,7 @@ Status levels:
 |------:|:------:|-------|
 | connection | 100% | All methods fully implemented |
 | channel | 100% | All methods fully implemented including flow control |
-| exchange | 80% | direct/fanout implemented; topic pattern matching TODO |
+| exchange | 100% | All exchange types fully implemented |
 | queue | 100% | All methods fully implemented |
 | basic | 100% | All methods fully implemented |
 | tx | 100% | All transaction methods fully implemented |
@@ -62,10 +62,19 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| exchange.declare | ⚠️ | Supports `direct`/`fanout`; missing `topic` |
+| exchange.declare | ✅ | Supports `direct`, `fanout`, and `topic` exchange types |
 | exchange.declare-ok | ✅ | |
 | exchange.delete | ✅ | |
 | exchange.delete-ok | ✅ | |
+
+**Topic Exchange Features:**
+
+- ✅ Wildcard pattern matching with `*` (matches exactly one word)
+- ✅ Wildcard pattern matching with `#` (matches zero or more words)
+- ✅ Dot-separated routing key matching
+- ✅ Multiple binding patterns per queue
+- ✅ Complex pattern combinations (e.g., `*.error.#`, `log.*.database`)
+- ✅ Malformed input validation (empty words, invalid patterns)
 
 ## queue
 
