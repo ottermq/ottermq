@@ -20,6 +20,10 @@ type Config struct {
 	QueueBufferSize      int
 	LogLevel             string
 
+	// Extensions
+	EnableDLX    bool
+	EnableWebAPI bool
+	EnableUI     bool
 
 	// Web Admin
 	WebPort   string
@@ -37,17 +41,16 @@ func LoadConfig(version string) *Config {
 	return &Config{
 		BrokerPort:           getEnv("OTTERMQ_BROKER_PORT", "5672"),
 		BrokerHost:           getEnv("OTTERMQ_BROKER_HOST", ""),
-		Username:             getEnv("OTTERMQ_USERNAME", "guest"),
-		Password:             getEnv("OTTERMQ_PASSWORD", "guest"),
 		HeartbeatIntervalMax: getEnvAsUint16("OTTERMQ_HEARTBEAT_INTERVAL", 60),
 		ChannelMax:           getEnvAsUint16("OTTERMQ_CHANNEL_MAX", 2048),
 		FrameMax:             getEnvAsUint32("OTTERMQ_FRAME_MAX", 131072),
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
-		WebPort:              getEnv("OTTERMQ_WEB_PORT", "3000"),
-		JwtSecret:            getEnv("OTTERMQ_JWT_SECRET", "secret"),
 		LogLevel:             getEnv("LOG_LEVEL", "info"),
 
+		EnableDLX:    getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
+		EnableWebAPI: getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
+		EnableUI:     getEnvAsBool("OTTERMQ_ENABLE_UI", true),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
 		Username:  getEnv("OTTERMQ_USERNAME", "guest"),
