@@ -121,10 +121,10 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		}
 
 		if len(matchedQueues) == 0 {
-			log.Error().Str("routing_key", routingKey).
+			log.Debug().Str("routing_key", routingKey).
 				Str("exchange", exchangeName).
 				Msg("No matching bindings for routing key")
-			return "", fmt.Errorf("no matching bindings for routing key %s in exchange %s", routingKey, exchangeName)
+			return msg.ID, nil
 		}
 
 		for queue := range matchedQueues {
