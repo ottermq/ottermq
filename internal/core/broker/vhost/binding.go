@@ -66,6 +66,16 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		}
 
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
+	case TOPIC:
+		for _, b := range exchange.Bindings[routingKey] {
+			// verify binding uniqueness
+			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
+				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s' with routing key '%s'", queueName, exchangeName, routingKey), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+			}
+		}
+		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
+	default:
+		return errors.NewChannelError(fmt.Sprintf("exchange '%s' has unsupported type '%s'", exchangeName, exchange.Typ), uint16(amqp.NOT_IMPLEMENTED), uint16(amqp.EXCHANGE), uint16(amqp.QUEUE_BIND))
 	}
 
 	if exchange.Props.Durable && queue.Props.Durable {
