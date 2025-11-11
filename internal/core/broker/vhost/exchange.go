@@ -29,10 +29,9 @@ type ExchangeProperties struct {
 type ExchangeType string
 
 const (
-	DIRECT  ExchangeType = "direct"
-	FANOUT  ExchangeType = "fanout"
-	TOPIC   ExchangeType = "topic"
-	HEADERS ExchangeType = "headers"
+	DIRECT ExchangeType = "direct"
+	FANOUT ExchangeType = "fanout"
+	TOPIC  ExchangeType = "topic"
 )
 
 type MandatoryExchange struct {

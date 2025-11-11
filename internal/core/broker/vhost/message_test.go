@@ -196,11 +196,11 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 	}
 
 	// Create exchange with unsupported type
-	exchangeName := "headers-ex"
-	xType := HEADERS
+	exchangeName := "unsupported-ex"
+	xType := "some-unsupported-type"
 	vh.Exchanges[exchangeName] = &Exchange{
 		Name:  exchangeName,
-		Typ:   xType,
+		Typ:   ExchangeType(xType),
 		Props: &ExchangeProperties{Internal: false},
 	}
 	msg := &amqp.Message{
