@@ -110,12 +110,12 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 		}
 		return msg.ID, nil
 	case TOPIC:
-		matchedQueues := make(map[*Queue]bool)
+		matchedQueues := make(map[*Queue]struct{})
 
 		for bindingKey, bindings := range exchange.Bindings {
 			if MatchTopic(routingKey, bindingKey) {
 				for _, binding := range bindings {
-					matchedQueues[binding.Queue] = true
+					matchedQueues[binding.Queue] = struct{}{}
 				}
 			}
 		}
