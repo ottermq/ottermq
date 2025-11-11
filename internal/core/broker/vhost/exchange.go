@@ -231,6 +231,26 @@ func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
 	}
 }
 
+// MatchTopic determines whether an AMQP topic exchange routing key matches a binding pattern.
+//
+// Parameters:
+//
+//	routingKey: The routing key of the published message (e.g., "foo.bar.baz").
+//	patternKey: The binding pattern to match against (e.g., "foo.*.baz", "foo.#").
+//
+// Returns:
+//
+//	true if the routingKey matches the patternKey according to AMQP topic exchange semantics; false otherwise.
+//
+// AMQP Topic Matching Semantics:
+//   - Words are dot-separated (e.g., "a.b.c").
+//   - '*' matches exactly one word (e.g., "a.*.c" matches "a.b.c" but not "a.b.d.c").
+//   - '#' matches zero or more words (e.g., "a.#" matches "a", "a.b", "a.b.c", etc.).
+//   - A pattern of "#" matches any routing key.
+//   - Empty words (e.g., "a..b", ".a", "a.") are considered invalid and do not match.
+//   - Matching is case-sensitive.
+//
+// Reference: AMQP 0.9.1 topic exchange specification.
 func MatchTopic(routingKey, patternKey string) bool {
 	// Handle exact match optimization
 	if routingKey == patternKey {
@@ -254,6 +274,26 @@ func MatchTopic(routingKey, patternKey string) bool {
 	return matchWords(routingWords, patternWords, 0, 0)
 }
 
+// matchWords recursively matches a routing key against a pattern key using AMQP topic wildcards.
+//
+// Parameters:
+//
+//	routing: slice of words from the routing key (e.g., "a.b.c" -> ["a", "b", "c"])
+//	pattern: slice of words from the pattern key (e.g., "a.*.c" -> ["a", "*", "c"])
+//	rIdx: current index in the routing slice
+//	pIdx: current index in the pattern slice
+//
+// Algorithm:
+//   - The function recursively advances through both slices, matching words according to the following rules:
+//   - If both indices reach the end, it's a match.
+//   - If the pattern is exhausted but routing remains, it's not a match.
+//   - If routing is exhausted but pattern remains, only matches if all remaining pattern words are "#".
+//   - For each pattern word:
+//   - "#": matches zero or more routing words. Recursively try both:
+//   - Advancing pattern index (zero words matched)
+//   - Advancing routing index (one word matched)
+//   - "*": matches exactly one routing word. Advance both indices.
+//   - Literal: must match the current routing word. Advance both indices if matched.
 func matchWords(routing, pattern []string, rIdx, pIdx int) bool {
 	// Both exhausted → match
 	if pIdx == len(pattern) && rIdx == len(routing) {
