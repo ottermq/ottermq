@@ -173,15 +173,19 @@ func (vh *VHost) deleteExchangeUnlocked(name string) error {
 		}
 	}
 	// Check if the exchange exists
-	_, ok := vh.Exchanges[name]
+	exchange, ok := vh.Exchanges[name]
 	if !ok {
 		return fmt.Errorf("exchange %s not found", name)
 	}
+	durable := exchange.Props.Durable
 
 	delete(vh.Exchanges, name)
-	// Handle durable property
-	if err := vh.persist.DeleteExchangeMetadata(vh.Name, name); err != nil {
-		return fmt.Errorf("failed to delete exchange from persistence: %v", err)
+	// Verify if exchange is durable
+	if durable {
+		// Handle durable property
+		if err := vh.persist.DeleteExchangeMetadata(vh.Name, name); err != nil {
+			return fmt.Errorf("failed to delete exchange from persistence: %v", err)
+		}
 	}
 	log.Debug().Str("exchange", name).Msg("Deleted exchange")
 	return nil
