@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"errors"
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -38,6 +39,11 @@ type DeadLetter struct {
 }
 
 func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error {
+	// Check if queue has DLX configured
+	if queue.Props.DeadLetterExchange == "" {
+		return errors.New("queue has no dead-letter-exchange configured")
+	}
+
 	log.Debug().
 		Str("queue", queue.Name).
 		Str("dlx", queue.Props.DeadLetterExchange).
