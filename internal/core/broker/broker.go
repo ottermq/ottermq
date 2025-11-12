@@ -70,7 +70,6 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 func (b *Broker) Start() error {
 	Logo()
 	log.Info().Str("version", b.config.Version).Msg("🦦 OtterMQ")
-	log.Info().Msg("Broker is starting...")
 
 	configurations := b.setConfigurations()
 
@@ -86,7 +85,6 @@ func (b *Broker) Start() error {
 
 	// Signal that the broker is ready to accept connections
 	close(b.Ready)
-	log.Info().Msg("Broker is ready")
 
 	return b.acceptLoop(configurations)
 }

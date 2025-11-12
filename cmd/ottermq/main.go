@@ -92,8 +92,12 @@ func main() {
 	var app interface{ ShutdownWithContext(context.Context) error }
 	var logfile *os.File
 
+	<-b.Ready
 	if cfg.EnableWebAPI {
 		log.Info().Msg("Web API enabled - initializing web server...")
+
+		// // Wait for broker to be ready before initializing web server
+		// log.Info().Msg("Broker ready signal received, initializing web server...")
 
 		// Initialize the web admin server
 		webConfig := &web.Config{
