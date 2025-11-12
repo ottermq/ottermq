@@ -73,7 +73,9 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 }
 
 func (b *Broker) Start() error {
-	Logo()
+	if b.config.ShowLogo {
+		Logo()
+	}
 	log.Info().Str("version", b.config.Version).Msg("🦦 OtterMQ")
 
 	configurations := b.setConfigurations()

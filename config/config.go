@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	// Core
+	ShowLogo   bool
 	BrokerPort string
 	BrokerHost string
 
@@ -44,6 +45,7 @@ func LoadConfig(version string) *Config {
 	_ = godotenv.Load()
 
 	return &Config{
+		ShowLogo:   getEnvAsBool("OTTERMQ_SHOW_LOGO", false),
 		BrokerPort: getEnv("OTTERMQ_BROKER_PORT", "5672"),
 		BrokerHost: getEnv("OTTERMQ_BROKER_HOST", ""),
 
