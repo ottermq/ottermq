@@ -22,9 +22,10 @@ type Config struct {
 	QueueBufferSize      int
 
 	// Extensions
-	EnableDLX    bool
-	EnableWebAPI bool
-	EnableUI     bool
+	EnableDLX     bool
+	EnableWebAPI  bool
+	EnableUI      bool
+	EnableSwagger bool
 
 	// Web Admin
 	WebPort   string
@@ -52,9 +53,10 @@ func LoadConfig(version string) *Config {
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
 
-		EnableDLX:    getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
-		EnableWebAPI: getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
-		EnableUI:     getEnvAsBool("OTTERMQ_ENABLE_UI", true),
+		EnableDLX:     getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
+		EnableWebAPI:  getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
+		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
+		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
 		Username:  getEnv("OTTERMQ_USERNAME", "guest"),

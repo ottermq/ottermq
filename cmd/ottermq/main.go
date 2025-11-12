@@ -107,6 +107,8 @@ func main() {
 			Password:      cfg.Password,
 			JwtKey:        cfg.JwtSecret,
 			WebServerPort: cfg.WebPort,
+			EnableUI:      cfg.EnableUI,
+			EnableSwagger: cfg.EnableSwagger,
 		}
 		// initialize amqp client connection
 		conn, err := web.GetBrokerClient(webConfig)
