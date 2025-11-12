@@ -91,7 +91,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 	assert.Equal(t, "rejected", headers["x-last-death-reason"])
 	assert.Equal(t, "amq.direct", headers["x-last-death-exchange"])
 
-	xDeath, ok := headers["x-death"].([]xDeathEntry)
+	xDeath, ok := headers["x-death"].([]map[string]any)
 	require.True(t, ok, "x-death should be array of entries")
 	require.Len(t, xDeath, 1, "Should have one death entry")
 
@@ -223,7 +223,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 	assert.Equal(t, "rejected", headers["x-first-death-reason"])
 	assert.Equal(t, "queue1", headers["x-last-death-queue"])
 
-	xDeath, ok := headers["x-death"].([]xDeathEntry)
+	xDeath, ok := headers["x-death"].([]map[string]any)
 	require.True(t, ok)
 	require.Len(t, xDeath, 1)
 	assert.Equal(t, uint32(1), xDeath[0]["count"])
@@ -247,7 +247,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 	assert.Equal(t, "rejected", headers["x-last-death-reason"])
 
 	// Verify x-death array has 2 entries, newest first
-	xDeath, ok = headers["x-death"].([]xDeathEntry)
+	xDeath, ok = headers["x-death"].([]map[string]any)
 	require.True(t, ok)
 	require.Len(t, xDeath, 2, "Should have two death entries")
 
@@ -307,7 +307,7 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 	deadMsg := dlq.Pop()
 	require.NotNil(t, deadMsg)
 
-	xDeath := deadMsg.Properties.Headers["x-death"].([]xDeathEntry)
+	xDeath := deadMsg.Properties.Headers["x-death"].([]map[string]any)
 	routingKeys, ok := xDeath[0]["routing-keys"].([]string)
 	require.True(t, ok)
 
@@ -362,7 +362,7 @@ func TestDeadLetter_ExpirationCleared(t *testing.T) {
 
 	assert.Empty(t, deadMsg.Properties.Expiration, "Expiration should be cleared")
 
-	xDeath := deadMsg.Properties.Headers["x-death"].([]xDeathEntry)
+	xDeath := deadMsg.Properties.Headers["x-death"].([]map[string]any)
 	assert.Equal(t, "60000", xDeath[0]["original-expiration"], "Original expiration should be preserved in x-death")
 }
 
@@ -425,7 +425,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 			assert.Equal(t, tc.expected, headers["x-first-death-reason"])
 			assert.Equal(t, tc.expected, headers["x-last-death-reason"])
 
-			xDeath := headers["x-death"].([]xDeathEntry)
+			xDeath := headers["x-death"].([]map[string]any)
 			assert.Equal(t, tc.expected, xDeath[0]["reason"])
 		})
 	}

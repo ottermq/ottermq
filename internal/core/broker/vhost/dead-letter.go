@@ -23,9 +23,6 @@ func (r ReasonType) String() string {
 	return string(r)
 }
 
-// xDeathEntry represents a single entry in the x-death header array of key-value pairs
-type xDeathEntry map[string]any
-
 type DeadLetterer interface {
 	DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error
 }
@@ -115,7 +112,7 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	headers["x-last-death-exchange"] = exchange
 
 	// Create x-death entry
-	death := xDeathEntry{
+	death := map[string]any{
 		"queue":               queue,
 		"reason":              reason.String(),
 		"count":               uint32(1), // long int
@@ -126,27 +123,12 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	}
 
 	// Get existing x-death header
-	var xDeathEvents []xDeathEntry
-	if existing, ok := headers["x-death"].([]map[string]any); ok {
-		// Convert back from []map[string]any to []xDeathEntry
-		xDeathEvents = make([]xDeathEntry, len(existing))
-		for i, entry := range existing {
-			xDeathEvents[i] = xDeathEntry(entry)
-		}
-	} else if existing, ok := headers["x-death"].([]xDeathEntry); ok {
-		// Handle case where it's still []xDeathEntry (shouldn't happen but be safe)
-		xDeathEvents = existing
-	} else {
-		xDeathEvents = []xDeathEntry{}
+	xDeathEvents, ok := headers["x-death"].([]map[string]any)
+	if !ok {
+		xDeathEvents = []map[string]any{}
 	}
 	death["count"] = uint32(len(xDeathEvents)) + 1
-	xDeathEvents = append([]xDeathEntry{death}, xDeathEvents...)
-	
-	// Convert []xDeathEntry to []map[string]any for AMQP encoding
-	xDeathArray := make([]map[string]any, len(xDeathEvents))
-	for i, entry := range xDeathEvents {
-		xDeathArray[i] = map[string]any(entry)
-	}
-	headers["x-death"] = xDeathArray
+	xDeathEvents = append([]map[string]any{death}, xDeathEvents...)
+	headers["x-death"] = xDeathEvents
 	return headers
 }

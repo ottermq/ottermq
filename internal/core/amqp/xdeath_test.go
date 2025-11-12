@@ -10,7 +10,9 @@ import (
 // TestEncodeDecodeXDeathHeader tests encoding and decoding of x-death header structure
 func TestEncodeDecodeXDeathHeader(t *testing.T) {
 	// Create an x-death entry similar to what we use
-	xDeathEntry := map[string]any{
+
+	// Create x-death array
+	xDeathArray := []map[string]any{{
 		"queue":               "test-queue",
 		"reason":              "rejected",
 		"count":               uint32(1),
@@ -18,20 +20,17 @@ func TestEncodeDecodeXDeathHeader(t *testing.T) {
 		"exchange":            "test-exchange",
 		"routing-keys":        []string{"key1", "key2"},
 		"original-expiration": "",
-	}
-
-	// Create x-death array
-	xDeathArray := []map[string]any{xDeathEntry}
+	}}
 
 	// Create headers with x-death
 	headers := map[string]any{
-		"x-death":                  xDeathArray,
-		"x-first-death-queue":      "test-queue",
-		"x-first-death-reason":     "rejected",
-		"x-first-death-exchange":   "test-exchange",
-		"x-last-death-queue":       "test-queue",
-		"x-last-death-reason":      "rejected",
-		"x-last-death-exchange":    "test-exchange",
+		"x-death":                xDeathArray,
+		"x-first-death-queue":    "test-queue",
+		"x-first-death-reason":   "rejected",
+		"x-first-death-exchange": "test-exchange",
+		"x-last-death-queue":     "test-queue",
+		"x-last-death-reason":    "rejected",
+		"x-last-death-exchange":  "test-exchange",
 	}
 
 	// Encode
@@ -45,12 +44,12 @@ func TestEncodeDecodeXDeathHeader(t *testing.T) {
 	require.NoError(t, err, "Should decode without error")
 
 	// Verify x-death
-	xDeath, ok := decoded["x-death"].([]interface{})
-	require.True(t, ok, "x-death should be decoded as []interface{}")
+	xDeath, ok := decoded["x-death"].([]any)
+	require.True(t, ok, "x-death should be decoded as []any")
 	require.Len(t, xDeath, 1, "x-death should have 1 entry")
 
 	// Verify first entry
-	entry, ok := xDeath[0].(map[string]interface{})
+	entry, ok := xDeath[0].(map[string]any)
 	require.True(t, ok, "x-death entry should be a map")
 
 	assert.Equal(t, "test-queue", entry["queue"])
@@ -59,7 +58,7 @@ func TestEncodeDecodeXDeathHeader(t *testing.T) {
 	assert.Equal(t, "test-exchange", entry["exchange"])
 
 	// Verify routing-keys
-	routingKeys, ok := entry["routing-keys"].([]interface{})
+	routingKeys, ok := entry["routing-keys"].([]any)
 	require.True(t, ok, "routing-keys should be an array")
 	require.Len(t, routingKeys, 2)
 	assert.Equal(t, "key1", routingKeys[0])
