@@ -308,7 +308,7 @@ func parseConnectionTuneFrame(payload []byte) (*ConnectionTune, error) {
 		return nil, fmt.Errorf("failed to decode channel max: %v", err)
 	}
 
-	frameMax, err := DecodeLongInt(buf)
+	frameMax, err := DecodeLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode frame max: %v", err)
 	}
@@ -333,7 +333,7 @@ func parseConnectionTuneOkFrame(payload []byte) (interface{}, error) {
 		return nil, fmt.Errorf("failed to decode channel max: %v", err)
 	}
 
-	frameMax, err := DecodeLongInt(buf)
+	frameMax, err := DecodeLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode frame max: %v", err)
 	}

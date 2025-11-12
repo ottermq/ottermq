@@ -264,10 +264,10 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.Headers != nil {
 		flags |= (1 << 13)
+		log.Debug().Interface("headers", props.Headers).Msg("Encoding headers in BasicProperties")
 		encodedTable := EncodeTable(props.Headers)
-		if _, err := buf.Write(encodedTable); err != nil {
-			return nil, 0, err
-		}
+		log.Debug().Int("encoded_size", len(encodedTable)).Msg("Encoded table size")
+		EncodeLongStr(&buf, encodedTable)
 	}
 	if props.DeliveryMode != 0 {
 		flags |= (1 << 12)
@@ -371,7 +371,7 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 	}
 	log.Trace().Msgf("- HEADER - Weight: %d\n", weight)
 
-	bodySize, err := DecodeLongLongInt(buf)
+	bodySize, err := DecodeLongLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode body size: %v", err)
 	}
@@ -467,7 +467,7 @@ func parseBasicQosFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("payload too short")
 	}
 	buf := bytes.NewReader(payload)
-	prefetchSize, err := DecodeLongInt(buf)
+	prefetchSize, err := DecodeLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode prefetch size: %v", err)
 	}
@@ -689,7 +689,7 @@ func parseBasicAckFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
-	deliveryTag, err := DecodeLongLongInt(buf)
+	deliveryTag, err := DecodeLongLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
 	}
@@ -717,7 +717,7 @@ func parseBasicRejectFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
-	deliveryTag, err := DecodeLongLongInt(buf)
+	deliveryTag, err := DecodeLongLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
 	}
@@ -779,7 +779,7 @@ func parseBasicNackFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
-	deliveryTag, err := DecodeLongLongInt(buf)
+	deliveryTag, err := DecodeLongLongUInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
 	}
