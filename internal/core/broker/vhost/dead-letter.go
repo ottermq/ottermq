@@ -97,7 +97,7 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	if headers == nil {
 		headers = make(map[string]any)
 	}
-	if headers["x-first-death-queue"] == nil {
+	if _, exists := headers["x-first-death-queue"]; !exists {
 		// first time dead-lettering, initialize x-first-death-* headers
 		headers["x-first-death-queue"] = queue
 		headers["x-first-death-reason"] = reason.String()
@@ -120,20 +120,12 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	}
 
 	// Get existing x-death header
-	xDeath, exists := headers["x-death"]
-	if !exists {
-		// First x-death entry
-		headers["x-death"] = []xDeathEntry{}
-	}
-	deathArray, ok := xDeath.([]xDeathEntry)
+	xDeathEvents, ok := headers["x-death"].([]xDeathEntry)
 	if !ok {
-		// Malformed x-death header, reset it
-		log.Warn().Msg("Malformed x-death header, resetting it")
-		headers["x-death"] = []xDeathEntry{}
+		xDeathEvents = []xDeathEntry{}
 	}
-	death["count"] = uint32(len(deathArray)) + 1
-	deathArray = append([]xDeathEntry{death}, deathArray...)
-	headers["x-death"] = deathArray
-
+	death["count"] = uint32(len(xDeathEvents)) + 1
+	xDeathEvents = append([]xDeathEntry{death}, xDeathEvents...)
+	headers["x-death"] = xDeathEvents
 	return headers
 }
