@@ -42,7 +42,11 @@ func (m *MockAddr) Network() string { return m.network }
 func (m *MockAddr) String() string  { return m.address }
 
 func createTestVHost() *VHost {
-	vh := NewVhost("test-vhost", 1000, nil) // Using nil persistence for tests
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 
 	// Add test queue
 	vh.Queues["test-queue"] = &Queue{

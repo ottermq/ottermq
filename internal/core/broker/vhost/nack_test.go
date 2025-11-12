@@ -54,7 +54,11 @@ func (s *stubPersistence) Initialize() error                                    
 func (s *stubPersistence) Close() error                                          { return nil }
 
 func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	// create queue
 	q, err := vh.CreateQueue("q1", nil, conn)
@@ -106,7 +110,11 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 
 func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	sp := &stubPersistence{}
-	vh := NewVhost("test-vhost", 1000, sp)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     sp,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	// ensure queue exists (name referenced in records)
 	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
@@ -164,7 +172,11 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 }
 
 func TestHandleBasicNack_NoChannelState(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	err := vh.HandleBasicNack(conn, 1, 1, false, true)
 	if err == nil {
@@ -173,7 +185,11 @@ func TestHandleBasicNack_NoChannelState(t *testing.T) {
 }
 
 func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)

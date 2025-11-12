@@ -29,11 +29,13 @@ type Queue struct {
 }
 
 type QueueProperties struct {
-	Passive    bool      `json:"passive"`
-	Durable    bool      `json:"durable"`
-	AutoDelete bool      `json:"auto_delete"`
-	Exclusive  bool      `json:"exclusive"` // not implemented yet
-	Arguments  QueueArgs `json:"arguments"`
+	Passive              bool      `json:"passive"`
+	Durable              bool      `json:"durable"`
+	AutoDelete           bool      `json:"auto_delete"`
+	Exclusive            bool      `json:"exclusive"`
+	Arguments            QueueArgs `json:"arguments"`
+	DeadLetterExchange   string    `json:"dead_letter_exchange,omitempty"`
+	DeadLetterRoutingKey string    `json:"dead_letter_routing_key,omitempty"`
 }
 
 func NewQueue(name string, bufferSize int) *Queue {

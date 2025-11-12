@@ -46,7 +46,11 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	}
 
 	// Create test vhost with a test queue
-	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("test-vhost", options)
 	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100)
 	vh.Queues["test-queue"].Props = &vhost.QueueProperties{
 		Passive:    false,

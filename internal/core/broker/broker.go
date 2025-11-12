@@ -60,7 +60,12 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		persist:     persist,
 		Ready:       make(chan struct{}),
 	}
-	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
+	options := vhost.VHostOptions{
+		QueueBufferSize: config.QueueBufferSize,
+		Persistence:     b.persist,
+		EnableDLX:       config.EnableDLX,
+	}
+	b.VHosts["/"] = vhost.NewVhost("/", options)
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
 	b.ManagerApi = &DefaultManagerApi{b}

@@ -12,7 +12,11 @@ import (
 
 // Test fanout publish distributes to all bound queues
 func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -59,7 +63,11 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 
 // Test fanout with empty bindings
 func TestFanoutPublish_NoBindings(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout-empty"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -81,7 +89,11 @@ func TestFanoutPublish_NoBindings(t *testing.T) {
 
 // Test fanout ignores routing key during publish
 func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -114,7 +126,11 @@ func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
 
 // Test fanout unbind removes correct queue
 func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -171,7 +187,11 @@ func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
 
 // Test fanout auto-delete after last unbind
 func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout-autodel"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{
@@ -201,7 +221,11 @@ func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
 
 // Test fanout unbind with routing key is ignored
 func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -225,7 +249,11 @@ func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
 
 // Test binding with same queue+exchange+key but different args creates multiple bindings
 func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -263,7 +291,11 @@ func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
 
 // Test binding with identical args fails with PRECONDITION_FAILED
 func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -298,7 +330,11 @@ func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
 
 // Test unbind requires matching arguments
 func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -339,7 +375,11 @@ func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
 
 // Test unbind removes only binding with matching arguments
 func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -380,7 +420,11 @@ func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
 
 // Test binding with nil arguments
 func TestBindQueue_NilArguments(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -419,7 +463,11 @@ func TestBindQueue_NilArguments(t *testing.T) {
 
 // Test direct exchange routes only to matching key
 func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -465,7 +513,11 @@ func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
 
 // Test direct exchange with non-existent routing key
 func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -492,7 +544,11 @@ func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
 
 // Test auto-delete doesn't trigger when other bindings exist
 func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -526,7 +582,11 @@ func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
 
 // Test auto-delete with multiple routing keys
 func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -562,7 +622,11 @@ func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
 
 // Test HasRoutingForMessage with fanout
 func TestHasRoutingForMessage_Fanout(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -595,7 +659,11 @@ func TestHasRoutingForMessage_Fanout(t *testing.T) {
 
 // Test HasRoutingForMessage with direct
 func TestHasRoutingForMessage_Direct(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})

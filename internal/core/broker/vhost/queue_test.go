@@ -102,7 +102,11 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 }
 
 func TestExclusiveQueueDeletedOnConnectionClose(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	// conn := &mockConn{}
 	conn := net.Conn(nil)
 

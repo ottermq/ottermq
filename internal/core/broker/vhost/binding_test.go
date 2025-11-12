@@ -10,7 +10,11 @@ import (
 
 // Test UnbindQueue with valid binding
 func TestUnbindQueue_Success(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	// Create exchange and queue
 	exchangeName := "test-exchange"
@@ -51,7 +55,11 @@ func TestUnbindQueue_Success(t *testing.T) {
 
 // Test UnbindQueue with non-existent exchange
 func TestUnbindQueue_ExchangeNotFound(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	queueName := "test-queue"
 	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
@@ -78,7 +86,11 @@ func TestUnbindQueue_ExchangeNotFound(t *testing.T) {
 
 // Test UnbindQueue with non-existent queue
 func TestUnbindQueue_QueueNotFound(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -105,7 +117,11 @@ func TestUnbindQueue_QueueNotFound(t *testing.T) {
 
 // Test UnbindQueue with non-existent binding
 func TestUnbindQueue_BindingNotFound(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -136,7 +152,11 @@ func TestUnbindQueue_BindingNotFound(t *testing.T) {
 
 // Test UnbindQueue with multiple bindings on same routing key
 func TestUnbindQueue_MultipleBindings(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	routingKey := "shared.key"
@@ -195,7 +215,11 @@ func TestUnbindQueue_MultipleBindings(t *testing.T) {
 
 // Test UnbindQueue removes routing key when last queue is unbound
 func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -224,7 +248,11 @@ func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
 
 // Test UnbindQueue with fanout exchange
 func TestUnbindQueue_FanoutExchange(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	queueName := "test-queue"
@@ -272,7 +300,11 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 
 // Test UnbindQueue triggers auto-delete of exchange
 func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -304,7 +336,11 @@ func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
 
 // Test UnbindQueue doesn't auto-delete exchange when other bindings exist
 func TestUnbindQueue_NoAutoDeleteWhenOtherBindingsExist(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	routingKey := "test.key"
@@ -333,7 +369,11 @@ func TestUnbindQueue_NoAutoDeleteWhenOtherBindingsExist(t *testing.T) {
 
 // Test DeleteBindingUnlocked with queue not in binding list
 func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchange := &Exchange{
 		Name:     "test-exchange",
@@ -377,7 +417,11 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 
 // Test idempotency - trying to unbind already unbound queue
 func TestUnbindQueue_AlreadyUnbound(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"

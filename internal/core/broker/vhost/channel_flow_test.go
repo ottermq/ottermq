@@ -28,7 +28,11 @@ import (
 
 // TestHandleChannelFlow_ClientInitiated tests client-initiated flow control
 func TestHandleChannelFlow_ClientInitiated(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -63,7 +67,11 @@ func TestHandleChannelFlow_ClientInitiated(t *testing.T) {
 
 // TestHandleChannelFlow_ServerInitiated tests server-initiated flow control
 func TestHandleChannelFlow_ServerInitiated(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -95,7 +103,11 @@ func TestHandleChannelFlow_ServerInitiated(t *testing.T) {
 
 // TestGetChannelFlowState_NonExistentChannel tests default state for non-existent channel
 func TestGetChannelFlowState_NonExistentChannel(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(99)
 
@@ -111,7 +123,11 @@ func TestGetChannelFlowState_NonExistentChannel(t *testing.T) {
 
 // TestGetOrCreateChannelDelivery_DefaultFlowState tests that new channels start with flow active
 func TestGetOrCreateChannelDelivery_DefaultFlowState(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -128,7 +144,11 @@ func TestGetOrCreateChannelDelivery_DefaultFlowState(t *testing.T) {
 
 // TestShouldThrottle_FlowPaused tests that shouldThrottle returns true when flow is paused
 func TestShouldThrottle_FlowPaused(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -166,7 +186,11 @@ func TestShouldThrottle_FlowPaused(t *testing.T) {
 
 // TestShouldThrottle_FlowAndQoS tests interaction between flow control and QoS
 func TestShouldThrottle_FlowAndQoS(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -220,7 +244,11 @@ func TestShouldThrottle_FlowAndQoS(t *testing.T) {
 
 // TestHandleChannelFlow_MultipleChannels tests flow control on different channels
 func TestHandleChannelFlow_MultipleChannels(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel1 := uint16(1)
 	channel2 := uint16(2)
@@ -272,7 +300,11 @@ func TestHandleChannelFlow_MultipleChannels(t *testing.T) {
 
 // TestHandleChannelFlow_OverrideInitiator tests that new flow requests override previous initiator
 func TestHandleChannelFlow_OverrideInitiator(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 	channel := uint16(1)
 
@@ -304,7 +336,11 @@ func TestHandleChannelFlow_OverrideInitiator(t *testing.T) {
 
 // TestShouldThrottle_NilChannelState tests that nil channel state doesn't cause panic
 func TestShouldThrottle_NilChannelState(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 	var conn net.Conn = nil
 
 	consumer := &Consumer{

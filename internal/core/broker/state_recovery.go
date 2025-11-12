@@ -22,7 +22,11 @@ func RecoverBrokerState(b *Broker) error {
 			continue
 		}
 		vhostName := entry.Name()
-		v := vhost.NewVhost(vhostName, b.config.QueueBufferSize, b.persist)
+		options := vhost.VHostOptions{
+			QueueBufferSize: b.config.QueueBufferSize,
+			Persistence:     b.persist,
+		}
+		v := vhost.NewVhost(vhostName, options)
 		// Recover exchanges
 		exchangesDir := filepath.Join(vhostsDir, vhostName, "exchanges")
 		exFiles, _ := os.ReadDir(exchangesDir)

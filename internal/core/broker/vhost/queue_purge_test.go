@@ -58,7 +58,11 @@ func (f *fakePersistence) Close() error      { return nil }
 
 func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 	fp := &fakePersistence{}
-	vh := NewVhost("/", 100, fp)
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     fp,
+	}
+	vh := NewVhost("/", options)
 
 	// Create a durable queue
 	_, err := vh.CreateQueue("q1", &QueueProperties{Durable: true}, nil)
@@ -98,7 +102,11 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 }
 
 func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
-	vh := NewVhost("/", 100, &fakePersistence{})
+	options := VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &fakePersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	_, err := vh.PurgeQueue("does-not-exist", nil)
 	if err == nil {
@@ -121,7 +129,11 @@ func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
 }
 
 func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing.T) {
-	vh := NewVhost("/", 100, &fakePersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &fakePersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	// Mock connections
 	ownerConn := &mockConn{}

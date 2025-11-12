@@ -32,7 +32,11 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
-	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("test-vhost", options)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{
@@ -104,7 +108,11 @@ func TestHandleChannelFlow_InvalidContent(t *testing.T) {
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
-	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("test-vhost", options)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{
@@ -139,7 +147,11 @@ func TestHandleChannelFlow_NonExistentChannel(t *testing.T) {
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
-	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("test-vhost", options)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{
@@ -186,7 +198,11 @@ func TestHandleChannelFlowOk(t *testing.T) {
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
-	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("test-vhost", options)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{

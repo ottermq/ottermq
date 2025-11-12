@@ -41,9 +41,18 @@ type VHost struct {
 
 	// Transactions per channel
 	ChannelTransactions map[ConnectionChannelKey]*ChannelTransactionState
+
+	// Dead letter handler
+	DeadLetterer DeadLetterer
 }
 
-func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
+type VHostOptions struct {
+	QueueBufferSize int
+	Persistence     persistence.Persistence
+	EnableDLX       bool
+}
+
+func NewVhost(vhostName string, options VHostOptions) *VHost {
 	id := uuid.New().String()
 	vh := &VHost{
 		Name:                vhostName,
@@ -51,8 +60,8 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		Exchanges:           make(map[string]*Exchange),
 		Queues:              make(map[string]*Queue),
 		Users:               make(map[string]*persistdb.User),
-		queueBufferSize:     queueBufferSize,
-		persist:             persist,
+		queueBufferSize:     options.QueueBufferSize,
+		persist:             options.Persistence,
 		Consumers:           make(map[ConsumerKey]*Consumer),
 		ConsumersByQueue:    make(map[string][]*Consumer),
 		ConsumersByChannel:  make(map[ConnectionChannelKey][]*Consumer),
@@ -63,9 +72,15 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state
-	if persist != nil {
+	if options.Persistence != nil {
 		vh.loadPersistedState()
 	}
+	if options.EnableDLX {
+		vh.DeadLetterer = &DeadLetter{vh: vh}
+	} else {
+		vh.DeadLetterer = &NoOpDeadLetterer{}
+	}
+
 	return vh
 }
 
