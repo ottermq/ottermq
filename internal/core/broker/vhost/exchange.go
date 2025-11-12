@@ -143,7 +143,7 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 
 	vh.Exchanges[name] = NewExchange(name, typ, props)
 	// Handle durable property
-	if props.Durable {
+	if props != nil && props.Durable {
 		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
 			log.Error().Err(err).Str("exchange", name).Msg("Failed to save exchange metadata")
 		}
