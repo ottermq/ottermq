@@ -196,8 +196,18 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	if props == nil {
 		props = NewQueueProperties()
 	}
+
+	// Parse DLX arguments
+	if dlx, ok := props.Arguments["x-dead-letter-exchange"].(string); ok {
+		props.DeadLetterExchange = dlx
+	}
+	if dlrk, ok := props.Arguments["x-dead-letter-routing-key"].(string); ok {
+		props.DeadLetterRoutingKey = dlrk
+	}
+
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
+
 	if props.Exclusive {
 		queue.OwnerConn = conn
 	}
