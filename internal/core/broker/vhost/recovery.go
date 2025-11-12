@@ -53,13 +53,13 @@ func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) e
 	}
 
 	for _, msgData := range msgs {
-		msg := &amqp.Message{
+		msg := amqp.Message{
 			ID:   msgData.ID,
 			Body: msgData.Body,
 			// TODO: map properties
 		}
 		select {
-		case q.messages <- *msg:
+		case q.messages <- msg:
 			q.count++
 		default:
 			// Optionally handle the case where the channel is full

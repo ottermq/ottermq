@@ -115,7 +115,6 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	death := map[string]any{
 		"queue":               queue,
 		"reason":              reason.String(),
-		"count":               uint32(1), // long int
 		"time":                time.Now().UTC().Format(time.RFC3339),
 		"exchange":            exchange,
 		"routing-keys":        routingKeys,
@@ -127,7 +126,7 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	if !ok {
 		xDeathEvents = []map[string]any{}
 	}
-	death["count"] = uint32(len(xDeathEvents)) + 1
+	death["count"] = uint32(len(xDeathEvents) + 1) // Must be uint32 for proper AMQP encoding
 	xDeathEvents = append([]map[string]any{death}, xDeathEvents...)
 	headers["x-death"] = xDeathEvents
 	return headers

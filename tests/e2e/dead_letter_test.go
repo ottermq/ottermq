@@ -13,15 +13,16 @@ import (
 func TestDLX_BasicRejection(t *testing.T) {
 	tc := NewTestConnection(t, brokerURL)
 	defer tc.Close()
-
+	dlx := "test-dlx-basic"
+	dlk := "dead"
 	// Create DLX and dead letter queue
-	err := tc.Ch.ExchangeDeclare("test-dlx-basic", "direct", false, true, false, false, nil)
+	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err)
 
 	dlq, err := tc.Ch.QueueDeclare("test-dlq-basic", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	err = tc.Ch.QueueBind(dlq.Name, "dead", "test-dlx-basic", false, nil)
+	err = tc.Ch.QueueBind(dlq.Name, dlk, dlx, false, nil)
 	require.NoError(t, err)
 
 	// Create main queue with DLX configuration
@@ -32,11 +33,14 @@ func TestDLX_BasicRejection(t *testing.T) {
 		false,
 		false,
 		amqp.Table{
-			"x-dead-letter-exchange":    "test-dlx-basic",
-			"x-dead-letter-routing-key": "dead",
+			"x-dead-letter-exchange":    dlx,
+			"x-dead-letter-routing-key": dlk,
 		},
 	)
 	require.NoError(t, err)
+
+	// Consume and reject the message
+	msgs := tc.StartConsumer(mainQueue.Name, "", false)
 
 	// Publish a message to main queue
 	err = tc.Ch.Publish("", mainQueue.Name, false, false, amqp.Publishing{
@@ -45,13 +49,12 @@ func TestDLX_BasicRejection(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Consume and reject the message
-	msgs := tc.StartConsumer(mainQueue.Name, "", false)
-
 	msg, ok := tc.ConsumeWithTimeout(msgs, 2*time.Second)
 	if !ok {
 		t.Fatal("timeout waiting for message")
 	}
+
+	dlqMsgs := tc.StartConsumer(dlq.Name, "", true)
 
 	// Reject without requeue
 	err = msg.Reject(false)
@@ -59,8 +62,6 @@ func TestDLX_BasicRejection(t *testing.T) {
 
 	// Verify message was routed to DLQ
 	time.Sleep(100 * time.Millisecond) // Give time for dead-lettering
-
-	dlqMsgs := tc.StartConsumer(dlq.Name, "", true)
 
 	deadMsg, ok := tc.ConsumeWithTimeout(dlqMsgs, 2*time.Second)
 	if !ok {
@@ -70,11 +71,11 @@ func TestDLX_BasicRejection(t *testing.T) {
 	assert.Equal(t, []byte("test message for rejection"), deadMsg.Body)
 
 	// Verify x-death headers
-	xDeath, ok := deadMsg.Headers["x-death"].([]interface{})
+	xDeath, ok := deadMsg.Headers["x-death"].([]map[string]any)
 	require.True(t, ok, "x-death header should be an array")
 	require.Len(t, xDeath, 1, "should have one death entry")
 
-	deathEntry := xDeath[0].(amqp.Table)
+	deathEntry := xDeath[0]
 	assert.Equal(t, "rejected", deathEntry["reason"])
 	assert.Equal(t, mainQueue.Name, deathEntry["queue"])
 	assert.Equal(t, int32(1), deathEntry["count"])

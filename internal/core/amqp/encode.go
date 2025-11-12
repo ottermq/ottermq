@@ -53,8 +53,8 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		_ = binary.Write(buf, binary.BigEndian, v) // Error ignored as bytes.Buffer.Write never fails
 
 	case int:
-		buf.WriteByte('I')                         // Field value type 'I' (int32)
-		_ = binary.Write(buf, binary.BigEndian, v) // Error ignored as bytes.Buffer.Write never fails
+		buf.WriteByte('I')                                // Field value type 'I' (int32)
+		_ = binary.Write(buf, binary.BigEndian, int32(v)) // Cast to int32 for proper encoding
 
 	case uint32:
 		buf.WriteByte('i')                         // Field value type 'i' (uint32)
