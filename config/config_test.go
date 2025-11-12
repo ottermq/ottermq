@@ -51,20 +51,39 @@ func TestLoadConfigWithDefaults(t *testing.T) {
 	if config.LogLevel != "info" {
 		t.Errorf("Expected LogLevel to be 'info', got '%s'", config.LogLevel)
 	}
+	if config.EnableDLX != true {
+		t.Errorf("Expected EnableDLX to be true, got %t", config.EnableDLX)
+	}
+	if config.EnableWebAPI != true {
+		t.Errorf("Expected EnableWebAPI to be true, got %t", config.EnableWebAPI)
+	}
+	if config.EnableUI != true {
+		t.Errorf("Expected EnableUI to be true, got %t", config.EnableUI)
+	}
+	if config.EnableSwagger != false {
+		t.Errorf("Expected EnableSwagger to be false, got %t", config.EnableSwagger)
+	}
 }
 
 func TestLoadConfigWithEnvVars(t *testing.T) {
 	// Set environment variables
 	os.Setenv("OTTERMQ_BROKER_PORT", "15672")
 	os.Setenv("OTTERMQ_BROKER_HOST", "localhost")
-	os.Setenv("OTTERMQ_USERNAME", "admin")
-	os.Setenv("OTTERMQ_PASSWORD", "admin123")
+
 	os.Setenv("OTTERMQ_HEARTBEAT_INTERVAL", "120")
 	os.Setenv("OTTERMQ_CHANNEL_MAX", "4096")
 	os.Setenv("OTTERMQ_FRAME_MAX", "262144")
 	os.Setenv("OTTERMQ_SSL", "true")
 	os.Setenv("OTTERMQ_QUEUE_BUFFER_SIZE", "50000")
+
+	os.Setenv("OTTERMQ_ENABLE_DLX", "false")
+	os.Setenv("OTTERMQ_ENABLE_WEB_API", "false")
+	os.Setenv("OTTERMQ_ENABLE_UI", "false")
+	os.Setenv("OTTERMQ_ENABLE_SWAGGER", "true")
+
 	os.Setenv("OTTERMQ_WEB_PORT", "8080")
+	os.Setenv("OTTERMQ_USERNAME", "admin")
+	os.Setenv("OTTERMQ_PASSWORD", "admin123")
 	os.Setenv("OTTERMQ_JWT_SECRET", "my-secret-key")
 	os.Setenv("LOG_LEVEL", "debug")
 
@@ -113,6 +132,18 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	}
 	if config.LogLevel != "debug" {
 		t.Errorf("Expected LogLevel to be 'debug', got '%s'", config.LogLevel)
+	}
+	if config.EnableDLX != false {
+		t.Errorf("Expected EnableDLX to be false, got %t", config.EnableDLX)
+	}
+	if config.EnableWebAPI != false {
+		t.Errorf("Expected EnableWebAPI to be false, got %t", config.EnableWebAPI)
+	}
+	if config.EnableUI != false {
+		t.Errorf("Expected EnableUI to be false, got %t", config.EnableUI)
+	}
+	if config.EnableSwagger != true {
+		t.Errorf("Expected EnableSwagger to be true, got %t", config.EnableSwagger)
 	}
 }
 
