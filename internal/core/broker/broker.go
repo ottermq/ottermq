@@ -36,6 +36,7 @@ type Broker struct {
 	rootCtx      context.Context
 	rootCancel   context.CancelFunc
 	persist      persistence.Persistence
+	Ready        chan struct{} // Signals when the broker is ready to accept connections
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -57,6 +58,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
 		persist:     persist,
+		Ready:       make(chan struct{}),
 	}
 	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
 	b.framer = &amqp.DefaultFramer{}
@@ -67,7 +69,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 
 func (b *Broker) Start() error {
 	Logo()
-	log.Info().Str("version", b.config.Version).Msg("OtterMQ")
+	log.Info().Str("version", b.config.Version).Msg("🦦 OtterMQ")
 	log.Info().Msg("Broker is starting...")
 
 	configurations := b.setConfigurations()
@@ -81,6 +83,10 @@ func (b *Broker) Start() error {
 	b.listener = listener
 	defer listener.Close()
 	log.Info().Str("addr", addr).Msg("Started TCP listener")
+
+	// Signal that the broker is ready to accept connections
+	close(b.Ready)
+	log.Info().Msg("Broker is ready")
 
 	return b.acceptLoop(configurations)
 }
