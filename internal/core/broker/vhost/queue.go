@@ -29,13 +29,11 @@ type Queue struct {
 }
 
 type QueueProperties struct {
-	Passive              bool      `json:"passive"`
-	Durable              bool      `json:"durable"`
-	AutoDelete           bool      `json:"auto_delete"`
-	Exclusive            bool      `json:"exclusive"`
-	Arguments            QueueArgs `json:"arguments"`
-	DeadLetterExchange   string    `json:"dead_letter_exchange,omitempty"`
-	DeadLetterRoutingKey string    `json:"dead_letter_routing_key,omitempty"`
+	Passive    bool      `json:"passive"`
+	Durable    bool      `json:"durable"`
+	AutoDelete bool      `json:"auto_delete"`
+	Exclusive  bool      `json:"exclusive"`
+	Arguments  QueueArgs `json:"arguments"`
 }
 
 func NewQueue(name string, bufferSize int) *Queue {
@@ -196,15 +194,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	if props == nil {
 		props = NewQueueProperties()
 	}
-
-	// Parse DLX arguments
-	if dlx, ok := props.Arguments["x-dead-letter-exchange"].(string); ok {
-		props.DeadLetterExchange = dlx
-	}
-	if dlrk, ok := props.Arguments["x-dead-letter-routing-key"].(string); ok {
-		props.DeadLetterRoutingKey = dlrk
-	}
-
+	// DLX properties comes directly from arguments: single source of truth
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
 

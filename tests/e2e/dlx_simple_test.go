@@ -14,13 +14,15 @@ func TestDLX_Simple(t *testing.T) {
 	defer tc.Close()
 
 	// Create simple DLX setup
-	err := tc.Ch.ExchangeDeclare("simple-dlx", "direct", false, true, false, false, nil)
+	dlx := "simple-dlx"
+	dlk := "dead"
+
+	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err, "Failed to declare DLX exchange")
 
 	dlq, err := tc.Ch.QueueDeclare("simple-dlq", false, true, false, false, nil)
 	require.NoError(t, err, "Failed to declare DLQ")
-
-	err = tc.Ch.QueueBind(dlq.Name, "dead", "simple-dlx", false, nil)
+	err = tc.Ch.QueueBind(dlq.Name, dlk, dlx, false, nil)
 	require.NoError(t, err, "Failed to bind DLQ")
 
 	// Create main queue with DLX
@@ -31,8 +33,8 @@ func TestDLX_Simple(t *testing.T) {
 		false,
 		false,
 		amqp.Table{
-			"x-dead-letter-exchange":    "simple-dlx",
-			"x-dead-letter-routing-key": "dead",
+			"x-dead-letter-exchange":    dlx,
+			"x-dead-letter-routing-key": dlk,
 		},
 	)
 	require.NoError(t, err, "Failed to declare main queue")

@@ -15,10 +15,13 @@ func TestNoOpDeadLetterer(t *testing.T) {
 		RoutingKey: "test.key",
 		Body:       []byte("test message"),
 	}
+	args := map[string]any{
+		"x-dead-letter-exchange": "dlx",
+	}
 	queue := &Queue{
 		Name: "test-queue",
 		Props: &QueueProperties{
-			DeadLetterExchange: "dlx",
+			Arguments: args,
 		},
 	}
 
@@ -493,9 +496,6 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 	}
 	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
 	require.NoError(t, err)
-
-	// Arguments should still be parsed but DeadLetterer won't do anything
-	assert.Equal(t, "dlx", mainQueue.Props.DeadLetterExchange)
 
 	msg := amqp.Message{
 		RoutingKey: "test.key",

@@ -191,7 +191,7 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 		log.Error().Msg("Invalid content type for QueueDeclareMessage")
 		return nil, fmt.Errorf("invalid content type for QueueDeclareMessage")
 	}
-	log.Debug().Interface("content", content).Msg("Content")
+
 	queueName := content.QueueName
 
 	queue, err := vh.CreateQueue(queueName, &vhost.QueueProperties{

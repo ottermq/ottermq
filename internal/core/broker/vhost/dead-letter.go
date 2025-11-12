@@ -42,13 +42,14 @@ type DeadLetter struct {
 
 func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error {
 	// Check if queue has DLX configured
-	if queue.Props.DeadLetterExchange == "" {
+	dlx, ok := queue.Props.Arguments["x-dead-letter-exchange"].(string)
+	if !ok || dlx == "" {
 		return ErrNoDLXConfigured
 	}
 
 	log.Debug().
 		Str("queue", queue.Name).
-		Str("dlx", queue.Props.DeadLetterExchange).
+		Str("dlx", dlx).
 		Str("reason", reason.String()).
 		Msg("Dead-lettering message")
 	// 1. Add x-death header
@@ -63,13 +64,12 @@ func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonTy
 
 	// 2. Determine routing key
 	dlk := msg.RoutingKey
-	if queue.Props.DeadLetterRoutingKey != "" {
-		dlk = queue.Props.DeadLetterRoutingKey
+	if dlrk, ok := queue.Props.Arguments["x-dead-letter-routing-key"].(string); ok && dlrk != "" {
+		dlk = dlrk
 		msg.RoutingKey = dlk
 	}
 
 	// 3. Publish to DLX
-	dlx := queue.Props.DeadLetterExchange
 	msg.Exchange = dlx
 	_, err := dl.vh.Publish(dlx, dlk, &msg)
 
