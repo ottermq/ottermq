@@ -4,52 +4,10 @@ import (
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockPersistence is a no-op persistence implementation for tests
-type mockPersistence struct{}
-
-func (m *mockPersistence) SaveQueueMetadata(vhost, name string, props persistence.QueueProperties) error {
-	return nil
-}
-func (m *mockPersistence) LoadQueueMetadata(vhost, name string) (persistence.QueueProperties, error) {
-	return persistence.QueueProperties{}, nil
-}
-func (m *mockPersistence) DeleteQueueMetadata(vhost, name string) error { return nil }
-func (m *mockPersistence) SaveExchangeMetadata(vhost, name, exchangeType string, props persistence.ExchangeProperties) error {
-	return nil
-}
-func (m *mockPersistence) LoadExchangeMetadata(vhost, name string) (string, persistence.ExchangeProperties, error) {
-	return "", persistence.ExchangeProperties{}, nil
-}
-func (m *mockPersistence) DeleteExchangeMetadata(vhost, name string) error { return nil }
-func (m *mockPersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
-	return nil
-}
-func (m *mockPersistence) LoadExchangeBindings(vhost, exchange string) ([]persistence.BindingData, error) {
-	return nil, nil
-}
-func (m *mockPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
-	return nil
-}
-func (m *mockPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {
-	return nil
-}
-func (m *mockPersistence) LoadMessages(vhostName, queueName string) ([]persistence.Message, error) {
-	return nil, nil
-}
-func (m *mockPersistence) DeleteMessage(vhost, queue, msgId string) error { return nil }
-func (m *mockPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
-	return nil, nil
-}
-func (m *mockPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
-	return nil, nil
-}
-func (m *mockPersistence) Initialize() error { return nil }
-func (m *mockPersistence) Close() error      { return nil }
 
 func TestNoOpDeadLetterer(t *testing.T) {
 	dl := &NoOpDeadLetterer{}
@@ -70,7 +28,7 @@ func TestNoOpDeadLetterer(t *testing.T) {
 
 func TestDeadLetter_BasicRejection(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -148,7 +106,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 
 func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -196,7 +154,7 @@ func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 
 func TestDeadLetter_MultipleDeaths(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -301,7 +259,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 
 func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -356,7 +314,7 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 
 func TestDeadLetter_ExpirationCleared(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -407,7 +365,7 @@ func TestDeadLetter_ExpirationCleared(t *testing.T) {
 
 func TestDeadLetter_DifferentReasons(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -472,7 +430,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 
 func TestDeadLetter_NilHeaders(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -519,7 +477,7 @@ func TestDeadLetter_NilHeaders(t *testing.T) {
 
 func TestDeadLetter_DisabledFeature(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       false, // DLX disabled
 	})
@@ -551,7 +509,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 
 func TestDeadLetter_TopicExchange(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
@@ -606,7 +564,7 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 
 func TestDeadLetter_PersistentMessage(t *testing.T) {
 	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &mockPersistence{},
+		Persistence:     &dummy.DummyPersistence{},
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})

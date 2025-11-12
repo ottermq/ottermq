@@ -5,53 +5,8 @@ import (
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	p "github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
-
-// stubPersistence captures DeleteMessage calls for assertions
-type stubPersistence struct {
-	deletes []struct{ vhost, queue, msgId string }
-}
-
-func (s *stubPersistence) SaveExchangeMetadata(vhost, name, exchangeType string, props p.ExchangeProperties) error {
-	return nil
-}
-func (s *stubPersistence) LoadExchangeMetadata(vhost, name string) (string, p.ExchangeProperties, error) {
-	return "", p.ExchangeProperties{}, nil
-}
-func (s *stubPersistence) DeleteExchangeMetadata(vhost, name string) error { return nil }
-func (s *stubPersistence) SaveQueueMetadata(vhost, name string, props p.QueueProperties) error {
-	return nil
-}
-func (s *stubPersistence) LoadQueueMetadata(vhost, name string) (p.QueueProperties, error) {
-	return p.QueueProperties{}, nil
-}
-func (s *stubPersistence) DeleteQueueMetadata(vhost, name string) error { return nil }
-func (s *stubPersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
-	return nil
-}
-func (s *stubPersistence) LoadExchangeBindings(vhost, exchange string) ([]p.BindingData, error) {
-	return nil, nil
-}
-func (s *stubPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, args map[string]any) error {
-	return nil
-}
-func (s *stubPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps p.MessageProperties) error {
-	return nil
-}
-func (s *stubPersistence) LoadMessages(vhostName, queueName string) ([]p.Message, error) {
-	return nil, nil
-}
-func (s *stubPersistence) DeleteMessage(vhost, queue, msgId string) error {
-	s.deletes = append(s.deletes, struct{ vhost, queue, msgId string }{vhost, queue, msgId})
-	return nil
-}
-func (s *stubPersistence) LoadAllExchanges(vhost string) ([]p.ExchangeSnapshot, error) {
-	return nil, nil
-}
-func (s *stubPersistence) LoadAllQueues(vhost string) ([]p.QueueSnapshot, error) { return nil, nil }
-func (s *stubPersistence) Initialize() error                                     { return nil }
-func (s *stubPersistence) Close() error                                          { return nil }
 
 func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	var options = VHostOptions{
@@ -109,10 +64,13 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 }
 
 func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
-	sp := &stubPersistence{}
+	sp := &dummy.DummyPersistence{
+		DeletedMessagesDetailed: []dummy.DeleteRecord{}, // Enable detailed tracking
+	}
 	var options = VHostOptions{
 		QueueBufferSize: 1000,
 		Persistence:     sp,
+		EnableDLX:       true, // Enable DLX, but queue has no DLX config, so messages will be discarded
 	}
 	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
@@ -159,15 +117,15 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	}
 
 	// Expect persistence deletions for m1 and m2
-	if len(sp.deletes) != 2 {
-		t.Fatalf("expected 2 DeleteMessage calls, got %d", len(sp.deletes))
+	if len(sp.DeletedMessagesDetailed) != 2 {
+		t.Fatalf("expected 2 DeleteMessage calls, got %d", len(sp.DeletedMessagesDetailed))
 	}
 	got := map[string]bool{}
-	for _, d := range sp.deletes {
-		got[d.msgId] = true
+	for _, d := range sp.DeletedMessagesDetailed {
+		got[d.MsgID] = true
 	}
 	if !got["m1"] || !got["m2"] {
-		t.Errorf("expected deletes for m1 and m2, got %#v", sp.deletes)
+		t.Errorf("expected deletes for m1 and m2, got %#v", sp.DeletedMessagesDetailed)
 	}
 }
 

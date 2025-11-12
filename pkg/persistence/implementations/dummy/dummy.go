@@ -2,8 +2,21 @@ package dummy
 
 import "github.com/andrelcunha/ottermq/pkg/persistence"
 
-// DummyPersistence implements persistence.Persistence with no-ops for testing
-type DummyPersistence struct{}
+// DummyPersistence implements persistence.Persistence with no-ops for testing.
+// It can optionally track DeleteMessage calls for test assertions.
+type DummyPersistence struct {
+	// DeletedMessages tracks msgId of deleted messages (if tracking enabled)
+	DeletedMessages []string
+	// DeletedMessagesDetailed tracks full details of deleted messages (if tracking enabled)
+	DeletedMessagesDetailed []DeleteRecord
+}
+
+// DeleteRecord captures full details of a DeleteMessage call
+type DeleteRecord struct {
+	Vhost string
+	Queue string
+	MsgID string
+}
 
 func (d *DummyPersistence) SaveExchangeMetadata(vhost, name, exchangeType string, props persistence.ExchangeProperties) error {
 	return nil
@@ -42,10 +55,22 @@ func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]persistence.Mess
 	return []persistence.Message{}, nil
 }
 
-// SaveMessage
+// SaveMessage is a no-op
 func (d *DummyPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {
 	return nil
 }
+
+// DeleteMessage optionally tracks deleted messages if DeletedMessages or DeletedMessagesDetailed slices are initialized
 func (d *DummyPersistence) DeleteMessage(vhost, queue, msgId string) error {
+	if d.DeletedMessages != nil {
+		d.DeletedMessages = append(d.DeletedMessages, msgId)
+	}
+	if d.DeletedMessagesDetailed != nil {
+		d.DeletedMessagesDetailed = append(d.DeletedMessagesDetailed, DeleteRecord{
+			Vhost: vhost,
+			Queue: queue,
+			MsgID: msgId,
+		})
+	}
 	return nil
 }
