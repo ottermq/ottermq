@@ -92,20 +92,21 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 	}
 	// Dead-letter or discard the messages
 	for _, record := range recordsToNack {
-		if vh.DeadLetterer != nil {
+		// Check if DLX extension is enabled and queue has DLX configured
+		if vh.VHostExtensions["dlx"] && vh.DeadLetterer != nil {
 			vh.mu.Lock()
 			queue, exists := vh.Queues[record.QueueName]
 			vh.mu.Unlock()
-			if exists {
+			if exists && queue.Props.DeadLetterExchange != "" {
 				err := vh.DeadLetterer.DeadLetter(record.Message, queue, REASON_REJECTED)
 				if err == nil {
 					log.Debug().Msg("Dead-lettering succeeded")
 					continue
 				}
+				log.Error().Err(err).Msg("Dead-lettering failed")
 			}
-			log.Error().Err(err).Msg("Dead-lettering failed")
 		}
-		// Discard the message
+		// Discard the message (no DLX configured or dead-lettering failed)
 		log.Debug().Uint64("delivery_tag", record.DeliveryTag).Uint16("channel", channel).Msg("Nack: discarding message")
 		if record.Persistent {
 			_ = vh.persist.DeleteMessage(vh.Name, record.QueueName, record.Message.ID)

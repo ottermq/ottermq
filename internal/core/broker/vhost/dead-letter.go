@@ -8,6 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var ErrNoDLXConfigured = errors.New("queue has no dead-letter-exchange configured")
+
 type ReasonType string
 
 const (
@@ -41,7 +43,7 @@ type DeadLetter struct {
 func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error {
 	// Check if queue has DLX configured
 	if queue.Props.DeadLetterExchange == "" {
-		return errors.New("queue has no dead-letter-exchange configured")
+		return ErrNoDLXConfigured
 	}
 
 	log.Debug().

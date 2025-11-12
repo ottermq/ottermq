@@ -46,6 +46,7 @@ type VHost struct {
 	DeadLetterer DeadLetterer
 
 	// TODO: create a type as a umbrella for all vhost extensions (dead-letter, cc/bcc, etc)
+	VHostExtensions map[string]bool
 }
 
 type VHostOptions struct {
@@ -71,6 +72,7 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		ChannelDeliveries:   make(map[ConnectionChannelKey]*ChannelDeliveryState),
 		redeliveredMessages: make(map[string]struct{}),
 		ChannelTransactions: make(map[ConnectionChannelKey]*ChannelTransactionState),
+		VHostExtensions:     make(map[string]bool),
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state
@@ -78,6 +80,7 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		vh.loadPersistedState()
 	}
 	if options.EnableDLX {
+		vh.VHostExtensions["dlx"] = true
 		vh.DeadLetterer = &DeadLetter{vh: vh}
 	} else {
 		vh.DeadLetterer = &NoOpDeadLetterer{}
