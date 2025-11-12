@@ -157,7 +157,12 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 				return nil, err
 			}
 
-			table[string(fieldName)] = arrayData
+			// Decode the array data into []interface{}
+			decodedArray, err := DecodeArray(arrayData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode array: %v", err)
+			}
+			table[string(fieldName)] = decodedArray
 
 		case 'T': // Timestamp
 			timestamp, err := DecodeTimestamp(buf)
@@ -193,6 +198,159 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 		}
 	}
 	return table, nil
+}
+
+// DecodeArray decodes an AMQP array from raw bytes
+func DecodeArray(data []byte) ([]interface{}, error) {
+	var result []interface{}
+	buf := bytes.NewReader(data)
+
+	for buf.Len() > 0 {
+		// Read value type
+		valueType, err := buf.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+
+		// Decode value based on type
+		switch valueType {
+		case 't': // Boolean
+			value, err := DecodeBoolean(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'b': // Signed 8-bit
+			var value int8
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'B': // Unsigned 8-bit
+			var value uint8
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'U': // Signed 16-bit
+			var value int16
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'u': // Unsigned 16-bit
+			var value uint16
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'I': // Signed 32-bit
+			value, err := DecodeLongInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'i': // Unsigned 32-bit
+			value, err := DecodeLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'L': // Signed 64-bit
+			value, err := DecodeLongLongInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'l': // Unsigned 64-bit
+			value, err := DecodeLongLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'f': // Float 32-bit
+			var value float32
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'd': // Double 64-bit
+			var value float64
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 's': // Short string
+			value, err := DecodeShortStr(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'S': // Long string
+			value, err := DecodeLongStr(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'F': // Field table
+			var tableLength uint32
+			if err := binary.Read(buf, binary.BigEndian, &tableLength); err != nil {
+				return nil, err
+			}
+			tableData := make([]byte, tableLength)
+			if _, err := buf.Read(tableData); err != nil {
+				return nil, err
+			}
+			value, err := DecodeTable(tableData)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'A': // Nested array
+			var arrayLength uint32
+			if err := binary.Read(buf, binary.BigEndian, &arrayLength); err != nil {
+				return nil, err
+			}
+			arrayData := make([]byte, arrayLength)
+			if _, err := buf.Read(arrayData); err != nil {
+				return nil, err
+			}
+			value, err := DecodeArray(arrayData)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'T': // Timestamp
+			value, err := DecodeTimestamp(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'V': // Void/null
+			result = append(result, nil)
+
+		default:
+			return nil, fmt.Errorf("unknown array element type: %c", valueType)
+		}
+	}
+
+	return result, nil
 }
 
 // DecodeTimestamp reads and decodes a 64-bit POSIX timestamp from a bytes.Reader

@@ -71,6 +71,12 @@ func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonTy
 
 	// 3. Publish to DLX
 	msg.Exchange = dlx
+	log.Info().
+		Str("dlx", dlx).
+		Str("routing_key", dlk).
+		Int("body_len", len(msg.Body)).
+		Int("headers_count", len(msg.Properties.Headers)).
+		Msg("=== PUBLISHING TO DLX ===")
 	_, err := dl.vh.Publish(dlx, dlk, &msg)
 
 	return err
@@ -120,12 +126,27 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	}
 
 	// Get existing x-death header
-	xDeathEvents, ok := headers["x-death"].([]xDeathEntry)
-	if !ok {
+	var xDeathEvents []xDeathEntry
+	if existing, ok := headers["x-death"].([]map[string]any); ok {
+		// Convert back from []map[string]any to []xDeathEntry
+		xDeathEvents = make([]xDeathEntry, len(existing))
+		for i, entry := range existing {
+			xDeathEvents[i] = xDeathEntry(entry)
+		}
+	} else if existing, ok := headers["x-death"].([]xDeathEntry); ok {
+		// Handle case where it's still []xDeathEntry (shouldn't happen but be safe)
+		xDeathEvents = existing
+	} else {
 		xDeathEvents = []xDeathEntry{}
 	}
 	death["count"] = uint32(len(xDeathEvents)) + 1
 	xDeathEvents = append([]xDeathEntry{death}, xDeathEvents...)
-	headers["x-death"] = xDeathEvents
+	
+	// Convert []xDeathEntry to []map[string]any for AMQP encoding
+	xDeathArray := make([]map[string]any, len(xDeathEvents))
+	for i, entry := range xDeathEvents {
+		xDeathArray[i] = map[string]any(entry)
+	}
+	headers["x-death"] = xDeathArray
 	return headers
 }
