@@ -85,15 +85,19 @@ func (b *Broker) Start() error {
 	return b.acceptLoop(configurations)
 }
 
+// Logo 🦦
 func Logo() {
-	// TODO: create a better logo: 🦦
 	fmt.Print(`
 	
- OOOOO  tt    tt                  MM    MM  QQQQQ 
-OO   OO tt    tt      eee  rr rr  MMM  MMM QQ   QQ
-OO   OO tttt  tttt  ee   e rrr  r MM MM MM QQ   QQ
-OO   OO tt    tt    eeeee  rr     MM    MM QQ  QQ 
- OOOO0   tttt  tttt  eeeee rr     MM    MM  QQQQ Q
+ .d88888b.  888   888                  888b     d888 .d88888b. 
+d88P" "Y88b 888   888                  8888b   d8888d88P" "Y88b
+888     888 888   888                  88888b.d88888888     888
+888     888 888888888888 .d88b. 888d888888Y88888P888888     888
+888     888 888   888   d8P  Y8b888P"  888 Y888P 888888     888
+888     888 888   888   88888888888    888  Y8P  888888 Y8b 888
+Y88b. .d88P Y88b. Y88b. Y8b.    888    888   "   888Y88b.Y8b88P
+ "Y88888P"   "Y888 "Y888 "Y8888 888    888       888 "Y888888" 
+                                                          Y8b
 
 `)
 }
