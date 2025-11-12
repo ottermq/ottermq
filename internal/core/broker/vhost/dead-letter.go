@@ -117,7 +117,12 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 		// First x-death entry
 		headers["x-death"] = []xDeathEntry{}
 	}
-	deathArray, _ := xDeath.([]xDeathEntry)
+	deathArray, ok := xDeath.([]xDeathEntry)
+	if !ok {
+		// Malformed x-death header, reset it
+		log.Warn().Msg("Malformed x-death header, resetting it")
+		headers["x-death"] = []xDeathEntry{}
+	}
 	death["count"] = uint32(len(deathArray)) + 1
 	deathArray = append([]xDeathEntry{death}, deathArray...)
 	headers["x-death"] = deathArray
