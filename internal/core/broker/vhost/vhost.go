@@ -44,6 +44,8 @@ type VHost struct {
 
 	// Dead letter handler
 	DeadLetterer DeadLetterer
+
+	// TODO: create a type as a umbrella for all vhost extensions (dead-letter, cc/bcc, etc)
 }
 
 type VHostOptions struct {
