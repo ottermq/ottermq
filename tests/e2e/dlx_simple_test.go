@@ -42,6 +42,10 @@ func TestDLX_Simple(t *testing.T) {
 	t.Logf("Created main queue: %s", mainQueue.Name)
 	t.Logf("Created DLQ: %s", dlq.Name)
 
+	// Start DLQ consumer FIRST (before any messages are published)
+	dlqMsgs := tc.StartConsumer(dlq.Name, "dlq-consumer", true)
+	t.Log("Started DLQ consumer")
+
 	// Publish a message
 	err = tc.Ch.Publish("", mainQueue.Name, false, false, amqp.Publishing{
 		Body: []byte("test"),
@@ -50,7 +54,7 @@ func TestDLX_Simple(t *testing.T) {
 
 	t.Log("Published message")
 
-	// Consume it
+	// Consume it from main queue
 	msgs := tc.StartConsumer(mainQueue.Name, "test", false)
 	msg, ok := tc.ConsumeWithTimeout(msgs, 2*time.Second)
 	require.True(t, ok, "Should receive message")
@@ -63,13 +67,12 @@ func TestDLX_Simple(t *testing.T) {
 
 	t.Log("Rejected message")
 
-	time.Sleep(500 * time.Millisecond) // Give time for dead-lettering
+	time.Sleep(100 * time.Millisecond) // Brief wait for dead-lettering to complete
 
-	// Try to consume from DLQ
+	// Receive from DLQ (consumer already started above)
 	t.Log("Attempting to consume from DLQ...")
-	dlqMsgs := tc.StartConsumer(dlq.Name, "dlq-consumer", true)
 
-	deadMsg, ok := tc.ConsumeWithTimeout(dlqMsgs, 3*time.Second)
+	deadMsg, ok := tc.ConsumeWithTimeout(dlqMsgs, 2*time.Second)
 	require.True(t, ok, "Should receive dead-lettered message in DLQ")
 
 	t.Logf("Received from DLQ: %s", string(deadMsg.Body))
