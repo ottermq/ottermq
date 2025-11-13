@@ -71,18 +71,20 @@ func TestDLX_BasicRejection(t *testing.T) {
 	assert.Equal(t, []byte("test message for rejection"), deadMsg.Body)
 
 	// Verify x-death headers
-	xDeath, ok := deadMsg.Headers["x-death"].([]map[string]any)
+	headers := deadMsg.Headers
+	xDeath, ok := headers["x-death"].([]interface{})
 	require.True(t, ok, "x-death header should be an array")
 	require.Len(t, xDeath, 1, "should have one death entry")
 
-	deathEntry := xDeath[0]
+	deathEntry := xDeath[0].(amqp.Table)
 	assert.Equal(t, "rejected", deathEntry["reason"])
 	assert.Equal(t, mainQueue.Name, deathEntry["queue"])
-	assert.Equal(t, int32(1), deathEntry["count"])
+	assert.Equal(t, int64(1), deathEntry["count"])
 
 	// Verify x-first-death headers
 	assert.Equal(t, mainQueue.Name, deadMsg.Headers["x-first-death-queue"])
 	assert.Equal(t, "rejected", deadMsg.Headers["x-first-death-reason"])
+
 }
 
 // TestDLX_Nack verifies that a nacked message (requeue=false) is routed to DLX

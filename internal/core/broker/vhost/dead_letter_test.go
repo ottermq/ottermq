@@ -98,7 +98,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 	firstDeath := xDeath[0]
 	assert.Equal(t, "main-queue", firstDeath["queue"])
 	assert.Equal(t, "rejected", firstDeath["reason"])
-	assert.Equal(t, uint32(1), firstDeath["count"])
+	assert.Equal(t, int64(1), firstDeath["count"])
 	assert.Equal(t, "amq.direct", firstDeath["exchange"])
 	assert.NotEmpty(t, firstDeath["time"])
 
@@ -257,7 +257,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 
 	// Second entry (index 1) should be the original death (queue1)
 	assert.Equal(t, "queue1", xDeath[1]["queue"])
-	assert.Equal(t, uint32(1), xDeath[1]["count"])
+	assert.Equal(t, int64(1), xDeath[1]["count"])
 }
 
 func TestDeadLetter_CCBCCHeaders(t *testing.T) {

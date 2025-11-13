@@ -99,12 +99,12 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		encodedTable := EncodeTable(v)
 		EncodeLongStr(buf, encodedTable)
 
-	case []any:
-		// Array type 'A'
-		buf.WriteByte('A')
-		arrayBuf := EncodeArray(v)
-		_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
-		buf.Write(arrayBuf)
+	// case []any:
+	// 	// Array type 'A'
+	// 	buf.WriteByte('A')
+	// 	arrayBuf := EncodeArray(v)
+	// 	_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
+	// 	buf.Write(arrayBuf)
 
 	case []string:
 		// Array of strings - convert to []any and encode
@@ -144,7 +144,7 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 }
 
 // EncodeArray encodes an AMQP array
-func EncodeArray(arr []interface{}) []byte {
+func EncodeArray(arr []any) []byte {
 	var buf bytes.Buffer
 	for _, value := range arr {
 		encodeValueToBuffer(value, &buf)
