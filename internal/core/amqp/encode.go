@@ -7,19 +7,6 @@ import (
 	"time"
 )
 
-// EncodeTable encodes a proper AMQP field table
-func EncodeTable(table map[string]any) []byte {
-	var buf bytes.Buffer
-	for key, value := range table {
-		// Field name
-		EncodeShortStr(&buf, key)
-
-		// Field value type and value
-		encodeValueToBuffer(value, &buf)
-	}
-	return buf.Bytes()
-}
-
 // encodeValueToBuffer encodes a single AMQP field value into the provided buffer
 // by selecting the appropriate type encoding based on the value's Go type.
 func encodeValueToBuffer(value any, buf *bytes.Buffer) {
@@ -48,13 +35,9 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		buf.WriteByte('u')                         // Field value type 'u' (unsigned 16-bit int)
 		_ = binary.Write(buf, binary.BigEndian, v) // Error ignored as bytes.Buffer.Write never fails
 
-	case int32:
+	case int32, int:
 		buf.WriteByte('I')                         // Field value type 'I' (int32)
 		_ = binary.Write(buf, binary.BigEndian, v) // Error ignored as bytes.Buffer.Write never fails
-
-	case int:
-		buf.WriteByte('I')                                // Field value type 'I' (int32)
-		_ = binary.Write(buf, binary.BigEndian, int32(v)) // Cast to int32 for proper encoding
 
 	case uint32:
 		buf.WriteByte('i')                         // Field value type 'i' (uint32)
@@ -87,60 +70,77 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		buf.WriteByte('S') // Field value type 'S' (long-string)
 		EncodeLongStr(buf, []byte(v))
 
-	case map[string]any:
+	case map[string]any, Table:
 		// Recursively encode the nested map
 		buf.WriteByte('F') // Field value type 'F' (field table)
-		encodedTable := EncodeTable(v)
+		encodedTable := EncodeTable(v.(map[string]any))
 		EncodeLongStr(buf, encodedTable)
 
-	case Table:
-		// Recursively encode the nested map
-		buf.WriteByte('F') // Field value type 'F' (field table)
-		encodedTable := EncodeTable(v)
-		EncodeLongStr(buf, encodedTable)
+	// case Table:
+	// 	// Recursively encode the nested map
+	// 	buf.WriteByte('F') // Field value type 'F' (field table)
+	// 	encodedTable := EncodeTable(v)
+	// 	EncodeLongStr(buf, encodedTable)
 
-	// case []any:
-	// 	// Array type 'A'
+	case []any, []string, []map[string]any, []Table:
+		buf.WriteByte('A')
+		arrayBuf := EncodeArray(v.([]any))
+		_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
+		buf.Write(arrayBuf)
+
+	// case []string:
+	// 	// Array of strings - convert to []any and encode
 	// 	buf.WriteByte('A')
-	// 	arrayBuf := EncodeArray(v)
+	// 	arr := make([]any, len(v))
+	// 	for i, item := range v {
+	// 		arr[i] = item
+	// 	}
+	// 	arrayBuf := EncodeArray(arr)
 	// 	_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
 	// 	buf.Write(arrayBuf)
 
-	case []string:
-		// Array of strings - convert to []any and encode
-		buf.WriteByte('A')
-		arr := make([]any, len(v))
-		for i, item := range v {
-			arr[i] = item
-		}
-		arrayBuf := EncodeArray(arr)
-		_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
-		buf.Write(arrayBuf)
+	// case []map[string]any:
+	// 	// Array of tables - convert to []any and encode
+	// 	buf.WriteByte('A')
+	// 	arr := make([]any, len(v))
+	// 	for i, item := range v {
+	// 		arr[i] = item
+	// 	}
+	// 	arrayBuf := EncodeArray(arr)
+	// 	_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
+	// 	buf.Write(arrayBuf)
 
-	case []map[string]any:
-		// Array of tables - convert to []any and encode
-		buf.WriteByte('A')
-		arr := make([]any, len(v))
-		for i, item := range v {
-			arr[i] = item
-		}
-		arrayBuf := EncodeArray(arr)
-		_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
-		buf.Write(arrayBuf)
+	// case []Table:
+	// 	buf.WriteByte('A')
+	// 	arr := make([]any, len(v))
+	// 	for i, item := range v {
+	// 		arr[i] = item
+	// 	}
+	// 	arrayBuf := EncodeArray(arr)
+	// 	_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
+	// 	buf.Write(arrayBuf)
 
-	case []Table:
-		buf.WriteByte('A')
-		arr := make([]any, len(v))
-		for i, item := range v {
-			arr[i] = item
-		}
-		arrayBuf := EncodeArray(arr)
-		_ = binary.Write(buf, binary.BigEndian, uint32(len(arrayBuf)))
-		buf.Write(arrayBuf)
+	case time.Time:
+		buf.WriteByte('T') // Timestamp
+		timestamp := v.Unix()
+		binary.Write(buf, binary.BigEndian, uint64(timestamp))
 
 	default:
 		buf.WriteByte('V') // Void/null type
 	}
+}
+
+// EncodeTable encodes a proper AMQP field table
+func EncodeTable(table map[string]any) []byte {
+	var buf bytes.Buffer
+	for key, value := range table {
+		// Field name
+		EncodeShortStr(&buf, key)
+
+		// Field value type and value
+		encodeValueToBuffer(value, &buf)
+	}
+	return buf.Bytes()
 }
 
 // EncodeArray encodes an AMQP array
