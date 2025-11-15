@@ -98,7 +98,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 	firstDeath := xDeath[0]
 	assert.Equal(t, "main-queue", firstDeath["queue"])
 	assert.Equal(t, "rejected", firstDeath["reason"])
-	assert.Equal(t, int64(1), firstDeath["count"])
+	assert.Equal(t, uint64(1), firstDeath["count"])
 	assert.Equal(t, "amq.direct", firstDeath["exchange"])
 	assert.NotEmpty(t, firstDeath["time"])
 
@@ -226,7 +226,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 	xDeath, ok := headers["x-death"].([]map[string]any)
 	require.True(t, ok)
 	require.Len(t, xDeath, 1)
-	assert.Equal(t, uint32(1), xDeath[0]["count"])
+	assert.Equal(t, uint64(1), xDeath[0]["count"])
 
 	// Second death: queue2 -> queue3
 	err = dl.DeadLetter(*msg2, queue2, REASON_REJECTED)
@@ -253,11 +253,11 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 
 	// First entry (index 0) should be the most recent death (queue2)
 	assert.Equal(t, "queue2", xDeath[0]["queue"])
-	assert.Equal(t, uint32(2), xDeath[0]["count"])
+	assert.Equal(t, uint64(2), xDeath[0]["count"])
 
 	// Second entry (index 1) should be the original death (queue1)
 	assert.Equal(t, "queue1", xDeath[1]["queue"])
-	assert.Equal(t, int64(1), xDeath[1]["count"])
+	assert.Equal(t, uint64(1), xDeath[1]["count"])
 }
 
 func TestDeadLetter_CCBCCHeaders(t *testing.T) {
