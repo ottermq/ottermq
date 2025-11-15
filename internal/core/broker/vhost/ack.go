@@ -43,9 +43,11 @@ func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag ui
 	ch.mu.Lock()
 	if multiple {
 		for tag, record := range ch.Unacked {
+			log.Debug().Uint64("tag", tag).Msg("Checking unacked tag for multiple ack")
 			if tag <= deliveryTag {
 				removed = append(removed, record)
 				delete(ch.Unacked, tag)
+				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
 	} else {
