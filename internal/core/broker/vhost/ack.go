@@ -96,7 +96,7 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 	for _, record := range recordsToNack {
 		// Check if DLX extension is enabled and queue has DLX configured
 		// DLX properties comes directly from arguments: single source of truth
-		if vh.VHostExtensions["dlx"] && vh.DeadLetterer != nil {
+		if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
 			vh.mu.Lock()
 			queue, exists := vh.Queues[record.QueueName]
 			args := queue.Props.Arguments

@@ -44,15 +44,17 @@ type VHost struct {
 
 	// Dead letter handler
 	DeadLetterer DeadLetterer
+	TTLManager   TTLManager
 
 	// TODO: create a type as a umbrella for all vhost extensions (dead-letter, cc/bcc, etc)
-	VHostExtensions map[string]bool
+	ActiveExtensions map[string]bool
 }
 
 type VHostOptions struct {
 	QueueBufferSize int
 	Persistence     persistence.Persistence
 	EnableDLX       bool
+	EnableTTL       bool
 }
 
 func NewVhost(vhostName string, options VHostOptions) *VHost {
@@ -72,21 +74,31 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		ChannelDeliveries:   make(map[ConnectionChannelKey]*ChannelDeliveryState),
 		redeliveredMessages: make(map[string]struct{}),
 		ChannelTransactions: make(map[ConnectionChannelKey]*ChannelTransactionState),
-		VHostExtensions:     make(map[string]bool),
+		ActiveExtensions:    make(map[string]bool),
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state
 	if options.Persistence != nil {
 		vh.loadPersistedState()
 	}
+	setupExtensions(options, vh)
+
+	return vh
+}
+
+func setupExtensions(options VHostOptions, vh *VHost) {
 	if options.EnableDLX {
-		vh.VHostExtensions["dlx"] = true
+		vh.ActiveExtensions["dlx"] = true
 		vh.DeadLetterer = &DeadLetter{vh: vh}
 	} else {
 		vh.DeadLetterer = &NoOpDeadLetterer{}
 	}
-
-	return vh
+	if options.EnableTTL {
+		vh.ActiveExtensions["ttl"] = true
+		vh.TTLManager = &DefaultTTLManager{vh: vh}
+	} else {
+		vh.TTLManager = &NoOpTTLManager{}
+	}
 }
 
 func (vh *VHost) SetFramer(framer amqp.Framer) {

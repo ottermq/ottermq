@@ -22,6 +22,7 @@ type Message struct {
 	ID         string            `json:"id"`
 	Body       []byte            `json:"body"`
 	Properties MessageProperties `json:"properties"`
+	EnqueuedAt int64             `json:"enqueued_at"`
 }
 
 // Basic queue/exchange properties - universal concepts
