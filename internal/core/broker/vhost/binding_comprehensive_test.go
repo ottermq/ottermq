@@ -312,19 +312,10 @@ func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
 		t.Fatalf("First bind failed: %v", err)
 	}
 
-	// Second bind with identical args should fail
+	// Second bind with identical args should now be idempotent and succeed
 	err = vh.BindQueue(exchangeName, queueName, routingKey, args, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding")
-	}
-
-	amqpErr, ok := err.(errors.AMQPError)
-	if !ok {
-		t.Fatalf("Expected AMQPError, got %T", err)
-	}
-
-	if amqpErr.ReplyCode() != uint16(amqp.PRECONDITION_FAILED) {
-		t.Errorf("Expected PRECONDITION_FAILED (406), got %d", amqpErr.ReplyCode())
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 }
 
@@ -441,15 +432,15 @@ func TestBindQueue_NilArguments(t *testing.T) {
 
 	// Bind again with nil should fail (duplicate)
 	err = vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding with nil args")
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 
 	// Bind with empty map should also fail (equivalent to nil for AMQP)
 	emptyArgs := map[string]interface{}{}
 	err = vh.BindQueue(exchangeName, queueName, routingKey, emptyArgs, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding with empty args (equivalent to nil)")
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 
 	// Should have 1 binding
