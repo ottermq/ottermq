@@ -18,12 +18,15 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 ## ✨ Features
 
 - AMQP-style Message Queuing
-- Exchanges and Bindings
+- Exchanges and Bindings (Direct, Fanout, Topic)
+- Dead Letter Exchange (DLX) - RabbitMQ-compatible error handling
+- Quality of Service (QoS) with prefetch limits
+- Transactions (TX class) - Atomic commit/rollback
+- Channel Flow Control for backpressure management
 - Pluggable Persistence Layer (JSON files, Memento WAL planned)
-- High Availability (planned)
 - Management Interface (Vue + Quasar)
 - Docker Support via `docker-compose`
-- RabbitMQ Client Compatibility (basic)
+- RabbitMQ Client Compatibility
 
 ## ⚙️ Installation
 
@@ -138,12 +141,12 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
 
-- Dead letter exchanges (RabbitMQ extension)
 - Message TTL and expiration
+- Queue length limits with dead lettering
 - Priority queues
 - Memento WAL persistence engine (planned)
 
-**All core AMQP message operations are now fully implemented**, including:
+**All core AMQP 0.9.1 message operations are now fully implemented**, including:
 
 - Push-based consumption (`basic.consume`/`basic.deliver`)
 - Pull-based consumption (`basic.get`)
@@ -152,6 +155,10 @@ OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, s
 - Message recovery (`basic.recover`, `basic.recover-async`)
 - Flow control (`channel.flow` for backpressure management)
 - Transactions (`tx.select`, `tx.commit`, `tx.rollback`)
+
+**RabbitMQ Extensions** (for compatibility):
+
+- Dead Letter Exchanges (DLX) with `x-death` tracking
 
 Basic compatibility with RabbitMQ clients is functional and tested. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 

@@ -28,6 +28,10 @@ This site tracks project status and documentation for users and contributors. Fo
 - Pluggable persistence layer (JSON today; Memento WAL planned)
 - Built-in management UI (Vue + Quasar)
 
+**RabbitMQ Extensions**:
+
+- **Dead Letter Exchange (DLX)** - Error handling and message routing ([DLX Guide](./dead-letter-exchange))
+
 ## Getting started
 
 - Build and run using `make build-all` then `make run`
