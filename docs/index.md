@@ -27,6 +27,8 @@ This site tracks project status and documentation for users and contributors. Fo
 - Message acknowledgments, rejections, and recovery
 - Pluggable persistence layer (JSON today; Memento WAL planned)
 - Built-in management UI (Vue + Quasar)
+- **Dead Letter Exchange (DLX)** - RabbitMQ-compatible error handling and message routing
+- Dead Letter Exchange: [DLX Guide](./dead-letter-exchange)
 
 ## Getting started
 

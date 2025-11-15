@@ -108,7 +108,7 @@ Status levels:
 | basic.get-ok | ✅ | |
 | basic.get-empty | ✅ | |
 | basic.ack | ✅ | |
-| basic.reject | ⚠️ | Requeue works; dead-lettering TODO |
+| basic.reject | ✅ | Requeue works; dead-lettering implemented |
 | basic.recover-async | ✅ | |
 | basic.recover | ✅ | |
 | basic.recover-ok | ✅ | |
