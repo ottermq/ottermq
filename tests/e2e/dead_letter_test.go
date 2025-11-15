@@ -79,7 +79,7 @@ func TestDLX_BasicRejection(t *testing.T) {
 	deathEntry := xDeath[0].(amqp.Table)
 	assert.Equal(t, "rejected", deathEntry["reason"])
 	assert.Equal(t, mainQueue.Name, deathEntry["queue"])
-	assert.Equal(t, int64(1), deathEntry["count"])
+	assert.Equal(t, int64(1), deathEntry["count"]) // Count is int64 in amqp.Table
 
 	// Verify x-first-death headers
 	assert.Equal(t, mainQueue.Name, deadMsg.Headers["x-first-death-queue"])
@@ -232,12 +232,12 @@ func TestDLX_MultipleDeaths(t *testing.T) {
 	// Verify newest death is first (q2)
 	death1 := xDeath2[0].(amqp.Table)
 	assert.Equal(t, "dlx-q2", death1["queue"])
-	assert.Equal(t, int32(2), death1["count"])
+	assert.Equal(t, int64(2), death1["count"])
 
 	// Verify oldest death is last (q1)
 	death2 := xDeath2[1].(amqp.Table)
 	assert.Equal(t, "dlx-q1", death2["queue"])
-	assert.Equal(t, int32(1), death2["count"])
+	assert.Equal(t, int64(1), death2["count"])
 
 	// Verify x-first-death points to q1 (original)
 	assert.Equal(t, "dlx-q1", msg3.Headers["x-first-death-queue"])
