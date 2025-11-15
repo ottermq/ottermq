@@ -88,37 +88,14 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		buf.Write(data)
 
 	case []map[string]any:
-		// log.Trace().Msg("Encoding array of map[string]any")
-		// buf.WriteByte('A')
-		// arr := make([]any, len(v))
-		// for i, item := range v {
-		// 	arr[i] = item
-		// }
-		// data := EncodeArray(arr)
-		// _ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
-		// buf.Write(data)
-		buf.WriteByte('A') // Array type
-		arrBuf := bytes.Buffer{}
-		// Encode as array of field tables
-
-		var arrayContent bytes.Buffer
-		for _, entry := range v {
-			var entryBuf bytes.Buffer
-			entryBuf.WriteByte('F') // Field table type
-			data := EncodeTable(entry)
-			_ = binary.Write(&entryBuf, binary.BigEndian, uint32(len(data)))
-			entryBuf.Write(data)
-			arrayContent.Write(entryBuf.Bytes())
+		buf.WriteByte('A') // Field value type 'A' (array)
+		arr := make([]any, len(v))
+		for i, item := range v {
+			arr[i] = item
 		}
-		// Write length of array content
-		_ = binary.Write(&arrBuf, binary.BigEndian, uint32(arrayContent.Len()))
-		arrBuf.Write(arrayContent.Bytes())
-
-		// Now write to main buffer
-		// EncodeShortStr(&buf, key)
-		buf.Write(arrBuf.Bytes())
-		// log.Trace().Msg("Encoding x-death header")
-		// log.Trace().Hex("x-death-encoded", arrBuf.Bytes()).Int("size", len(arrBuf.Bytes())).Msg("Encoded x-death header")
+		data := EncodeArray(arr)
+		_ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
+		buf.Write(data)
 
 	case []string:
 		// Array of strings - convert to []any and encode
@@ -160,12 +137,14 @@ func EncodeTable(table map[string]any) []byte {
 	return buf.Bytes()
 }
 
-func EncodeArray(arr any) []byte {
-	var buf bytes.Buffer
-	for _, value := range arr.([]any) {
-		encodeValueToBuffer(value, &buf)
+func EncodeArray(arr []any) []byte {
+	var arrContent bytes.Buffer
+	for _, item := range arr {
+		itemBuf := bytes.Buffer{}
+		encodeValueToBuffer(item, &itemBuf)
+		arrContent.Write(itemBuf.Bytes())
 	}
-	return buf.Bytes()
+	return arrContent.Bytes()
 }
 
 func EncodeLongStr(buf *bytes.Buffer, data []byte) {
