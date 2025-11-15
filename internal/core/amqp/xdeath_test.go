@@ -54,7 +54,7 @@ func TestEncodeDecodeXDeathHeader(t *testing.T) {
 
 	assert.Equal(t, "test-queue", entry["queue"])
 	assert.Equal(t, "rejected", entry["reason"])
-	assert.Equal(t, uint32(1), entry["count"])
+	assert.Equal(t, uint32(1), entry["count"]) // AMQP client decodes as uint32
 	assert.Equal(t, "test-exchange", entry["exchange"])
 
 	// Verify routing-keys
