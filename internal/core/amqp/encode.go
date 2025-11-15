@@ -9,8 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type XDeathEntry map[string]any
-
 func encodeHeaders(buf *bytes.Buffer, table map[string]any) {
 	// log.Debug().Interface("headers", table).Msg("Encoding headers in BasicProperties")
 	encodedTable := EncodeTable(table)
@@ -86,17 +84,41 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 		log.Trace().Msg("Encoding map[string]any")
 		buf.WriteByte('F') // Field value type 'F' (field table)
 		data := EncodeTable(v)
-		EncodeLongStr(buf, data)
+		_ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
+		buf.Write(data)
 
 	case []map[string]any:
-		log.Trace().Msg("Encoding array of map[string]any")
-		buf.WriteByte('A')
-		arr := make([]any, len(v))
-		for i, item := range v {
-			arr[i] = item
+		// log.Trace().Msg("Encoding array of map[string]any")
+		// buf.WriteByte('A')
+		// arr := make([]any, len(v))
+		// for i, item := range v {
+		// 	arr[i] = item
+		// }
+		// data := EncodeArray(arr)
+		// _ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
+		// buf.Write(data)
+		buf.WriteByte('A') // Array type
+		arrBuf := bytes.Buffer{}
+		// Encode as array of field tables
+
+		var arrayContent bytes.Buffer
+		for _, entry := range v {
+			var entryBuf bytes.Buffer
+			entryBuf.WriteByte('F') // Field table type
+			data := EncodeTable(entry)
+			_ = binary.Write(&entryBuf, binary.BigEndian, uint32(len(data)))
+			entryBuf.Write(data)
+			arrayContent.Write(entryBuf.Bytes())
 		}
-		data := EncodeArray(arr)
-		EncodeLongStr(buf, data)
+		// Write length of array content
+		_ = binary.Write(&arrBuf, binary.BigEndian, uint32(arrayContent.Len()))
+		arrBuf.Write(arrayContent.Bytes())
+
+		// Now write to main buffer
+		// EncodeShortStr(&buf, key)
+		buf.Write(arrBuf.Bytes())
+		// log.Trace().Msg("Encoding x-death header")
+		// log.Trace().Hex("x-death-encoded", arrBuf.Bytes()).Int("size", len(arrBuf.Bytes())).Msg("Encoded x-death header")
 
 	case []string:
 		// Array of strings - convert to []any and encode
@@ -106,13 +128,21 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 			arr[i] = item
 		}
 		data := EncodeArray(arr)
-		EncodeLongStr(buf, data)
+		_ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
+		buf.Write(data)
 
 	case time.Time:
 		log.Trace().Msg("Encoding time.Time value")
 		buf.WriteByte('T') // Timestamp
 		timestamp := v.Unix()
 		binary.Write(buf, binary.BigEndian, uint64(timestamp))
+
+	case []any:
+		log.Trace().Msg("Encoding []any array")
+		buf.WriteByte('A') // Array
+		data := EncodeArray(v)
+		_ = binary.Write(buf, binary.BigEndian, uint32(len(data)))
+		buf.Write(data)
 
 	default:
 		log.Warn().Interface("value", v).Msg("Unsupported AMQP field value type, encoding as null")
@@ -124,45 +154,8 @@ func encodeValueToBuffer(value any, buf *bytes.Buffer) {
 func EncodeTable(table map[string]any) []byte {
 	var buf bytes.Buffer
 	for key, value := range table {
-		// Field name
-		log.Trace().Str("key", key).Interface("value", value).Msg("Encoding table entry")
-		if key == "x-death" {
-			xDeathBuf := bytes.Buffer{}
-			// Encode as array of field tables
-			xDeathArray, ok := value.([]map[string]any)
-			if !ok {
-				log.Warn().Interface("x-death", value).Msg("x-death header is not in expected format, encoding as null")
-				EncodeShortStr(&buf, key)
-				buf.WriteByte('V') // Void/null type
-				continue
-			}
-
-			var arrayContent bytes.Buffer
-			for _, entry := range xDeathArray {
-				log.Trace().Msg("Encoding x-death entry as field table")
-				var entryBuf bytes.Buffer
-				entryBuf.WriteByte('F') // Field table type
-				entryData := EncodeTable(entry)
-				EncodeLongStr(&entryBuf, entryData)
-				arrayContent.Write(entryBuf.Bytes())
-			}
-			// Write length of array content
-			_ = binary.Write(&xDeathBuf, binary.BigEndian, uint32(arrayContent.Len()))
-			xDeathBuf.Write(arrayContent.Bytes())
-
-			// Now write to main buffer
-			EncodeShortStr(&buf, key)
-			buf.WriteByte('A') // Array type
-			buf.Write(xDeathBuf.Bytes())
-			log.Trace().Msg("Encoding x-death header")
-			log.Trace().Hex("x-death-encoded", xDeathBuf.Bytes()).Int("size", len(xDeathBuf.Bytes())).Msg("Encoded x-death header")
-
-		} else {
-			EncodeShortStr(&buf, key)
-
-			// Field value type and value
-			encodeValueToBuffer(value, &buf)
-		}
+		EncodeShortStr(&buf, key) // Encode the field name as short string
+		encodeValueToBuffer(value, &buf)
 	}
 	return buf.Bytes()
 }
