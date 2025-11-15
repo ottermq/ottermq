@@ -405,21 +405,23 @@ func TestDLX_MultipleNack(t *testing.T) {
 	err = msg2.Nack(true, false) // multiple=true, requeue=false
 	require.NoError(t, err)
 
-	// Only msg3 should be left in main queue, msg1 and msg2 should be in DLQ
+	// msg1 and msg2 should be in DLQ, msg3 is still unacked (delivered but not ready)
 	time.Sleep(100 * time.Millisecond)
-
-	inspected, err := tc.Ch.QueueInspect(mainQueue.Name)
-	require.NoError(t, err)
-	assert.Equal(t, 1, inspected.Messages, "one message should remain in main queue")
-
-	// Ack the remaining message
-	err = msg3.Ack(false)
-	require.NoError(t, err)
 
 	// Check DLQ has 2 messages
 	dlqInspected, err := tc.Ch.QueueInspect(dlq.Name)
 	require.NoError(t, err)
 	assert.Equal(t, 2, dlqInspected.Messages, "two messages should be in DLQ")
+
+	// Now ack msg3 to clear it
+	err = msg3.Ack(false)
+	require.NoError(t, err)
+
+	// After acking msg3, the main queue should be completely empty
+	time.Sleep(50 * time.Millisecond)
+	inspected, err := tc.Ch.QueueInspect(mainQueue.Name)
+	require.NoError(t, err)
+	assert.Equal(t, 0, inspected.Messages, "main queue should be empty after all messages processed")
 }
 
 // TestDLX_PersistentMessage verifies that persistent messages retain their delivery mode
