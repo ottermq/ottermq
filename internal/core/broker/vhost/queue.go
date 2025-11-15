@@ -32,7 +32,7 @@ type QueueProperties struct {
 	Passive    bool      `json:"passive"`
 	Durable    bool      `json:"durable"`
 	AutoDelete bool      `json:"auto_delete"`
-	Exclusive  bool      `json:"exclusive"` // not implemented yet
+	Exclusive  bool      `json:"exclusive"`
 	Arguments  QueueArgs `json:"arguments"`
 }
 
@@ -194,8 +194,10 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	if props == nil {
 		props = NewQueueProperties()
 	}
+	// DLX properties comes directly from arguments: single source of truth
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
+
 	if props.Exclusive {
 		queue.OwnerConn = conn
 	}

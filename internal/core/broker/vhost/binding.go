@@ -51,7 +51,8 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		for _, b := range exchange.Bindings[routingKey] {
 			// verify binding uniqueness
 			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
-				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s' with routing key '%s'", queueName, exchangeName, routingKey), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+				log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Str("routing_key", routingKey).Msg("Queue already bound to exchange with routing key")
+				return nil // idempotent
 			}
 		}
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)
@@ -61,7 +62,8 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		for _, b := range exchange.Bindings[routingKey] {
 			// verify binding uniqueness
 			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
-				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s'", queueName, exchangeName), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+				log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Msg("Queue already bound to exchange")
+				return nil // idempotent
 			}
 		}
 
@@ -70,7 +72,8 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[
 		for _, b := range exchange.Bindings[routingKey] {
 			// verify binding uniqueness
 			if vh.bindingExist(b, queueName, routingKey, args, exchangeName) {
-				return errors.NewChannelError(fmt.Sprintf("queue '%s' is already bound to exchange '%s' with routing key '%s'", queueName, exchangeName, routingKey), uint16(amqp.PRECONDITION_FAILED), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
+				log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Str("routing_key", routingKey).Msg("Queue already bound to exchange with routing key")
+				return nil // idempotent
 			}
 		}
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], newBinding)

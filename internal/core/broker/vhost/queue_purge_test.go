@@ -6,59 +6,18 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	amqperr "github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
-// fakePersistence records DeleteMessage calls for assertions
-type fakePersistence struct {
-	deleted []string
-}
-
-func (f *fakePersistence) SaveQueueMetadata(vhost, name string, props persistence.QueueProperties) error {
-	return nil
-}
-func (f *fakePersistence) LoadQueueMetadata(vhost, name string) (persistence.QueueProperties, error) {
-	return persistence.QueueProperties{}, nil
-}
-func (f *fakePersistence) DeleteQueueMetadata(vhost, name string) error { return nil }
-func (f *fakePersistence) SaveExchangeMetadata(vhost, name, exchangeType string, props persistence.ExchangeProperties) error {
-	return nil
-}
-func (f *fakePersistence) LoadExchangeMetadata(vhost, name string) (string, persistence.ExchangeProperties, error) {
-	return "", persistence.ExchangeProperties{}, nil
-}
-func (f *fakePersistence) DeleteExchangeMetadata(vhost, name string) error { return nil }
-func (f *fakePersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
-	return nil
-}
-func (f *fakePersistence) LoadExchangeBindings(vhost, exchange string) ([]persistence.BindingData, error) {
-	return nil, nil
-}
-func (f *fakePersistence) DeleteBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
-	return nil
-}
-func (f *fakePersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {
-	return nil
-}
-func (f *fakePersistence) LoadMessages(vhostName, queueName string) ([]persistence.Message, error) {
-	return nil, nil
-}
-func (f *fakePersistence) DeleteMessage(vhost, queue, msgId string) error {
-	f.deleted = append(f.deleted, msgId)
-	return nil
-}
-func (f *fakePersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
-	return nil, nil
-}
-func (f *fakePersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
-	return nil, nil
-}
-func (f *fakePersistence) Initialize() error { return nil }
-func (f *fakePersistence) Close() error      { return nil }
-
 func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
-	fp := &fakePersistence{}
-	vh := NewVhost("/", 100, fp)
+	fp := &dummy.DummyPersistence{
+		DeletedMessages: []string{}, // Enable simple tracking
+	}
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     fp,
+	}
+	vh := NewVhost("/", options)
 
 	// Create a durable queue
 	_, err := vh.CreateQueue("q1", &QueueProperties{Durable: true}, nil)
@@ -88,17 +47,21 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 	}
 
 	// Only persistent messages should trigger DeleteMessage
-	if len(fp.deleted) != 2 {
-		t.Fatalf("expected 2 persisted deletions, got %d (%v)", len(fp.deleted), fp.deleted)
+	if len(fp.DeletedMessages) != 2 {
+		t.Fatalf("expected 2 persisted deletions, got %d (%v)", len(fp.DeletedMessages), fp.DeletedMessages)
 	}
 	// Order is FIFO; expect m1 then m3
-	if fp.deleted[0] != "m1" || fp.deleted[1] != "m3" {
-		t.Fatalf("unexpected deletion order/ids: %v", fp.deleted)
+	if fp.DeletedMessages[0] != "m1" || fp.DeletedMessages[1] != "m3" {
+		t.Fatalf("unexpected deletion order/ids: %v", fp.DeletedMessages)
 	}
 }
 
 func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
-	vh := NewVhost("/", 100, &fakePersistence{})
+	options := VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	_, err := vh.PurgeQueue("does-not-exist", nil)
 	if err == nil {
@@ -121,7 +84,11 @@ func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
 }
 
 func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing.T) {
-	vh := NewVhost("/", 100, &fakePersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	// Mock connections
 	ownerConn := &mockConn{}

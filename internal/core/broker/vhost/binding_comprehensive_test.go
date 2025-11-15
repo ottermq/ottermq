@@ -12,7 +12,11 @@ import (
 
 // Test fanout publish distributes to all bound queues
 func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -59,7 +63,11 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 
 // Test fanout with empty bindings
 func TestFanoutPublish_NoBindings(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout-empty"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -81,7 +89,11 @@ func TestFanoutPublish_NoBindings(t *testing.T) {
 
 // Test fanout ignores routing key during publish
 func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -114,7 +126,11 @@ func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
 
 // Test fanout unbind removes correct queue
 func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -171,7 +187,11 @@ func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
 
 // Test fanout auto-delete after last unbind
 func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout-autodel"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{
@@ -201,7 +221,11 @@ func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
 
 // Test fanout unbind with routing key is ignored
 func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -225,7 +249,11 @@ func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
 
 // Test binding with same queue+exchange+key but different args creates multiple bindings
 func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -263,7 +291,11 @@ func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
 
 // Test binding with identical args fails with PRECONDITION_FAILED
 func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -280,25 +312,20 @@ func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
 		t.Fatalf("First bind failed: %v", err)
 	}
 
-	// Second bind with identical args should fail
+	// Second bind with identical args should now be idempotent and succeed
 	err = vh.BindQueue(exchangeName, queueName, routingKey, args, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding")
-	}
-
-	amqpErr, ok := err.(errors.AMQPError)
-	if !ok {
-		t.Fatalf("Expected AMQPError, got %T", err)
-	}
-
-	if amqpErr.ReplyCode() != uint16(amqp.PRECONDITION_FAILED) {
-		t.Errorf("Expected PRECONDITION_FAILED (406), got %d", amqpErr.ReplyCode())
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 }
 
 // Test unbind requires matching arguments
 func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -339,7 +366,11 @@ func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
 
 // Test unbind removes only binding with matching arguments
 func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -380,7 +411,11 @@ func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
 
 // Test binding with nil arguments
 func TestBindQueue_NilArguments(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -397,15 +432,15 @@ func TestBindQueue_NilArguments(t *testing.T) {
 
 	// Bind again with nil should fail (duplicate)
 	err = vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding with nil args")
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 
 	// Bind with empty map should also fail (equivalent to nil for AMQP)
 	emptyArgs := map[string]interface{}{}
 	err = vh.BindQueue(exchangeName, queueName, routingKey, emptyArgs, nil)
-	if err == nil {
-		t.Fatal("Expected error for duplicate binding with empty args (equivalent to nil)")
+	if err != nil {
+		t.Fatalf("Expected idempotent bind to succeed, got error: %v", err)
 	}
 
 	// Should have 1 binding
@@ -419,7 +454,11 @@ func TestBindQueue_NilArguments(t *testing.T) {
 
 // Test direct exchange routes only to matching key
 func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -465,7 +504,11 @@ func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
 
 // Test direct exchange with non-existent routing key
 func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -492,7 +535,11 @@ func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
 
 // Test auto-delete doesn't trigger when other bindings exist
 func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -526,7 +573,11 @@ func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
 
 // Test auto-delete with multiple routing keys
 func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -562,7 +613,11 @@ func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
 
 // Test HasRoutingForMessage with fanout
 func TestHasRoutingForMessage_Fanout(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -595,7 +650,11 @@ func TestHasRoutingForMessage_Fanout(t *testing.T) {
 
 // Test HasRoutingForMessage with direct
 func TestHasRoutingForMessage_Direct(t *testing.T) {
-	vh := NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := NewVhost("/", options)
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})

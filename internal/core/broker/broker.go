@@ -36,6 +36,7 @@ type Broker struct {
 	rootCtx      context.Context
 	rootCancel   context.CancelFunc
 	persist      persistence.Persistence
+	Ready        chan struct{} // Signals when the broker is ready to accept connections
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -57,8 +58,14 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
 		persist:     persist,
+		Ready:       make(chan struct{}),
 	}
-	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
+	options := vhost.VHostOptions{
+		QueueBufferSize: config.QueueBufferSize,
+		Persistence:     b.persist,
+		EnableDLX:       config.EnableDLX,
+	}
+	b.VHosts["/"] = vhost.NewVhost("/", options)
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
 	b.ManagerApi = &DefaultManagerApi{b}
@@ -66,13 +73,14 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 }
 
 func (b *Broker) Start() error {
-	Logo()
-	log.Info().Str("version", b.config.Version).Msg("OtterMQ")
-	log.Info().Msg("Broker is starting...")
+	if b.config.ShowLogo {
+		Logo()
+	}
+	log.Info().Str("version", b.config.Version).Msg("🦦 OtterMQ")
 
 	configurations := b.setConfigurations()
 
-	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
+	addr := fmt.Sprintf("%s:%s", b.config.BrokerHost, b.config.BrokerPort)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -82,18 +90,25 @@ func (b *Broker) Start() error {
 	defer listener.Close()
 	log.Info().Str("addr", addr).Msg("Started TCP listener")
 
+	// Signal that the broker is ready to accept connections
+	close(b.Ready)
+
 	return b.acceptLoop(configurations)
 }
 
+// Logo 🦦
 func Logo() {
-	// TODO: create a better logo: 🦦
 	fmt.Print(`
 	
- OOOOO  tt    tt                  MM    MM  QQQQQ 
-OO   OO tt    tt      eee  rr rr  MMM  MMM QQ   QQ
-OO   OO tttt  tttt  ee   e rrr  r MM MM MM QQ   QQ
-OO   OO tt    tt    eeeee  rr     MM    MM QQ  QQ 
- OOOO0   tttt  tttt  eeeee rr     MM    MM  QQQQ Q
+ .d88888b.  888   888                  888b     d888 .d88888b. 
+d88P" "Y88b 888   888                  8888b   d8888d88P" "Y88b
+888     888 888   888                  88888b.d88888888     888
+888     888 888888888888 .d88b. 888d888888Y88888P888888     888
+888     888 888   888   d8P  Y8b888P"  888 Y888P 888888     888
+888     888 888   888   88888888888    888  Y8P  888888 Y8b 888
+Y88b. .d88P Y88b. Y88b. Y8b.    888    888   "   888Y88b.Y8b88P
+ "Y88888P"   "Y888 "Y888 "Y8888 888    888       888 "Y888888" 
+                                                          Y8b
 
 `)
 }

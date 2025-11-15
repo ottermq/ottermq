@@ -25,7 +25,11 @@ func TestQueuePurgeHandler_Success(t *testing.T) {
 		framer: &amqp.DefaultFramer{},
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 	// Create queue and seed messages
 	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, nil)
@@ -64,7 +68,11 @@ func TestQueuePurgeHandler_QueueNotFound_SendsChannelClose(t *testing.T) {
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	conn := &mockConn{}
@@ -103,7 +111,11 @@ func TestQueuePurgeHandler_InvalidContentType(t *testing.T) {
 		framer: &amqp.DefaultFramer{},
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -130,7 +142,11 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 		framer: &amqp.DefaultFramer{},
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Create exchange and queue
@@ -178,7 +194,11 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Create only queue, no exchange
@@ -241,7 +261,11 @@ func TestQueueUnbindHandler_InvalidContentType(t *testing.T) {
 		framer: &amqp.DefaultFramer{},
 	}
 
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 
 	// Create request with wrong content type
 	request := &amqp.RequestMethodMessage{

@@ -37,27 +37,139 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 
 		// Read field value based on the type
 		switch fieldType {
-		case 'S': // String
-			var strLength uint32
-			if err := binary.Read(buf, binary.BigEndian, &strLength); err != nil {
+		case 't':
+			value, err := DecodeBoolean(buf)
+			if err != nil {
 				return nil, err
 			}
+			table[string(fieldName)] = value
 
-			strValue := make([]byte, strLength)
-			_, err := buf.Read(strValue)
+		case 'b': // Signed 8-bit integer
+			var intValue int8
+			if err := binary.Read(buf, binary.BigEndian, &intValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = intValue
+
+		case 'B': // Unsigned 8-bit integer
+			var uintValue uint8
+			if err := binary.Read(buf, binary.BigEndian, &uintValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = uintValue
+
+		case 'U': // signed short integer (16-bit)
+			var shortIntValue int16
+			if err := binary.Read(buf, binary.BigEndian, &shortIntValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = shortIntValue
+
+		case 'u': // Unsigned short integer (16-bit)
+			var ushortIntValue uint16
+			if err := binary.Read(buf, binary.BigEndian, &ushortIntValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = ushortIntValue
+
+		case 'I': // Long-int (signed 32-bit)
+			val, err := DecodeLongInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = val
+
+		case 'i': // Long-uint (unsigned 32-bit)
+			val, err := DecodeLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = val
+
+		case 'L': // Long long signed integer (64-bit)
+			val, err1 := DecodeLongLongInt(buf)
+			if err1 != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = val
+
+		case 'l': // Long long unsigned integer (64-bit)
+			val, err := DecodeLongLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = val
+
+		case 'f': // float (32-bit)
+			var floatValue float32
+			if err := binary.Read(buf, binary.BigEndian, &floatValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = floatValue
+
+		case 'd': // double (64-bit)
+			var doubleValue float64
+			if err := binary.Read(buf, binary.BigEndian, &doubleValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = doubleValue
+
+		case 'D': // Decimal type
+			// 1 byte scale + 4 bytes value
+			var scale uint8
+			if err := binary.Read(buf, binary.BigEndian, &scale); err != nil {
+				return nil, err
+			}
+			var decimalValue uint32
+			if err := binary.Read(buf, binary.BigEndian, &decimalValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = struct {
+				Scale uint8
+				Value uint32
+			}{Scale: scale, Value: decimalValue}
+
+		case 's': // Short String
+			strValue, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, err
 			}
 
-			table[string(fieldName)] = string(strValue)
+			table[string(fieldName)] = strValue
 
-		case 'I': // Integer (simplified, normally long-int should be used)
-			var intValue int32
-			if err := binary.Read(buf, binary.BigEndian, &intValue); err != nil {
+		case 'S': // Long String
+			strValue, err := DecodeLongStr(buf)
+			if err != nil {
 				return nil, err
 			}
 
-			table[string(fieldName)] = intValue
+			table[string(fieldName)] = strValue
+
+		case 'A': // Array
+			var arrayLength uint32
+			if err := binary.Read(buf, binary.BigEndian, &arrayLength); err != nil {
+				return nil, err
+			}
+
+			arrayData := make([]byte, arrayLength)
+			_, err := buf.Read(arrayData)
+			if err != nil {
+				return nil, err
+			}
+
+			// Decode the array data into []interface{}
+			decodedArray, err := DecodeArray(arrayData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode array: %v", err)
+			}
+			table[string(fieldName)] = decodedArray
+
+		case 'T': // Timestamp
+			timestamp, err := DecodeTimestamp(buf)
+			if err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = timestamp
 
 		case 'F': // Field Table
 			var strLength uint32
@@ -77,37 +189,168 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 			}
 			table[string(fieldName)] = value
 
-		case 't':
-			value, err := DecodeBoolean(buf)
-			if err != nil {
-				return nil, err
-			}
-			table[string(fieldName)] = value
-
-		// Add cases for other types as needed
 		case 'V': // Void (null)
 			// No payload, just store nil or skip
 			table[string(fieldName)] = nil
-
-		case 'U': // Unsigned integer (32-bit)
-			var intValue uint32
-			if err := binary.Read(buf, binary.BigEndian, &intValue); err != nil {
-				return nil, err
-			}
-			table[string(fieldName)] = intValue
-
-		case 'l': // Long signed integer (64-bit)
-			var longValue int64
-			if err := binary.Read(buf, binary.BigEndian, &longValue); err != nil {
-				return nil, err
-			}
-			table[string(fieldName)] = longValue
 
 		default:
 			return nil, fmt.Errorf("unknown field type: %c", fieldType)
 		}
 	}
 	return table, nil
+}
+
+// DecodeArray decodes an AMQP array from raw bytes
+func DecodeArray(data []byte) ([]interface{}, error) {
+	var result []interface{}
+	buf := bytes.NewReader(data)
+
+	for buf.Len() > 0 {
+		// Read value type
+		valueType, err := buf.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+
+		// Decode value based on type
+		switch valueType {
+		case 't': // Boolean
+			value, err := DecodeBoolean(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'b': // Signed 8-bit
+			var value int8
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'B': // Unsigned 8-bit
+			var value uint8
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'U': // Signed 16-bit
+			var value int16
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'u': // Unsigned 16-bit
+			var value uint16
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'I': // Signed 32-bit
+			value, err := DecodeLongInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'i': // Unsigned 32-bit
+			value, err := DecodeLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'L': // Signed 64-bit
+			value, err := DecodeLongLongInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'l': // Unsigned 64-bit
+			value, err := DecodeLongLongUInt(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'f': // Float 32-bit
+			var value float32
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'd': // Double 64-bit
+			var value float64
+			if err := binary.Read(buf, binary.BigEndian, &value); err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 's': // Short string
+			value, err := DecodeShortStr(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'S': // Long string
+			value, err := DecodeLongStr(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'F': // Field table
+			var tableLength uint32
+			if err := binary.Read(buf, binary.BigEndian, &tableLength); err != nil {
+				return nil, err
+			}
+			tableData := make([]byte, tableLength)
+			if _, err := buf.Read(tableData); err != nil {
+				return nil, err
+			}
+			value, err := DecodeTable(tableData)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'A': // Nested array
+			var arrayLength uint32
+			if err := binary.Read(buf, binary.BigEndian, &arrayLength); err != nil {
+				return nil, err
+			}
+			arrayData := make([]byte, arrayLength)
+			if _, err := buf.Read(arrayData); err != nil {
+				return nil, err
+			}
+			value, err := DecodeArray(arrayData)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'T': // Timestamp
+			value, err := DecodeTimestamp(buf)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, value)
+
+		case 'V': // Void/null
+			result = append(result, nil)
+
+		default:
+			return nil, fmt.Errorf("unknown array element type: %c", valueType)
+		}
+	}
+
+	return result, nil
 }
 
 // DecodeTimestamp reads and decodes a 64-bit POSIX timestamp from a bytes.Reader
@@ -165,7 +408,15 @@ func DecodeShortInt(buf *bytes.Reader) (uint16, error) {
 	return value, nil
 }
 
-func DecodeLongInt(buf *bytes.Reader) (uint32, error) {
+func DecodeLongInt(buf *bytes.Reader) (int32, error) {
+	var longIntValue int32
+	if err := binary.Read(buf, binary.BigEndian, &longIntValue); err != nil {
+		return 0, err
+	}
+	return longIntValue, nil
+}
+
+func DecodeLongUInt(buf *bytes.Reader) (uint32, error) {
 	var value uint32
 	err := binary.Read(buf, binary.BigEndian, &value)
 	if err != nil {
@@ -174,7 +425,15 @@ func DecodeLongInt(buf *bytes.Reader) (uint32, error) {
 	return value, nil
 }
 
-func DecodeLongLongInt(buf *bytes.Reader) (uint64, error) {
+func DecodeLongLongInt(buf *bytes.Reader) (int64, error) {
+	var longLongInt int64
+	if err := binary.Read(buf, binary.BigEndian, &longLongInt); err != nil {
+		return 0, err
+	}
+	return longLongInt, nil
+}
+
+func DecodeLongLongUInt(buf *bytes.Reader) (uint64, error) {
 	var value uint64
 	err := binary.Read(buf, binary.BigEndian, &value)
 	if err != nil {

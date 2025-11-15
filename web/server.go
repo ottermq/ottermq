@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 )
 
 type WebServer struct {
@@ -30,6 +31,8 @@ type Config struct {
 	Password      string
 	JwtKey        string
 	WebServerPort string
+	EnableUI      bool
+	EnableSwagger bool
 }
 
 func (ws *WebServer) Close() {
@@ -56,10 +59,15 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	// ws.Client = conn
 	app := ws.configServer(logFile)
 
-	app.Get("/docs/*", swagger.HandlerDefault)
-
 	// Serve static files (ui -- Vue frontend)
-	app.Static("/", "./ui")
+	if ws.config.EnableUI {
+		log.Info().Msg("Web UI enabled")
+		app.Static("/", "./ui")
+	}
+	if ws.config.EnableSwagger {
+		log.Info().Str("path", "/docs/index.html").Msg("Swagger docs enabled")
+		app.Get("/docs/*", swagger.HandlerDefault)
+	}
 
 	ws.AddApi(app)
 

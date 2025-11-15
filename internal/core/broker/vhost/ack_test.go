@@ -22,7 +22,11 @@ func newTestConsumer(conn net.Conn, ch uint16, queue string, noAck bool) *Consum
 }
 
 func TestChannelDeliveryState_SingleAck(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 
 	// Fake connection (nil is sufficient for HandleBasicAck)
 	var conn net.Conn = nil
@@ -71,7 +75,11 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 }
 
 func TestChannelDeliveryState_MultipleAck(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 1}
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
@@ -110,7 +118,11 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 }
 
 func TestChannelDeliveryState_UnknownTag(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	// Ack when there is no state — should return error in current implementation
 	if err := vh.HandleBasicAck(conn, 1, 42, false); err == nil {
@@ -119,7 +131,11 @@ func TestChannelDeliveryState_UnknownTag(t *testing.T) {
 }
 
 func TestDeliverTracking_NoAckFlag(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 2}
 
@@ -147,7 +163,11 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 }
 
 func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	// Create a queue
 	q, err := vh.CreateQueue("q-clean", nil, conn)

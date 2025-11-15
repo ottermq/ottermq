@@ -29,10 +29,9 @@ type ExchangeProperties struct {
 type ExchangeType string
 
 const (
-	DIRECT  ExchangeType = "direct"
-	FANOUT  ExchangeType = "fanout"
-	TOPIC   ExchangeType = "topic"
-	HEADERS ExchangeType = "headers"
+	DIRECT ExchangeType = "direct"
+	FANOUT ExchangeType = "fanout"
+	TOPIC  ExchangeType = "topic"
 )
 
 type MandatoryExchange struct {
@@ -144,7 +143,7 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 
 	vh.Exchanges[name] = NewExchange(name, typ, props)
 	// Handle durable property
-	if props.Durable {
+	if props != nil && props.Durable {
 		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
 			log.Error().Err(err).Str("exchange", name).Msg("Failed to save exchange metadata")
 		}
@@ -174,15 +173,19 @@ func (vh *VHost) deleteExchangeUnlocked(name string) error {
 		}
 	}
 	// Check if the exchange exists
-	_, ok := vh.Exchanges[name]
+	exchange, ok := vh.Exchanges[name]
 	if !ok {
 		return fmt.Errorf("exchange %s not found", name)
 	}
+	durable := exchange.Props.Durable
 
 	delete(vh.Exchanges, name)
-	// Handle durable property
-	if err := vh.persist.DeleteExchangeMetadata(vh.Name, name); err != nil {
-		return fmt.Errorf("failed to delete exchange from persistence: %v", err)
+	// Verify if exchange is durable
+	if durable {
+		// Handle durable property
+		if err := vh.persist.DeleteExchangeMetadata(vh.Name, name); err != nil {
+			return fmt.Errorf("failed to delete exchange from persistence: %v", err)
+		}
 	}
 	log.Debug().Str("exchange", name).Msg("Deleted exchange")
 	return nil

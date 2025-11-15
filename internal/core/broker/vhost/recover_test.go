@@ -9,7 +9,11 @@ import (
 )
 
 func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 
 	// Create queue
@@ -72,7 +76,11 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 
 	// Create queue
@@ -145,7 +153,11 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 
 	// Create queue
@@ -196,7 +208,11 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 
 	// Create queue
@@ -266,7 +282,11 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 }
 
 func TestHandleBasicRecover_NoChannelState(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 
 	// Call recover without setting up channel state
@@ -277,7 +297,11 @@ func TestHandleBasicRecover_NoChannelState(t *testing.T) {
 }
 
 func TestRedeliveredMarkLifecycle(t *testing.T) {
-	vh := NewVhost("test-vhost", 1000, nil)
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
 
 	// Mark a message as redelivered
 	vh.markAsRedelivered("msg1")

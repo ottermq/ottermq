@@ -96,37 +96,21 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 	}
 	ch.mu.Unlock()
 
-	deliverFrame := vh.framer.CreateBasicDeliverFrame(
-		consumer.Channel,
-		consumer.Tag,
-		msg.Exchange,
-		msg.RoutingKey,
-		tag,
-		redelivered,
-	)
-	headerFrame := vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg)
-	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)
+	// Create frames and append them as a single slice
+	frames := append(
+		vh.framer.CreateBasicDeliverFrame(
+			consumer.Channel,
+			consumer.Tag,
+			msg.Exchange,
+			msg.RoutingKey,
+			tag,
+			redelivered,
+		), append(
+			vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg),
+			vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)...)...)
 
-	if err := vh.framer.SendFrame(consumer.Connection, deliverFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send deliver frame")
-		if track {
-			ch.mu.Lock()
-			delete(ch.Unacked, tag)
-			ch.mu.Unlock()
-		}
-		return err
-	}
-	if err := vh.framer.SendFrame(consumer.Connection, headerFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send header frame")
-		if track {
-			ch.mu.Lock()
-			delete(ch.Unacked, tag)
-			ch.mu.Unlock()
-		}
-		return err
-	}
-	if err := vh.framer.SendFrame(consumer.Connection, bodyFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send body frame")
+	if err := vh.framer.SendFrame(consumer.Connection, frames); err != nil {
+		log.Error().Err(err).Msg("Failed to send frames")
 		if track {
 			ch.mu.Lock()
 			delete(ch.Unacked, tag)

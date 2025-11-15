@@ -29,7 +29,7 @@ const brokerURL = "amqp://guest:guest@localhost:5672/"
 func TestMain(m *testing.M) {
 	// Set up logger for tests (less verbose)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
-	zerolog.SetGlobalLevel(zerolog.WarnLevel) // Only show warnings and errors during tests
+	zerolog.SetGlobalLevel(zerolog.DebugLevel) // Enable debug for DLX testing
 
 	// Verify that no other broker is running on the test port
 	conn, err := amqp.Dial(brokerURL)
@@ -70,14 +70,15 @@ func setupBroker() error {
 
 	// Configure the broker for tests
 	cfg := &config.Config{
-		Host:            "localhost",
-		Port:            "5672",
+		BrokerHost:      "localhost",
+		BrokerPort:      "5672",
 		Username:        "guest",
 		Password:        "guest",
 		LogLevel:        "warn",
 		QueueBufferSize: 100000,
 		JwtSecret:       "test-secret",
-		WebServerPort:   "3001", // Different port to avoid conflicts
+		WebPort:         "3001", // Different port to avoid conflicts
+		EnableDLX:       true,   // Enable DLX for tests
 	}
 
 	logger.Init(cfg.LogLevel)

@@ -43,9 +43,11 @@ func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag ui
 	ch.mu.Lock()
 	if multiple {
 		for tag, record := range ch.Unacked {
+			log.Debug().Uint64("tag", tag).Msg("Checking unacked tag for multiple ack")
 			if tag <= deliveryTag {
 				removed = append(removed, record)
 				delete(ch.Unacked, tag)
+				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
 	} else {
@@ -90,8 +92,27 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 		}
 		return nil
 	}
-	// TODO: implement dead-lettering
+	// Dead-letter or discard the messages
 	for _, record := range recordsToNack {
+		// Check if DLX extension is enabled and queue has DLX configured
+		// DLX properties comes directly from arguments: single source of truth
+		if vh.VHostExtensions["dlx"] && vh.DeadLetterer != nil {
+			vh.mu.Lock()
+			queue, exists := vh.Queues[record.QueueName]
+			args := queue.Props.Arguments
+			vh.mu.Unlock()
+			dlx, dlxExists := args["x-dead-letter-exchange"].(string)
+
+			if exists && dlxExists && dlx != "" {
+				err := vh.DeadLetterer.DeadLetter(record.Message, queue, REASON_REJECTED)
+				if err == nil {
+					log.Debug().Msg("Dead-lettering succeeded")
+					continue
+				}
+				log.Error().Err(err).Msg("Dead-lettering failed")
+			}
+		}
+		// Discard the message (no DLX configured or dead-lettering failed)
 		log.Debug().Uint64("delivery_tag", record.DeliveryTag).Uint16("channel", channel).Msg("Nack: discarding message")
 		if record.Persistent {
 			_ = vh.persist.DeleteMessage(vh.Name, record.QueueName, record.Message.ID)

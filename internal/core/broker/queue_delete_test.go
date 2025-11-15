@@ -13,7 +13,11 @@ import (
 
 func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Create queue
@@ -69,7 +73,11 @@ func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 
 func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Create queue and seed messages
@@ -117,7 +125,11 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 
 func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Create queue and seed messages
@@ -160,7 +172,11 @@ func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 
 func TestQueueDeleteHandler_ExclusiveOwnerMismatch_AccessRefused(t *testing.T) {
 	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
-	vh := vhost.NewVhost("/", 100, &dummy.DummyPersistence{})
+	var options = vhost.VHostOptions{
+		QueueBufferSize: 100,
+		Persistence:     &dummy.DummyPersistence{},
+	}
+	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
 	// Owner connection declares exclusive queue

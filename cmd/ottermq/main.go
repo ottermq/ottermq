@@ -14,6 +14,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/logger"
 	"github.com/andrelcunha/ottermq/web"
+	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,11 +38,6 @@ func main() {
 	logger.Init(cfg.LogLevel)
 
 	// Determine the directory of the running binary
-	// executablePath, err := os.Executable()
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("Failed to get executable path")
-	// }
-	// executableDir := filepath.Dir(executablePath)
 	dataDir := filepath.Join("data")
 
 	// Ensure the data directory exists
@@ -56,6 +52,7 @@ func main() {
 	b := broker.NewBroker(cfg, ctx, cancel)
 
 	// Verify if the database file exists
+	log.Info().Msg("Searching for database...")
 	dbPath := filepath.Join(dataDir, "ottermq.db")
 	persistdb.SetDbPath(dbPath)
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
@@ -90,42 +87,63 @@ func main() {
 		}
 	}()
 
-	// Initialize the web admin server
-	webConfig := &web.Config{
-		BrokerHost:    cfg.Host,
-		BrokerPort:    cfg.Port,
-		Username:      cfg.Username,
-		Password:      cfg.Password,
-		JwtKey:        cfg.JwtSecret,
-		WebServerPort: cfg.WebServerPort,
-	}
-	conn, err := web.GetBrokerClient(webConfig)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to broker")
-	}
-	defer conn.Close()
+	// Conditionally start web server based on EnableWebAPI flag
+	var webServer *web.WebServer
+	var app interface{ ShutdownWithContext(context.Context) error }
+	var logfile *os.File
 
-	webServer, err := web.NewWebServer(webConfig, b, conn)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create web server")
-	}
-	defer webServer.Close()
-	// open "server.log" for appending
-	logfile, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to open log file")
-	}
-	app := webServer.SetupApp(logfile) // Using os.Stdout for logging
+	<-b.Ready
+	if cfg.EnableWebAPI {
+		log.Info().Msg("Web API enabled - initializing web server...")
 
-	// Start the web admin server in a goroutine
-	go func() {
-		addr := fmt.Sprintf(":%s", cfg.WebServerPort)
-		log.Info().Str("addr", addr).Msg("Starting web server")
-		err := app.Listen(addr)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Web server error")
+		// // Wait for broker to be ready before initializing web server
+		// log.Info().Msg("Broker ready signal received, initializing web server...")
+
+		// Initialize the web admin server
+		webConfig := &web.Config{
+			BrokerHost:    cfg.BrokerHost,
+			BrokerPort:    cfg.BrokerPort,
+			Username:      cfg.Username,
+			Password:      cfg.Password,
+			JwtKey:        cfg.JwtSecret,
+			WebServerPort: cfg.WebPort,
+			EnableUI:      cfg.EnableUI,
+			EnableSwagger: cfg.EnableSwagger,
 		}
-	}()
+		// initialize amqp client connection
+		conn, err := web.GetBrokerClient(webConfig)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to connect to broker")
+		}
+		defer conn.Close()
+
+		webServer, err = web.NewWebServer(webConfig, b, conn)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to create web server")
+		}
+		defer webServer.Close()
+
+		// open "server.log" for appending
+		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to open log file")
+		}
+		defer logfile.Close()
+
+		app = webServer.SetupApp(logfile)
+
+		// Start the web admin server in a goroutine
+		go func() {
+			addr := fmt.Sprintf(":%s", cfg.WebPort)
+			log.Info().Str("addr", addr).Msg("Starting web server")
+			err := app.(*fiber.App).Listen(addr)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Web server error")
+			}
+		}()
+	} else {
+		log.Info().Msg("Web API disabled - skipping web server initialization")
+	}
 
 	// Handle OS signals for graceful shutdown
 	stop := make(chan os.Signal, 1)
@@ -157,8 +175,13 @@ func main() {
 	}
 
 	b.Shutdown()
-	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
-		log.Fatal().Err(err).Msg("Failed to shutdown web server")
+
+	// Shutdown the web server if it was started
+	if cfg.EnableWebAPI && app != nil {
+		if err := app.ShutdownWithContext(shutdownCtx); err != nil {
+			log.Fatal().Err(err).Msg("Failed to shutdown web server")
+		}
+		log.Info().Msg("Web server gracefully stopped")
 	}
 	log.Info().Msg("Server gracefully stopped")
 	os.Exit(0) // if came so far it means the server has stopped gracefully

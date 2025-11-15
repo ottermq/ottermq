@@ -9,19 +9,33 @@ import (
 )
 
 type Config struct {
-	Port                 string
-	Host                 string
-	Username             string
-	Password             string
+	// Core
+	ShowLogo   bool
+	BrokerPort string
+	BrokerHost string
+
+	// AMQP Settings
 	HeartbeatIntervalMax uint16
 	ChannelMax           uint16
 	FrameMax             uint32
 	Version              string
 	Ssl                  bool
 	QueueBufferSize      int
-	WebServerPort        string
-	JwtSecret            string
-	LogLevel             string
+
+	// Extensions
+	EnableDLX     bool
+	EnableWebAPI  bool
+	EnableUI      bool
+	EnableSwagger bool
+
+	// Web Admin
+	WebPort   string
+	Username  string
+	Password  string
+	JwtSecret string
+
+	// Logging
+	LogLevel string
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -31,19 +45,28 @@ func LoadConfig(version string) *Config {
 	_ = godotenv.Load()
 
 	return &Config{
-		Port:                 getEnv("OTTERMQ_BROKER_PORT", "5672"),
-		Host:                 getEnv("OTTERMQ_BROKER_HOST", ""),
-		Username:             getEnv("OTTERMQ_USERNAME", "guest"),
-		Password:             getEnv("OTTERMQ_PASSWORD", "guest"),
+		ShowLogo:   getEnvAsBool("OTTERMQ_SHOW_LOGO", false),
+		BrokerPort: getEnv("OTTERMQ_BROKER_PORT", "5672"),
+		BrokerHost: getEnv("OTTERMQ_BROKER_HOST", ""),
+
 		HeartbeatIntervalMax: getEnvAsUint16("OTTERMQ_HEARTBEAT_INTERVAL", 60),
 		ChannelMax:           getEnvAsUint16("OTTERMQ_CHANNEL_MAX", 2048),
 		FrameMax:             getEnvAsUint32("OTTERMQ_FRAME_MAX", 131072),
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
-		WebServerPort:        getEnv("OTTERMQ_WEB_PORT", "3000"),
-		JwtSecret:            getEnv("OTTERMQ_JWT_SECRET", "secret"),
-		LogLevel:             getEnv("LOG_LEVEL", "info"),
-		Version:              version,
+
+		EnableDLX:     getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
+		EnableWebAPI:  getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
+		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
+		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
+
+		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
+		Username:  getEnv("OTTERMQ_USERNAME", "guest"),
+		Password:  getEnv("OTTERMQ_PASSWORD", "guest"),
+		JwtSecret: getEnv("OTTERMQ_JWT_SECRET", "secret"),
+		Version:   version,
+
+		LogLevel: getEnv("LOG_LEVEL", "info"),
 	}
 }
 
