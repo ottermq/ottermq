@@ -264,10 +264,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.Headers != nil {
 		flags |= (1 << 13)
-		log.Debug().Interface("headers", props.Headers).Msg("Encoding headers in BasicProperties")
-		encodedTable := EncodeTable(props.Headers)
-		log.Debug().Int("encoded_size", len(encodedTable)).Msg("Encoded table size")
-		EncodeLongStr(&buf, encodedTable)
+		encodeHeaders(&buf, props.Headers)
 	}
 	if props.DeliveryMode != 0 {
 		flags |= (1 << 12)
