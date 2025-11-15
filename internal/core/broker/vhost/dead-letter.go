@@ -68,12 +68,6 @@ func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonTy
 
 	// 3. Publish to DLX
 	msg.Exchange = dlx
-	log.Info().
-		Str("dlx", dlx).
-		Str("routing_key", dlk).
-		Int("body_len", len(msg.Body)).
-		Int("headers_count", len(msg.Properties.Headers)).
-		Msg("=== PUBLISHING TO DLX ===")
 	_, err := dl.vh.Publish(dlx, dlk, &msg)
 
 	return err
@@ -100,6 +94,29 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	if headers == nil {
 		headers = make(map[string]any)
 	}
+
+	/*Create x-death entry*/
+	death := map[string]any{
+		"reason":       reason.String(),
+		"queue":        queue,
+		"time":         time.Now().UTC(),
+		"exchange":     exchange,
+		"routing-keys": routingKeys,
+	}
+	if expiration != "" {
+		death["original-expiration"] = expiration
+	}
+
+	/*Get existing x-death header*/
+	xDeathEvents, ok := headers["x-death"].([]map[string]any)
+	if !ok {
+		death["count"] = uint64(1)
+		headers["x-death"] = []map[string]any{death}
+	} else {
+		death["count"] = uint64(len(xDeathEvents) + 1)
+		headers["x-death"] = append([]map[string]any{death}, xDeathEvents...)
+	}
+
 	if _, exists := headers["x-first-death-queue"]; !exists {
 		// first time dead-lettering, initialize x-first-death-* headers
 		headers["x-first-death-queue"] = queue
@@ -111,23 +128,5 @@ func (dl *DeadLetter) addXDeathHeader(headers map[string]any, expiration, exchan
 	headers["x-last-death-reason"] = reason.String()
 	headers["x-last-death-exchange"] = exchange
 
-	// Create x-death entry
-	death := map[string]any{
-		"queue":        queue,
-		"reason":       reason.String(),
-		"time":         time.Now().UTC().Format(time.RFC3339),
-		"exchange":     exchange,
-		"routing-keys": routingKeys,
-		// "original-expiration": expiration,
-	}
-
-	// Get existing x-death header
-	xDeathEvents, ok := headers["x-death"].([]map[string]any)
-	if !ok {
-		xDeathEvents = []map[string]any{}
-	}
-	death["count"] = int64(len(xDeathEvents) + 1) // Must be int64 for proper AMQP encoding
-	xDeathEvents = append([]map[string]any{death}, xDeathEvents...)
-	headers["x-death"] = xDeathEvents
 	return headers
 }
