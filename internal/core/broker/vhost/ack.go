@@ -106,7 +106,7 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 			continue
 		}
 		ok := vh.handleDeadLetter(queue, record.Message, REASON_REJECTED)
-		if !ok {
+		if ok {
 			continue
 		}
 		// Discard the message (no DLX configured or dead-lettering failed)
@@ -118,6 +118,7 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 	return nil
 }
 
+// handleDeadLetter checks if dead-lettering is possible and performs it
 func (vh *VHost) handleDeadLetter(queue *Queue, msg Message, reason ReasonType) bool {
 	if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
 		vh.mu.Lock()
@@ -129,13 +130,14 @@ func (vh *VHost) handleDeadLetter(queue *Queue, msg Message, reason ReasonType) 
 			err := vh.DeadLetterer.DeadLetter(msg, queue, reason)
 			if err == nil {
 				log.Debug().Msg("Dead-lettering succeeded")
-
-				return false
+				// Dead-lettering succeeded
+				return true
 			}
 			log.Error().Err(err).Msg("Dead-lettering failed")
 		}
 	}
-	return true
+	// No DLX configured or dead-lettering not possible
+	return false
 }
 
 func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uint16, global bool) error {
