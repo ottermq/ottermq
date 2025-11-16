@@ -331,11 +331,7 @@ func (vh *VHost) handleTTLExpiration(msg Message, q *Queue) bool {
 			log.Error().Err(err).Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Error checking message expiration")
 		}
 		if expired {
-			if vh.handleDeadLetter(q, msg, REASON_EXPIRED) {
-				return expired
-			}
-
-			// Skip delivery
+			vh.handleDeadLetter(q, msg, REASON_EXPIRED)
 			// message is discarded due to expiration
 			log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Message expired, discarding")
 			// Should we persistently delete the message here?
