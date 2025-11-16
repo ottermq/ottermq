@@ -369,6 +369,7 @@ func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 		if msg != nil {
 			// Handle message expiration if needed
 			if vh.handleTTLExpiration(*msg, queue) {
+				// Message already expired and deleted
 				return
 			}
 			if msg.Properties.DeliveryMode == amqp.PERSISTENT {
