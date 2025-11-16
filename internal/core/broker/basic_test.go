@@ -457,14 +457,19 @@ func TestBasicReturn_SuccessfulReturn(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// Should send 3 frames: basic.return + header + body
-	if len(mockFramer.SentFrames) != 3 {
-		t.Errorf("Expected 3 frames (return + header + body), got %d", len(mockFramer.SentFrames))
+	// Should send 1 combined frame (basic.return + header + body sent together)
+	if len(mockFramer.SentFrames) != 1 {
+		t.Errorf("Expected 1 combined frame (return + header + body), got %d", len(mockFramer.SentFrames))
 	}
 
-	// Verify basic.return frame was sent first
-	if len(mockFramer.SentFrames) > 0 && string(mockFramer.SentFrames[0]) != "basic-return" {
-		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.SentFrames[0]))
+	// Verify the combined frame contains all three parts
+	if len(mockFramer.SentFrames) > 0 {
+		combinedFrame := string(mockFramer.SentFrames[0])
+		// The frame should contain all three mock frame types concatenated
+		expectedFrame := "basic-returnheader-framebody-frame"
+		if combinedFrame != expectedFrame {
+			t.Errorf("Expected combined frame '%s', got '%s'", expectedFrame, combinedFrame)
+		}
 	}
 }
 
@@ -543,13 +548,17 @@ func TestBasicPublishHandler_WithMandatoryFlag_NoRouting(t *testing.T) {
 		t.Errorf("Expected nil result, got: %v", result)
 	}
 
-	// Should send basic.return + header + body (3 frames)
-	if len(mockFramer.SentFrames) != 3 {
-		t.Errorf("Expected 3 frames for basic.return, got %d", len(mockFramer.SentFrames))
+	// Should send 1 combined frame (basic.return + header + body sent together)
+	if len(mockFramer.SentFrames) != 1 {
+		t.Errorf("Expected 1 combined frame for basic.return, got %d", len(mockFramer.SentFrames))
 	}
 
-	if string(mockFramer.SentFrames[0]) != "basic-return" {
-		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.SentFrames[0]))
+	if len(mockFramer.SentFrames) > 0 {
+		combinedFrame := string(mockFramer.SentFrames[0])
+		expectedFrame := "basic-returnheader-framebody-frame"
+		if combinedFrame != expectedFrame {
+			t.Errorf("Expected combined frame '%s', got '%s'", expectedFrame, combinedFrame)
+		}
 	}
 }
 

@@ -221,15 +221,3 @@ func (vh *VHost) listFanoutQueuesUnlocked(exchange *Exchange) []string {
 	}
 	return queues
 }
-
-func (vh *VHost) listFanoutQueues(exchangeName string) []string {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-
-	exchange, ok := vh.Exchanges[exchangeName]
-	if !ok {
-		return nil
-	}
-
-	return vh.listFanoutQueuesUnlocked(exchange)
-}

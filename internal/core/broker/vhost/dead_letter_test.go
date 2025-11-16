@@ -11,7 +11,7 @@ import (
 
 func TestNoOpDeadLetterer(t *testing.T) {
 	dl := &NoOpDeadLetterer{}
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "test.key",
 		Body:       []byte("test message"),
 	}
@@ -57,7 +57,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and dead-letter a message
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -134,7 +134,7 @@ func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and dead-letter a message
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -197,7 +197,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create message and dead-letter it twice
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -286,7 +286,7 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create message with CC and BCC headers
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -341,7 +341,7 @@ func TestDeadLetter_ExpirationCleared(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create message with expiration
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -405,7 +405,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(string(tc.reason), func(t *testing.T) {
-			msg := amqp.Message{
+			msg := Message{
 				RoutingKey: "test.key",
 				Exchange:   "amq.direct",
 				Body:       []byte("test"),
@@ -457,7 +457,7 @@ func TestDeadLetter_NilHeaders(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create message with nil headers
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "test.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test"),
@@ -497,7 +497,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
 	require.NoError(t, err)
 
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "test.key",
 		Body:       []byte("test"),
 	}
@@ -541,7 +541,7 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
 	require.NoError(t, err)
 
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("test message"),
@@ -590,7 +590,7 @@ func TestDeadLetter_PersistentMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create persistent message
-	msg := amqp.Message{
+	msg := Message{
 		RoutingKey: "original.key",
 		Exchange:   "amq.direct",
 		Body:       []byte("persistent test message"),

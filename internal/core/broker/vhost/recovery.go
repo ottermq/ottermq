@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
@@ -53,7 +52,7 @@ func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) e
 	}
 
 	for _, msgData := range msgs {
-		msg := amqp.Message{
+		msg := Message{
 			ID:   msgData.ID,
 			Body: msgData.Body,
 			// TODO: map properties

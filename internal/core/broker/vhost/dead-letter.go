@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,12 +23,12 @@ func (r ReasonType) String() string {
 }
 
 type DeadLetterer interface {
-	DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error
+	DeadLetter(msg Message, queue *Queue, reason ReasonType) error
 }
 
 type NoOpDeadLetterer struct{}
 
-func (d *NoOpDeadLetterer) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error {
+func (d *NoOpDeadLetterer) DeadLetter(msg Message, queue *Queue, reason ReasonType) error {
 	return nil
 }
 
@@ -37,7 +36,8 @@ type DeadLetter struct {
 	vh *VHost
 }
 
-func (dl *DeadLetter) DeadLetter(msg amqp.Message, queue *Queue, reason ReasonType) error {
+// DeadLetter handles dead-lettering of a message from a given queue for a specific reason
+func (dl *DeadLetter) DeadLetter(msg Message, queue *Queue, reason ReasonType) error {
 	// Check if queue has DLX configured
 	dlx, ok := queue.Props.Arguments["x-dead-letter-exchange"].(string)
 	if !ok || dlx == "" {

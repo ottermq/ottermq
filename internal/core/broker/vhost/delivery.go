@@ -13,7 +13,7 @@ type DeliveryRecord struct {
 	DeliveryTag uint64
 	ConsumerTag string
 	QueueName   string
-	Message     amqp.Message
+	Message     Message
 	Persistent  bool
 }
 
@@ -69,7 +69,7 @@ func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) FlowState {
 	}
 }
 
-func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
+func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered bool) error {
 	// If caller didn't force redelivered, consult the mark set during requeue/recover.
 	if !redelivered {
 		redelivered = vh.ShouldRedeliver(msg.ID)
@@ -95,7 +95,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		}
 	}
 	ch.mu.Unlock()
-
+	amqpMsg := msg.ToAMQPMessage()
 	// Create frames and append them as a single slice
 	frames := append(
 		vh.framer.CreateBasicDeliverFrame(
@@ -106,7 +106,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 			tag,
 			redelivered,
 		), append(
-			vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg),
+			vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), amqpMsg),
 			vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)...)...)
 
 	if err := vh.framer.SendFrame(consumer.Connection, frames); err != nil {
@@ -221,7 +221,7 @@ func (vh *VHost) getChannelDeliveryState(connection net.Conn, channel uint16) *C
 	return vh.ChannelDeliveries[key]
 }
 
-func (ch *ChannelDeliveryState) TrackDelivery(noAck bool, msg *amqp.Message, queue string) uint64 {
+func (ch *ChannelDeliveryState) TrackDelivery(noAck bool, msg *Message, queue string) uint64 {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	ch.LastDeliveryTag++

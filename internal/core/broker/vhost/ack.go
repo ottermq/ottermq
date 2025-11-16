@@ -81,12 +81,15 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 
 	if requeue {
 		for _, record := range recordsToNack {
-			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
-			vh.markAsRedelivered(record.Message.ID)
 			vh.mu.Lock()
 			queue := vh.Queues[record.QueueName]
 			vh.mu.Unlock()
 			if queue != nil {
+				if vh.handleTTLExpiration(record.Message, queue) {
+					continue
+				}
+				log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
+				vh.markAsRedelivered(record.Message.ID)
 				queue.Push(record.Message)
 			}
 		}
@@ -96,21 +99,15 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 	for _, record := range recordsToNack {
 		// Check if DLX extension is enabled and queue has DLX configured
 		// DLX properties comes directly from arguments: single source of truth
-		if vh.VHostExtensions["dlx"] && vh.DeadLetterer != nil {
-			vh.mu.Lock()
-			queue, exists := vh.Queues[record.QueueName]
-			args := queue.Props.Arguments
-			vh.mu.Unlock()
-			dlx, dlxExists := args["x-dead-letter-exchange"].(string)
-
-			if exists && dlxExists && dlx != "" {
-				err := vh.DeadLetterer.DeadLetter(record.Message, queue, REASON_REJECTED)
-				if err == nil {
-					log.Debug().Msg("Dead-lettering succeeded")
-					continue
-				}
-				log.Error().Err(err).Msg("Dead-lettering failed")
-			}
+		vh.mu.Lock()
+		queue, exists := vh.Queues[record.QueueName]
+		vh.mu.Unlock()
+		if !exists {
+			continue
+		}
+		ok := vh.handleDeadLetter(queue, record.Message, REASON_REJECTED)
+		if ok {
+			continue
 		}
 		// Discard the message (no DLX configured or dead-lettering failed)
 		log.Debug().Uint64("delivery_tag", record.DeliveryTag).Uint16("channel", channel).Msg("Nack: discarding message")
@@ -119,6 +116,28 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 		}
 	}
 	return nil
+}
+
+// handleDeadLetter checks if dead-lettering is possible and performs it
+func (vh *VHost) handleDeadLetter(queue *Queue, msg Message, reason ReasonType) bool {
+	if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
+		vh.mu.Lock()
+		args := queue.Props.Arguments
+		vh.mu.Unlock()
+		dlx, dlxExists := args["x-dead-letter-exchange"].(string)
+
+		if dlxExists && dlx != "" {
+			err := vh.DeadLetterer.DeadLetter(msg, queue, reason)
+			if err == nil {
+				log.Debug().Msg("Dead-lettering succeeded")
+				// Dead-lettering succeeded
+				return true
+			}
+			log.Error().Err(err).Msg("Dead-lettering failed")
+		}
+	}
+	// No DLX configured or dead-lettering not possible
+	return false
 }
 
 func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uint16, global bool) error {

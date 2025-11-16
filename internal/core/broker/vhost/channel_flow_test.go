@@ -4,7 +4,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -226,7 +225,7 @@ func TestShouldThrottle_FlowAndQoS(t *testing.T) {
 			DeliveryTag: i,
 			ConsumerTag: consumer.Tag,
 			QueueName:   consumer.QueueName,
-			Message:     amqp.Message{ID: "test"},
+			Message:     Message{ID: "test"},
 		}
 	}
 	channelState.mu.Unlock()

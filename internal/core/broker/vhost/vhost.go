@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
@@ -44,15 +43,16 @@ type VHost struct {
 
 	// Dead letter handler
 	DeadLetterer DeadLetterer
+	TTLManager   TTLManager
 
-	// TODO: create a type as a umbrella for all vhost extensions (dead-letter, cc/bcc, etc)
-	VHostExtensions map[string]bool
+	ActiveExtensions map[string]bool
 }
 
 type VHostOptions struct {
 	QueueBufferSize int
 	Persistence     persistence.Persistence
 	EnableDLX       bool
+	EnableTTL       bool
 }
 
 func NewVhost(vhostName string, options VHostOptions) *VHost {
@@ -72,21 +72,31 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		ChannelDeliveries:   make(map[ConnectionChannelKey]*ChannelDeliveryState),
 		redeliveredMessages: make(map[string]struct{}),
 		ChannelTransactions: make(map[ConnectionChannelKey]*ChannelTransactionState),
-		VHostExtensions:     make(map[string]bool),
+		ActiveExtensions:    make(map[string]bool),
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state
 	if options.Persistence != nil {
 		vh.loadPersistedState()
 	}
+	vh.setupExtensions(options)
+
+	return vh
+}
+
+func (vh *VHost) setupExtensions(options VHostOptions) {
 	if options.EnableDLX {
-		vh.VHostExtensions["dlx"] = true
+		vh.ActiveExtensions["dlx"] = true
 		vh.DeadLetterer = &DeadLetter{vh: vh}
 	} else {
 		vh.DeadLetterer = &NoOpDeadLetterer{}
 	}
-
-	return vh
+	if options.EnableTTL {
+		vh.ActiveExtensions["ttl"] = true
+		vh.TTLManager = &DefaultTTLManager{vh: vh}
+	} else {
+		vh.TTLManager = &NoOpTTLManager{}
+	}
 }
 
 func (vh *VHost) SetFramer(framer amqp.Framer) {
@@ -157,25 +167,7 @@ func (vh *VHost) loadPersistedState() {
 		}
 		// Load messages into the queue
 		for _, msgData := range queue.Messages {
-			msg := amqp.Message{
-				ID:   msgData.ID,
-				Body: msgData.Body,
-				Properties: amqp.BasicProperties{
-					ContentType:     amqp.ContentType(msgData.Properties.ContentType),
-					ContentEncoding: msgData.Properties.ContentEncoding,
-					Headers:         msgData.Properties.Headers,
-					DeliveryMode:    amqp.DeliveryMode(msgData.Properties.DeliveryMode),
-					Priority:        msgData.Properties.Priority,
-					CorrelationID:   msgData.Properties.CorrelationID,
-					ReplyTo:         msgData.Properties.ReplyTo,
-					Expiration:      msgData.Properties.Expiration,
-					MessageID:       msgData.Properties.MessageID,
-					Timestamp:       time.Unix(msgData.Properties.Timestamp, 0),
-					Type:            msgData.Properties.Type,
-					UserID:          msgData.Properties.UserID,
-					AppID:           msgData.Properties.AppID,
-				},
-			}
+			msg := FromPersistence(msgData)
 			vh.Queues[queue.Name].Push(msg)
 		}
 	}

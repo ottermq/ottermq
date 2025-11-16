@@ -5,7 +5,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -17,7 +16,7 @@ func TestQueueCapacityExceeds1000(t *testing.T) {
 	t.Logf("Starting to push 2000 messages to queue...")
 
 	for i := range 2000 {
-		msg := amqp.Message{
+		msg := Message{
 			ID:   fmt.Sprintf("msg-%d", i),
 			Body: []byte(fmt.Sprintf("Test message %d", i)),
 		}

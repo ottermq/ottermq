@@ -184,7 +184,7 @@ type DeathRecord struct {
 }
 
 // deadLetterMessage routes a message to the configured dead letter exchange
-func (vh *VHost) deadLetterMessage(msg amqp.Message, queue *Queue, reason string) error {
+func (vh *VHost) deadLetterMessage(msg Message, queue *Queue, reason string) error {
     // 1. Add x-death header
     msg.Properties.Headers = vh.addDeathHeader(msg.Properties.Headers, queue, reason)
     
@@ -248,7 +248,7 @@ func (vh *VHost) addDeathHeader(headers map[string]any, queue *Queue, reason str
 When message/queue TTL is implemented:
 
 ```go
-func (vh *VHost) expireMessage(msg amqp.Message, queue *Queue) {
+func (vh *VHost) expireMessage(msg Message, queue *Queue) {
     if queue.Props.DeadLetterExchange != "" {
         vh.deadLetterMessage(msg, queue, "expired")
     }
@@ -261,7 +261,7 @@ func (vh *VHost) expireMessage(msg amqp.Message, queue *Queue) {
 When queue maxlen is implemented:
 
 ```go
-func (q *Queue) Push(msg amqp.Message) error {
+func (q *Queue) Push(msg Message) error {
     if q.Props.MaxLength > 0 && q.Len() >= q.Props.MaxLength {
         // Remove oldest message and dead letter it
         oldest := q.PopOldest()
