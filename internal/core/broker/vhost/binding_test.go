@@ -383,7 +383,6 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 	}
 
 	queue1 := &Queue{Name: "queue1"}
-	_ = &Queue{Name: "queue2"}
 
 	// Add queue1 to binding
 	exchange.Bindings["test.key"] = []*Binding{
