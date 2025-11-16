@@ -331,9 +331,7 @@ func (vh *VHost) handleTTLExpiration(msg Message, q *Queue) bool {
 			log.Error().Err(err).Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Error checking message expiration")
 		}
 		if expired {
-			// verify if dlx argument is configured
-			ok := vh.handleDeadLetter(q, msg, REASON_EXPIRED)
-			if !ok {
+			if vh.handleDeadLetter(q, msg, REASON_EXPIRED) {
 				return expired
 			}
 
