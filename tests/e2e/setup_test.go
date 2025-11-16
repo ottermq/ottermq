@@ -79,6 +79,7 @@ func setupBroker() error {
 		JwtSecret:       "test-secret",
 		WebPort:         "3001", // Different port to avoid conflicts
 		EnableDLX:       true,   // Enable DLX for tests
+		EnableTTL:       true,   // Enable TTL for tests
 	}
 
 	logger.Init(cfg.LogLevel)
