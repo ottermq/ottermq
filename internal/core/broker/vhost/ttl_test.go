@@ -114,7 +114,7 @@ func TestDefaultTTLManager_CheckExpiration_PerMessageOverridesQueue(t *testing.T
 		ID:         "msg",
 		EnqueuedAt: time.UnixMilli(expiredTime),
 		Properties: amqp.BasicProperties{
-			Expiration: strconv.FormatInt(time.Now().Add(-100*time.Millisecond).UnixMilli(), 10),
+			Expiration: "100", // 100ms per-message TTL
 		},
 	}
 
@@ -225,7 +225,7 @@ func TestNoOpTTLManager_CheckExpiration(t *testing.T) {
 		ID:         "expired-msg",
 		EnqueuedAt: time.Now().Add(-1 * time.Hour),
 		Properties: amqp.BasicProperties{
-			Expiration: strconv.FormatInt(time.Now().Add(-30*time.Minute).UnixMilli(), 10),
+			Expiration: strconv.FormatInt(1800000, 10), // 30 minutes in ms
 		},
 	}
 
