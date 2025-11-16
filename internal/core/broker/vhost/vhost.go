@@ -79,12 +79,12 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	if options.Persistence != nil {
 		vh.loadPersistedState()
 	}
-	setupExtensions(options, vh)
+	vh.setupExtensions(options)
 
 	return vh
 }
 
-func setupExtensions(options VHostOptions, vh *VHost) {
+func (vh *VHost) setupExtensions(options VHostOptions) {
 	if options.EnableDLX {
 		vh.ActiveExtensions["dlx"] = true
 		vh.DeadLetterer = &DeadLetter{vh: vh}

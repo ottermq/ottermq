@@ -33,7 +33,7 @@ type Message struct {
 func NewMessage(msg amqp.Message, id string) Message {
 	return Message{
 		ID:         id,
-		EnqueuedAt: time.Now(),
+		EnqueuedAt: time.Now().Local().UTC(),
 		Body:       msg.Body,
 		Properties: msg.Properties,
 		Exchange:   msg.Exchange,
@@ -231,6 +231,10 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")
 		return nil
 	}
+	// verify the expiration
+	if vh.handleTTLExpiration(*msg, queue) {
+		return nil
+	}
 	return msg
 }
 
@@ -296,5 +300,54 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 		return false, nil
 	default:
 		return false, nil
+	}
+}
+
+func (vh *VHost) handleTTLExpiration(msg Message, q *Queue) bool {
+	expired := false
+	if vh.ActiveExtensions["ttl"] && vh.TTLManager != nil {
+		// Verify message expiration before delivery
+		expired, err := vh.TTLManager.CheckExpiration(&msg, q)
+		if err != nil && err != ErrNoTTLConfigured {
+			log.Error().Err(err).Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Error checking message expiration")
+		}
+		if expired {
+			// verify if dlx argument is configured
+			if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
+				vh.mu.Lock()
+				args := q.Props.Arguments
+				vh.mu.Unlock()
+				dlx, dlxExists := args["x-dead-letter-exchange"].(string)
+
+				if dlxExists && dlx != "" {
+					err := vh.DeadLetterer.DeadLetter(msg, q, REASON_EXPIRED)
+					if err == nil {
+						log.Debug().Msg("Dead-lettering succeeded")
+						return expired
+					}
+					log.Error().Err(err).Msg("Dead-lettering failed")
+				}
+			}
+
+			// Skip delivery
+			// message is discarded due to expiration
+			log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Message expired, discarding")
+			// Should we persistently delete the message here?
+			vh.deleteMessage(msg, q)
+			return expired
+		}
+	}
+	return expired
+}
+
+func (vh *VHost) deleteMessage(msg Message, q *Queue) {
+	if msg.Properties.DeliveryMode == amqp.PERSISTENT {
+		if vh.persist != nil {
+			if err := vh.persist.DeleteMessage(vh.Name, q.Name, msg.ID); err != nil {
+				log.Error().Err(err).Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Failed to delete persisted message")
+			} else {
+				log.Debug().Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Deleted persisted message")
+			}
+		}
 	}
 }

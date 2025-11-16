@@ -27,63 +27,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicPublishHandler(newState, conn, vh)
 
 	case uint16(amqp.BASIC_GET):
-		getMsg := request.Content.(*amqp.BasicGetMessageContent)
-		queue := getMsg.Queue
-		noAck := getMsg.NoAck
-
-		msgCount, err := vh.GetMessageCount(queue)
-		if err != nil {
-			log.Error().Err(err).Msg("Error getting message count")
-			return nil, err
-		}
-		if msgCount == 0 {
-			frame := b.framer.CreateBasicGetEmptyFrame(request.Channel)
-			if err := b.framer.SendFrame(conn, frame); err != nil {
-				log.Error().Err(err).Msg("Failed to send basic get empty frame")
-			}
-			return nil, nil
-		}
-
-		// Get the message from the queue
-		msg := vh.GetMessage(queue)
-
-		// Get or create the channel delivery state
-		channelKey := vhost.ConnectionChannelKey{
-			Connection: conn,
-			Channel:    request.Channel,
-		}
-		ch := vh.GetOrCreateChannelDelivery(channelKey)
-
-		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
-
-		// Check if message should be marked as redelivered
-		redelivered := vh.ShouldRedeliver(msg.ID)
-
-		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag, redelivered)
-		err = b.framer.SendFrame(conn, frame)
-		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
-
-		if err != nil {
-			log.Debug().Err(err).Msg("Error sending frame")
-			return nil, err
-		}
-		responseContent := amqp.ResponseContent{
-			Channel: request.Channel,
-			ClassID: request.ClassID,
-			Weight:  0,
-			Message: msg.ToAMQPMessage(),
-		}
-		// Header
-		frame = responseContent.FormatHeaderFrame()
-		if err := b.framer.SendFrame(conn, frame); err != nil {
-			log.Error().Err(err).Msg("Failed to send header frame")
-		}
-		// Body
-		frame = responseContent.FormatBodyFrame()
-		if err := b.framer.SendFrame(conn, frame); err != nil {
-			log.Error().Err(err).Msg("Failed to send body frame")
-		}
-		return nil, nil
+		return b.basicGetHandler(request, vh, conn)
 
 	case uint16(amqp.BASIC_ACK):
 		return b.basicAckHandler(newState, conn, vh)
@@ -103,6 +47,70 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) basicGetHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
+	getMsg := request.Content.(*amqp.BasicGetMessageContent)
+	queue := getMsg.Queue
+	noAck := getMsg.NoAck
+
+	msgCount, err := vh.GetMessageCount(queue)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting message count")
+		return nil, err
+	}
+
+	// Get the message from the queue
+	var msg *vhost.Message
+	if msgCount > 0 {
+		msg = vh.GetMessage(queue)
+	}
+
+	if msgCount == 0 || msg == nil {
+		frame := b.framer.CreateBasicGetEmptyFrame(request.Channel)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send basic get empty frame")
+		}
+		return nil, nil
+	}
+
+	// Get or create the channel delivery state
+	channelKey := vhost.ConnectionChannelKey{
+		Connection: conn,
+		Channel:    request.Channel,
+	}
+	ch := vh.GetOrCreateChannelDelivery(channelKey)
+
+	deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+	// Check if message should be marked as redelivered
+	redelivered := vh.ShouldRedeliver(msg.ID)
+
+	frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount), deliveryTag, redelivered)
+	err = b.framer.SendFrame(conn, frame)
+	log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
+
+	if err != nil {
+		log.Debug().Err(err).Msg("Error sending frame")
+		return nil, err
+	}
+	responseContent := amqp.ResponseContent{
+		Channel: request.Channel,
+		ClassID: request.ClassID,
+		Weight:  0,
+		Message: msg.ToAMQPMessage(),
+	}
+	// Header
+	frame = responseContent.FormatHeaderFrame()
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send header frame")
+	}
+	// Body
+	frame = responseContent.FormatBodyFrame()
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send body frame")
+	}
+	return nil, nil
 }
 
 func (b *Broker) basicQoSHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
@@ -480,28 +488,19 @@ func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn ne
 }
 
 func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey string, msg *amqp.Message) (any, error) {
-	frame := b.framer.CreateBasicReturnFrame(channel, 312, "No route", exchange, routingKey)
-	if err := b.framer.SendFrame(conn, frame); err != nil {
-		log.Error().Err(err).Msg("Failed to send basic return frame")
-		return nil, err
-	}
-	log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("Sent Basic.Return frame")
+	frames := append(
+		b.framer.CreateBasicReturnFrame(
+			channel,
+			uint16(amqp.NO_ROUTE),
+			"No route",
+			exchange,
+			routingKey,
+		), append(
+			b.framer.CreateHeaderFrame(channel, uint16(amqp.BASIC), *msg),
+			b.framer.CreateBodyFrame(channel, msg.Body)...)...)
 
-	responseContent := amqp.ResponseContent{
-		Channel: channel,
-		ClassID: uint16(amqp.BASIC),
-		Weight:  0,
-		Message: *msg,
-	}
-	// Header
-	frame = responseContent.FormatHeaderFrame()
-	if err := b.framer.SendFrame(conn, frame); err != nil {
-		log.Error().Err(err).Msg("Failed to send header frame")
-	}
-	// Body
-	frame = responseContent.FormatBodyFrame()
-	if err := b.framer.SendFrame(conn, frame); err != nil {
-		log.Error().Err(err).Msg("Failed to send body frame")
+	if err := b.framer.SendFrame(conn, frames); err != nil {
+		log.Error().Err(err).Msg("Failed to send basic return frame")
 	}
 	return nil, nil
 }

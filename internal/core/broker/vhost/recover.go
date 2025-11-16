@@ -27,16 +27,13 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 	ch.mu.Unlock()
 
 	for _, record := range unackedMessages {
+		// Expire if needed
+		if vh.handleTTLExpiration(record.Message, vh.Queues[record.QueueName]) {
+			continue
+		}
 		if requeue {
 			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
-			vh.mu.Lock()
-			queue := vh.Queues[record.QueueName]
-			vh.mu.Unlock()
-			if queue != nil {
-				// mark as redelivered for next delivery
-				vh.markAsRedelivered(record.Message.ID)
-				queue.Push(record.Message)
-			}
+			vh.requeueMessage(record)
 		} else {
 			vh.mu.Lock()
 			consumerKey := ConnectionChannelKey{conn, channel}
@@ -67,17 +64,21 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 			} else {
 				// consumer no longer exists, requeue
 				log.Debug().Str("consumer", record.ConsumerTag).Msgf("Consumer not found for recovered message, requeuing")
-				vh.mu.Lock()
-				q := vh.Queues[record.QueueName]
-				vh.mu.Unlock()
-				if q != nil {
-					vh.markAsRedelivered(record.Message.ID)
-					q.Push(record.Message)
-				}
+				vh.requeueMessage(record)
 			}
 		}
 	}
 	return nil
+}
+
+func (vh *VHost) requeueMessage(record *DeliveryRecord) {
+	vh.mu.Lock()
+	queue := vh.Queues[record.QueueName]
+	vh.mu.Unlock()
+	if queue != nil {
+		vh.markAsRedelivered(record.Message.ID)
+		queue.Push(record.Message)
+	}
 }
 
 func (vh *VHost) markAsRedelivered(msgID string) {

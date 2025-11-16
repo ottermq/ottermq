@@ -36,6 +36,7 @@ type DeadLetter struct {
 	vh *VHost
 }
 
+// DeadLetter handles dead-lettering of a message from a given queue for a specific reason
 func (dl *DeadLetter) DeadLetter(msg Message, queue *Queue, reason ReasonType) error {
 	// Check if queue has DLX configured
 	dlx, ok := queue.Props.Arguments["x-dead-letter-exchange"].(string)
