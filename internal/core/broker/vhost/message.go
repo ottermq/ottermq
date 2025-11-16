@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,11 +32,23 @@ type Message struct {
 }
 
 func NewMessage(msg amqp.Message, id string) Message {
+	props := msg.Properties
+
+	// Convert relative Expiration (TTL in ms) to absolute timestamp
+	// RabbitMQ sends Expiration as a string like "100" meaning 100ms from now
+	if props.Expiration != "" {
+		if ttlMs, err := strconv.ParseInt(props.Expiration, 10, 64); err == nil && ttlMs > 0 {
+			// Convert relative TTL to absolute expiration timestamp
+			expiresAt := time.Now().Add(time.Duration(ttlMs) * time.Millisecond)
+			props.Expiration = strconv.FormatInt(expiresAt.UnixMilli(), 10)
+		}
+	}
+
 	return Message{
 		ID:         id,
 		EnqueuedAt: time.Now().Local().UTC(),
 		Body:       msg.Body,
-		Properties: msg.Properties,
+		Properties: props,
 		Exchange:   msg.Exchange,
 		RoutingKey: msg.RoutingKey,
 	}
