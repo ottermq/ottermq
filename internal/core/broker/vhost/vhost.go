@@ -45,7 +45,6 @@ type VHost struct {
 	DeadLetterer DeadLetterer
 	TTLManager   TTLManager
 
-	// TODO: create a type as a umbrella for all vhost extensions (dead-letter, cc/bcc, etc)
 	ActiveExtensions map[string]bool
 }
 
