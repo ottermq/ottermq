@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -17,6 +18,92 @@ type SaveMessageRequest struct {
 	MsgID      string
 	Body       []byte
 	MsgProps   persistence.MessageProperties
+}
+
+type Message struct {
+	ID         string
+	EnqueuedAt time.Time
+	Body       []byte
+	Properties amqp.BasicProperties
+	Exchange   string
+	RoutingKey string
+}
+
+func NewMessage(msg amqp.Message, id string) Message {
+	return Message{
+		ID:         id,
+		EnqueuedAt: time.Now(),
+		Body:       msg.Body,
+		Properties: msg.Properties,
+		Exchange:   msg.Exchange,
+		RoutingKey: msg.RoutingKey,
+	}
+}
+
+func (m *Message) ToAMQPMessage() amqp.Message {
+	return amqp.Message{
+		Body:       m.Body,
+		Properties: m.Properties,
+		Exchange:   m.Exchange,
+		RoutingKey: m.RoutingKey,
+	}
+}
+
+func (m *Message) ToPersistence() persistence.Message {
+	return persistence.Message{
+		ID:         m.ID,
+		Body:       m.Body,
+		Properties: convertToPersistedProperties(m.Properties),
+		EnqueuedAt: m.EnqueuedAt.UnixMilli(),
+	}
+}
+
+func FromPersistence(msgData persistence.Message) amqp.Message {
+	msg := amqp.Message{
+		ID:   msgData.ID,
+		Body: msgData.Body,
+		Properties: amqp.BasicProperties{
+			ContentType:     amqp.ContentType(msgData.Properties.ContentType),
+			ContentEncoding: msgData.Properties.ContentEncoding,
+			Headers:         msgData.Properties.Headers,
+			DeliveryMode:    amqp.DeliveryMode(msgData.Properties.DeliveryMode),
+			Priority:        msgData.Properties.Priority,
+			CorrelationID:   msgData.Properties.CorrelationID,
+			ReplyTo:         msgData.Properties.ReplyTo,
+			Expiration:      msgData.Properties.Expiration,
+			MessageID:       msgData.Properties.MessageID,
+			Timestamp:       time.Unix(msgData.Properties.Timestamp, 0),
+			Type:            msgData.Properties.Type,
+			UserID:          msgData.Properties.UserID,
+			AppID:           msgData.Properties.AppID,
+		},
+	}
+	return msg
+}
+
+func convertToPersistedProperties(amqpProps amqp.BasicProperties) persistence.MessageProperties {
+	var timestamp int64
+	if amqpProps.Timestamp.IsZero() {
+		timestamp = 0
+	} else {
+		timestamp = amqpProps.Timestamp.Unix()
+	}
+	msgProps := persistence.MessageProperties{
+		ContentType:     string(amqpProps.ContentType),
+		ContentEncoding: amqpProps.ContentEncoding,
+		Headers:         amqpProps.Headers,
+		DeliveryMode:    uint8(amqpProps.DeliveryMode),
+		Priority:        amqpProps.Priority,
+		CorrelationID:   amqpProps.CorrelationID,
+		ReplyTo:         amqpProps.ReplyTo,
+		Expiration:      amqpProps.Expiration,
+		MessageID:       amqpProps.MessageID,
+		Timestamp:       timestamp,
+		Type:            amqpProps.Type,
+		UserID:          amqpProps.UserID,
+		AppID:           amqpProps.AppID,
+	}
+	return msgProps
 }
 
 // TODO: create a higher level abstraction of amqp.Message, exposing the content, requeued count, etc
@@ -39,27 +126,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 
 	log.Trace().Str("id", msg.ID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(msg.Body)).Interface("properties", msg.Properties).Msg("Publishing message")
 
-	var timestamp int64
-	if msg.Properties.Timestamp.IsZero() {
-		timestamp = 0
-	} else {
-		timestamp = msg.Properties.Timestamp.Unix()
-	}
-	msgProps := persistence.MessageProperties{
-		ContentType:     string(msg.Properties.ContentType),
-		ContentEncoding: msg.Properties.ContentEncoding,
-		Headers:         msg.Properties.Headers,
-		DeliveryMode:    uint8(msg.Properties.DeliveryMode),
-		Priority:        msg.Properties.Priority,
-		CorrelationID:   msg.Properties.CorrelationID,
-		ReplyTo:         msg.Properties.ReplyTo,
-		Expiration:      msg.Properties.Expiration,
-		MessageID:       msg.Properties.MessageID,
-		Timestamp:       timestamp,
-		Type:            msg.Properties.Type,
-		UserID:          msg.Properties.UserID,
-		AppID:           msg.Properties.AppID,
-	}
+	msgProps := convertToPersistedProperties(msg.Properties)
 	switch exchange.Typ {
 	case DIRECT:
 		bindings, ok := exchange.Bindings[routingKey]

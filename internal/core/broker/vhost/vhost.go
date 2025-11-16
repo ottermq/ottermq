@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
@@ -169,25 +168,7 @@ func (vh *VHost) loadPersistedState() {
 		}
 		// Load messages into the queue
 		for _, msgData := range queue.Messages {
-			msg := amqp.Message{
-				ID:   msgData.ID,
-				Body: msgData.Body,
-				Properties: amqp.BasicProperties{
-					ContentType:     amqp.ContentType(msgData.Properties.ContentType),
-					ContentEncoding: msgData.Properties.ContentEncoding,
-					Headers:         msgData.Properties.Headers,
-					DeliveryMode:    amqp.DeliveryMode(msgData.Properties.DeliveryMode),
-					Priority:        msgData.Properties.Priority,
-					CorrelationID:   msgData.Properties.CorrelationID,
-					ReplyTo:         msgData.Properties.ReplyTo,
-					Expiration:      msgData.Properties.Expiration,
-					MessageID:       msgData.Properties.MessageID,
-					Timestamp:       time.Unix(msgData.Properties.Timestamp, 0),
-					Type:            msgData.Properties.Type,
-					UserID:          msgData.Properties.UserID,
-					AppID:           msgData.Properties.AppID,
-				},
-			}
+			msg := FromPersistence(msgData)
 			vh.Queues[queue.Name].Push(msg)
 		}
 	}
