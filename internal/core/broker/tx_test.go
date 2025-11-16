@@ -270,7 +270,7 @@ func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
 	// Do NOT enter transaction mode
 
 	// Create a message to publish
-	msg := &amqp.Message{
+	amqpMsg := &amqp.Message{
 		ID:   "test-msg-1",
 		Body: []byte("test message"),
 		Properties: amqp.BasicProperties{
@@ -280,7 +280,7 @@ func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
 	}
 
 	// Try to buffer (should return false since not in TX mode)
-	_, err, buffered := broker.bufferPublishInTransaction(vh, 1, conn, "test-exchange", "test.key", msg, false)
+	_, err, buffered := broker.bufferPublishInTransaction(vh, 1, conn, "test-exchange", "test.key", amqpMsg, false)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -290,7 +290,9 @@ func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
 	}
 
 	// Now publish directly (simulating normal flow)
-	_, err = vh.Publish("test-exchange", "test.key", msg)
+	msgId := vhost.GenerateMessageId()
+	msg := vhost.NewMessage(*amqpMsg, msgId)
+	_, err = vh.Publish("test-exchange", "test.key", &msg)
 	if err != nil {
 		t.Fatalf("Publish failed: %v", err)
 	}
@@ -318,7 +320,7 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
-		Message: amqp.Message{
+		Message: vhost.Message{
 			ID:   "test-msg-1",
 			Body: []byte("test message"),
 		},
@@ -380,7 +382,7 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
-		Message: amqp.Message{
+		Message: vhost.Message{
 			ID:   "test-msg-1",
 			Body: []byte("test message"),
 		},
@@ -437,7 +439,7 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
-		Message: amqp.Message{
+		Message: vhost.Message{
 			ID:   "test-msg-1",
 			Body: []byte("test message"),
 		},
@@ -553,7 +555,7 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	for i := uint64(1); i <= 3; i++ {
 		vh.ChannelDeliveries[channelKey].Unacked[i] = &vhost.DeliveryRecord{
 			DeliveryTag: i,
-			Message: amqp.Message{
+			Message: vhost.Message{
 				ID:   "test-msg",
 				Body: []byte("test"),
 			},
@@ -1046,12 +1048,12 @@ func TestCommit_MixedOperations(t *testing.T) {
 
 	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
-		Message:     amqp.Message{ID: "msg-1", Body: []byte("test")},
+		Message:     vhost.Message{ID: "msg-1", Body: []byte("test")},
 		QueueName:   "test-queue",
 	}
 	vh.ChannelDeliveries[channelKey].Unacked[2] = &vhost.DeliveryRecord{
 		DeliveryTag: 2,
-		Message:     amqp.Message{ID: "msg-2", Body: []byte("test")},
+		Message:     vhost.Message{ID: "msg-2", Body: []byte("test")},
 		QueueName:   "test-queue",
 	}
 

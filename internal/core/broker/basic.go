@@ -7,7 +7,6 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -68,12 +67,11 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			log.Debug().Err(err).Msg("Error sending frame")
 			return nil, err
 		}
-
 		responseContent := amqp.ResponseContent{
 			Channel: request.Channel,
 			ClassID: request.ClassID,
 			Weight:  0,
-			Message: *msg,
+			Message: msg.ToAMQPMessage(),
 		}
 		// Header
 		frame = responseContent.FormatHeaderFrame()
@@ -196,9 +194,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			return nil, err
 		}
 
-		msgID := uuid.New().String()
-		msg := &amqp.Message{
-			ID:         msgID,
+		amqpMsg := &amqp.Message{
 			Body:       body,
 			Properties: *props,
 			Exchange:   exchange,
@@ -206,7 +202,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		}
 
 		// Check if in transaction
-		a, err, ok := b.bufferPublishInTransaction(vh, channel, conn, exchange, routingKey, msg, mandatory)
+		a, err, ok := b.bufferPublishInTransaction(vh, channel, conn, exchange, routingKey, amqpMsg, mandatory)
 		if ok {
 			// Reset channel state after buffering in transaction
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
@@ -217,15 +213,16 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			if mandatory {
 				// Return message to the publisher
 				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
-				return b.BasicReturn(conn, channel, exchange, routingKey, msg)
+				return b.BasicReturn(conn, channel, exchange, routingKey, amqpMsg)
 			}
 			// No routing and not mandatory - silently drop the message
 			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, silently dropped (not mandatory)")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			return nil, nil
 		}
-
-		_, err = vh.Publish(exchange, routingKey, msg)
+		msgID := vhost.GenerateMessageId()
+		msg := vhost.NewMessage(*amqpMsg, msgID)
+		_, err = vh.Publish(exchange, routingKey, &msg)
 		if err == nil {
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}

@@ -23,7 +23,7 @@ func TestPublishToInternalExchange(t *testing.T) {
 		Props: &ExchangeProperties{Internal: true},
 	}
 
-	msg := &amqp.Message{
+	msg := &Message{
 		Body:       []byte("test"),
 		Properties: amqp.BasicProperties{},
 	}
@@ -44,7 +44,7 @@ func TestPublishToNonExistentExchange(t *testing.T) {
 		Queues:    make(map[string]*Queue),
 	}
 
-	msg := &amqp.Message{
+	msg := &Message{
 		Body:       []byte("test"),
 		Properties: amqp.BasicProperties{},
 	}
@@ -68,7 +68,7 @@ func TestPublishToDirectExchangeWithBinding(t *testing.T) {
 	// Create a queue
 	queue := &Queue{
 		Name:     "test-queue",
-		messages: make(chan amqp.Message, 100),
+		messages: make(chan Message, 100),
 		Props:    &QueueProperties{Durable: false},
 	}
 	vh.Queues["test-queue"] = queue
@@ -85,7 +85,7 @@ func TestPublishToDirectExchangeWithBinding(t *testing.T) {
 		},
 	}
 
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:         uuid.New().String(),
 		Body:       []byte("test message"),
 		Properties: amqp.BasicProperties{},
@@ -120,7 +120,7 @@ func TestPublishToDirectExchangeWithoutBinding(t *testing.T) {
 		Props:    &ExchangeProperties{Internal: false},
 		Bindings: make(map[string][]*Binding),
 	}
-	msg := &amqp.Message{
+	msg := &Message{
 		Body:       []byte("test"),
 		Properties: amqp.BasicProperties{},
 	}
@@ -143,12 +143,12 @@ func TestPublishToFanoutExchange(t *testing.T) {
 	// Create queues
 	queue1 := &Queue{
 		Name:     "queue1",
-		messages: make(chan amqp.Message, 100),
+		messages: make(chan Message, 100),
 		Props:    &QueueProperties{Durable: false},
 	}
 	queue2 := &Queue{
 		Name:     "queue2",
-		messages: make(chan amqp.Message, 100),
+		messages: make(chan Message, 100),
 		Props:    &QueueProperties{Durable: false},
 	}
 
@@ -166,7 +166,7 @@ func TestPublishToFanoutExchange(t *testing.T) {
 		{Queue: queue2},
 	}
 
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:         uuid.New().String(),
 		Body:       []byte("fanout message"),
 		Properties: amqp.BasicProperties{},
@@ -203,7 +203,7 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 		Typ:   ExchangeType(xType),
 		Props: &ExchangeProperties{Internal: false},
 	}
-	msg := &amqp.Message{
+	msg := &Message{
 		Body:       []byte("test"),
 		Properties: amqp.BasicProperties{},
 	}

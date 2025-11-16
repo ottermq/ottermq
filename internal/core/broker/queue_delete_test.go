@@ -85,7 +85,7 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
-	q.Push(amqp.Message{ID: "1", Body: []byte("A")})
+	q.Push(vhost.Message{ID: "1", Body: []byte("A")})
 
 	conn := &mockConn{}
 	b.mu.Lock()
@@ -137,8 +137,8 @@ func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
-	q.Push(amqp.Message{ID: "1"})
-	q.Push(amqp.Message{ID: "2"})
+	q.Push(vhost.Message{ID: "1"})
+	q.Push(vhost.Message{ID: "2"})
 
 	conn := &mockConn{}
 

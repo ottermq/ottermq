@@ -96,13 +96,13 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		exchange := pub.ExchangeName
 		routingKey := pub.RoutingKey
 		mandatory := pub.Mandatory
-		msg := &pub.Message
+		amqpMsg := &pub.Message
 		hasRouting, err := vh.HasRoutingForMessage(exchange, routingKey)
 
 		if !hasRouting {
 			if mandatory {
 				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
-				_, err = b.BasicReturn(conn, channel, exchange, routingKey, msg)
+				_, err = b.BasicReturn(conn, channel, exchange, routingKey, amqpMsg)
 				if err != nil {
 					publishErrors = append(publishErrors, err)
 				} else {
@@ -115,8 +115,9 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			continue
 		}
-
-		_, err = vh.Publish(pub.ExchangeName, pub.RoutingKey, msg)
+		msgID := vhost.GenerateMessageId()
+		msg := vhost.NewMessage(*amqpMsg, msgID)
+		_, err = vh.Publish(pub.ExchangeName, pub.RoutingKey, &msg)
 		if err != nil {
 			publishErrors = append(publishErrors, err)
 		}

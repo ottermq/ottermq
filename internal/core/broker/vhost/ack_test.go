@@ -3,8 +3,6 @@ package vhost
 import (
 	"net"
 	"testing"
-
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 )
 
 // helper to build a minimal consumer
@@ -42,8 +40,8 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Simulate two delivered messages (manual ack)
-	m1 := amqp.Message{ID: "m1", Body: []byte("m1")}
-	m2 := amqp.Message{ID: "m2", Body: []byte("m2")}
+	m1 := Message{ID: "m1", Body: []byte("m1")}
+	m2 := Message{ID: "m2", Body: []byte("m2")}
 
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
@@ -182,7 +180,7 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
 
-	msg := amqp.Message{ID: "mx", Body: []byte("x")}
+	msg := Message{ID: "mx", Body: []byte("x")}
 	ch.mu.Lock()
 	ch.LastDeliveryTag = 1
 	ch.Unacked[1] = &DeliveryRecord{DeliveryTag: 1, QueueName: q.Name, Message: msg}

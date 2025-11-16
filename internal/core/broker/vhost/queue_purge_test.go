@@ -26,9 +26,9 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 	}
 
 	// Enqueue 3 messages: 2 persistent, 1 non-persistent
-	vh.Queues["q1"].Push(amqp.Message{ID: "m1", Body: []byte("a"), Properties: amqp.BasicProperties{DeliveryMode: amqp.PERSISTENT}})
-	vh.Queues["q1"].Push(amqp.Message{ID: "m2", Body: []byte("b"), Properties: amqp.BasicProperties{DeliveryMode: amqp.NON_PERSISTENT}})
-	vh.Queues["q1"].Push(amqp.Message{ID: "m3", Body: []byte("c"), Properties: amqp.BasicProperties{DeliveryMode: amqp.PERSISTENT}})
+	vh.Queues["q1"].Push(Message{ID: "m1", Body: []byte("a"), Properties: amqp.BasicProperties{DeliveryMode: amqp.PERSISTENT}})
+	vh.Queues["q1"].Push(Message{ID: "m2", Body: []byte("b"), Properties: amqp.BasicProperties{DeliveryMode: amqp.NON_PERSISTENT}})
+	vh.Queues["q1"].Push(Message{ID: "m3", Body: []byte("c"), Properties: amqp.BasicProperties{DeliveryMode: amqp.PERSISTENT}})
 
 	if got := vh.Queues["q1"].Len(); got != 3 {
 		t.Fatalf("precondition: expected 3 messages in queue, got %d", got)

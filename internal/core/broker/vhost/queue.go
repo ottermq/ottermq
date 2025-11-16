@@ -16,12 +16,12 @@ import (
 type QueueArgs map[string]any
 
 type Queue struct {
-	Name      string            `json:"name"`
-	Props     *QueueProperties  `json:"properties"`
-	messages  chan amqp.Message `json:"-"`
-	count     int               `json:"-"`
-	mu        sync.Mutex        `json:"-"`
-	OwnerConn net.Conn          `json:"-"`
+	Name      string           `json:"name"`
+	Props     *QueueProperties `json:"properties"`
+	messages  chan Message     `json:"-"`
+	count     int              `json:"-"`
+	mu        sync.Mutex       `json:"-"`
+	OwnerConn net.Conn         `json:"-"`
 	/* Delivery */
 	deliveryCtx    context.Context    `json:"-"`
 	deliveryCancel context.CancelFunc `json:"-"`
@@ -41,7 +41,7 @@ func NewQueue(name string, bufferSize int) *Queue {
 	return &Queue{
 		Name:       name,
 		Props:      &QueueProperties{},
-		messages:   make(chan amqp.Message, bufferSize),
+		messages:   make(chan Message, bufferSize),
 		count:      0,
 		delivering: false,
 	}
@@ -307,7 +307,7 @@ func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 	}
 }
 
-func (q *Queue) Push(msg amqp.Message) {
+func (q *Queue) Push(msg Message) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {
@@ -319,13 +319,13 @@ func (q *Queue) Push(msg amqp.Message) {
 	}
 }
 
-func (q *Queue) Pop() *amqp.Message {
+func (q *Queue) Pop() *Message {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.popUnlocked()
 }
 
-func (q *Queue) popUnlocked() *amqp.Message {
+func (q *Queue) popUnlocked() *Message {
 	select {
 	case msg := <-q.messages:
 		q.count--
@@ -360,7 +360,7 @@ func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 			uint16(amqp.QUEUE),
 			uint16(amqp.QUEUE_PURGE))
 	}
-	purged := queue.StreamPurge(func(msg *amqp.Message) {
+	purged := queue.StreamPurge(func(msg *Message) {
 		if msg != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
 			if vh.persist != nil {
 				if err := vh.persist.DeleteMessage(vh.Name, name, msg.ID); err != nil {
@@ -373,7 +373,7 @@ func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 	return purged, nil
 }
 
-func (q *Queue) StreamPurge(process func(*amqp.Message)) uint32 {
+func (q *Queue) StreamPurge(process func(*Message)) uint32 {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

@@ -32,7 +32,7 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 	}
 
 	// Publish a message
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:   "msg-1",
 		Body: []byte("test message"),
 		Properties: amqp.BasicProperties{
@@ -72,7 +72,7 @@ func TestFanoutPublish_NoBindings(t *testing.T) {
 	exchangeName := "test-fanout-empty"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
 
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:   "msg-1",
 		Body: []byte("test message"),
 		Properties: amqp.BasicProperties{
@@ -100,7 +100,7 @@ func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
 	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "", nil, nil)
 
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:   "msg-1",
 		Body: []byte("test"),
 		Properties: amqp.BasicProperties{
@@ -473,7 +473,7 @@ func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
 	vh.BindQueue(exchangeName, "queue3", "logs.error", nil, nil)
 
 	// Publish to logs.error
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:   "msg-1",
 		Body: []byte("error message"),
 		Properties: amqp.BasicProperties{
@@ -516,7 +516,7 @@ func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
 	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
 	vh.BindQueue(exchangeName, "queue1", "existing.key", nil, nil)
 
-	msg := &amqp.Message{
+	msg := &Message{
 		ID:   "msg-1",
 		Body: []byte("test"),
 		Properties: amqp.BasicProperties{

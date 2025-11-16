@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -39,6 +40,9 @@ func NewMessage(msg amqp.Message, id string) Message {
 		RoutingKey: msg.RoutingKey,
 	}
 }
+func GenerateMessageId() string {
+	return uuid.New().String()
+}
 
 func (m *Message) ToAMQPMessage() amqp.Message {
 	return amqp.Message{
@@ -58,8 +62,8 @@ func (m *Message) ToPersistence() persistence.Message {
 	}
 }
 
-func FromPersistence(msgData persistence.Message) amqp.Message {
-	msg := amqp.Message{
+func FromPersistence(msgData persistence.Message) Message {
+	msg := Message{
 		ID:   msgData.ID,
 		Body: msgData.Body,
 		Properties: amqp.BasicProperties{
@@ -106,9 +110,7 @@ func convertToPersistedProperties(amqpProps amqp.BasicProperties) persistence.Me
 	return msgProps
 }
 
-// TODO: create a higher level abstraction of amqp.Message, exposing the content, requeued count, etc
-
-func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (string, error) {
+func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -216,7 +218,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (st
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) GetMessage(queueName string) *amqp.Message {
+func (vh *VHost) GetMessage(queueName string) *Message {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	queue, ok := vh.Queues[queueName]

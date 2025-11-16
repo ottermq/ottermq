@@ -4,7 +4,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -29,7 +28,7 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	vh.mu.Unlock()
 
 	// add one unacked record
-	msg := amqp.Message{ID: "m5", Body: []byte("x")}
+	msg := Message{ID: "m5", Body: []byte("x")}
 	ch.mu.Lock()
 	ch.Unacked[5] = &DeliveryRecord{
 		DeliveryTag: 5,
@@ -86,7 +85,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	vh.mu.Unlock()
 
 	// tags 1..4, mark 1 and 2 as persistent to check deletion
-	msgs := []amqp.Message{
+	msgs := []Message{
 		{ID: "m1"}, {ID: "m2"}, {ID: "m3"}, {ID: "m4"},
 	}
 	ch.mu.Lock()
@@ -161,7 +160,7 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 	// tags 1..4
 	ch.mu.Lock()
 	for i := uint64(1); i <= 4; i++ {
-		ch.Unacked[i] = &DeliveryRecord{DeliveryTag: i, ConsumerTag: "c", QueueName: "q1", Message: amqp.Message{ID: "m"}}
+		ch.Unacked[i] = &DeliveryRecord{DeliveryTag: i, ConsumerTag: "c", QueueName: "q1", Message: Message{ID: "m"}}
 	}
 	ch.mu.Unlock()
 

@@ -4,7 +4,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/testutil"
 )
 
@@ -30,8 +29,8 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Add unacked messages
-	m1 := amqp.Message{ID: "msg1", Body: []byte("test1")}
-	m2 := amqp.Message{ID: "msg2", Body: []byte("test2")}
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
+	m2 := Message{ID: "msg2", Body: []byte("test2")}
 
 	ch.mu.Lock()
 	ch.Unacked[1] = &DeliveryRecord{
@@ -114,7 +113,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	vh.ChannelDeliveries[channelKey] = ch
 	vh.mu.Unlock()
 
-	m1 := amqp.Message{ID: "msg1", Body: []byte("test1")}
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
 	ch.LastDeliveryTag = 1 // Set counter so next delivery gets tag 2
 	ch.Unacked[1] = &DeliveryRecord{
@@ -173,7 +172,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
 
-	m1 := amqp.Message{ID: "msg1", Body: []byte("test1")}
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
 	ch.Unacked[1] = &DeliveryRecord{
 		DeliveryTag: 1,
@@ -247,7 +246,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	vh.ChannelDeliveries[channelKey] = ch
 	vh.mu.Unlock()
 
-	m1 := amqp.Message{ID: "msg1", Body: []byte("test1")}
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
 	ch.Unacked[1] = &DeliveryRecord{
 		DeliveryTag: 1,

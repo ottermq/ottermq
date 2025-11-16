@@ -33,8 +33,8 @@ func TestQueuePurgeHandler_Success(t *testing.T) {
 	vh.SetFramer(b.framer)
 	// Create queue and seed messages
 	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, nil)
-	vh.Queues["purge-q"].Push(amqp.Message{ID: "1", Body: []byte("a")})
-	vh.Queues["purge-q"].Push(amqp.Message{ID: "2", Body: []byte("b")})
+	vh.Queues["purge-q"].Push(vhost.Message{ID: "1", Body: []byte("a")})
+	vh.Queues["purge-q"].Push(vhost.Message{ID: "2", Body: []byte("b")})
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
