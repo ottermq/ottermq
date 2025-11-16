@@ -46,7 +46,7 @@ func NewMessage(msg amqp.Message, id string) Message {
 
 	return Message{
 		ID:         id,
-		EnqueuedAt: time.Now().Local().UTC(),
+		EnqueuedAt: time.Now().UTC(),
 		Body:       msg.Body,
 		Properties: props,
 		Exchange:   msg.Exchange,
@@ -77,8 +77,9 @@ func (m *Message) ToPersistence() persistence.Message {
 
 func FromPersistence(msgData persistence.Message) Message {
 	msg := Message{
-		ID:   msgData.ID,
-		Body: msgData.Body,
+		ID:         msgData.ID,
+		EnqueuedAt: time.UnixMilli(msgData.EnqueuedAt),
+		Body:       msgData.Body,
 		Properties: amqp.BasicProperties{
 			ContentType:     amqp.ContentType(msgData.Properties.ContentType),
 			ContentEncoding: msgData.Properties.ContentEncoding,
