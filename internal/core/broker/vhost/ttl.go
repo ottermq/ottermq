@@ -48,9 +48,34 @@ func (dtm *DefaultTTLManager) CheckExpiration(msg *Message, queue *Queue) (bool,
 
 // parseTTLArgument extracts the x-message-ttl argument from the queue arguments
 func parseTTLArgument(args map[string]interface{}) (int64, bool) {
-	ttlFloat, ok := args["x-message-ttl"].(float64)
+	ttl, ok := args["x-message-ttl"]
 	if !ok {
 		return 0, false
 	}
-	return int64(ttlFloat), true
+
+	// Handle different integer types that may come from AMQP
+	switch v := ttl.(type) {
+	case int64:
+		if v <= 0 {
+			return 0, false
+		}
+		return v, true
+	case int32:
+		if v <= 0 {
+			return 0, false
+		}
+		return int64(v), true
+	case int:
+		if v <= 0 {
+			return 0, false
+		}
+		return int64(v), true
+	case float64:
+		if v <= 0 {
+			return 0, false
+		}
+		return int64(v), true
+	default:
+		return 0, false
+	}
 }
