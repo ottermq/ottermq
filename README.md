@@ -159,6 +159,7 @@ OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, s
 **RabbitMQ Extensions** (for compatibility):
 
 - Dead Letter Exchanges (DLX) with `x-death` tracking
+- Message TTL and Expiration with per-message and per-queue support
 
 Basic compatibility with RabbitMQ clients is functional and tested. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 

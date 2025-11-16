@@ -60,6 +60,17 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Message TTL and Expiration** - RabbitMQ-compatible time-to-live for messages (v0.13.0)
+  - [x] Per-message TTL via `Expiration` property (relative milliseconds)
+  - [x] Per-queue TTL via `x-message-ttl` argument
+  - [x] TTL precedence rules (per-message takes priority)
+  - [x] Lazy expiration at retrieval time (delivery, basic.get, requeue, recovery)
+  - [x] Absolute timestamp conversion for per-message TTL
+  - [x] Age-based expiration for per-queue TTL
+  - [x] DLX integration with `expired` death reason
+  - [x] Extension registry framework with `EnableTTL` flag
+  - [x] `TTLManager` interface with Default and NoOp implementations
+  - [x] Comprehensive test coverage (14 unit tests, 10 e2e scenarios)
 - [x] **Dead Letter Exchange (DLX)** - RabbitMQ-compatible error handling (v0.12.0)
   - [x] Queue-level DLX configuration via `x-dead-letter-exchange`
   - [x] Routing key override via `x-dead-letter-routing-key`
@@ -102,10 +113,6 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 #### **Phase 1: Advanced Features (High Priority)**
 
-- [ ] **Message TTL and expiration**
-  - [ ] Per-message TTL
-  - [ ] Per-queue TTL
-  - [ ] TTL-based dead lettering (expired reason)
 - [ ] **Queue length limits**
   - [ ] Max-length configuration
   - [ ] Max-length dead lettering (maxlen reason)
@@ -233,17 +240,29 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - `tests/e2e/dead_letter_test.go` - Comprehensive DLX tests
 - `docs/dead-letter-exchange.md` - Full DLX documentation
 
-### **Phase 8: Message TTL and Expiration (Current Focus)**
+### **Phase 8: Message TTL and Expiration (COMPLETED - v0.13.0)**
 
-**Goal**: Implement message and queue TTL with dead letter integration
+**Goal**: Implement message and queue TTL with dead letter integration ✅
 
-**Tasks**:
+**Completed Tasks**:
 
-1. Per-message TTL configuration
-2. Per-queue TTL configuration
-3. TTL expiration monitoring and cleanup
-4. Dead letter routing for expired messages
-5. Integration with existing DLX infrastructure
+1. ✅ Per-message TTL via `Expiration` property (relative → absolute conversion)
+2. ✅ Per-queue TTL via `x-message-ttl` argument
+3. ✅ TTL expiration checking with precedence rules
+4. ✅ Lazy expiration at all retrieval points (delivery, basic.get, requeue, recovery)
+5. ✅ Dead letter routing for expired messages with `expired` reason
+6. ✅ Extension registry framework with feature flags
+7. ✅ Three-layer message type separation (amqp/vhost/persistence)
+8. ✅ Comprehensive test coverage (14 unit tests, 10 e2e tests)
+9. ✅ Documentation (message-ttl.md)
+
+**Key files**:
+
+- `internal/core/broker/vhost/ttl.go` - TTL manager and CheckExpiration logic
+- `internal/core/broker/vhost/message.go` - Expiration conversion and checking
+- `internal/core/broker/vhost/ttl_test.go` - 14 unit tests
+- `tests/e2e/ttl_test.go` - 10 comprehensive e2e tests
+- `docs/message-ttl.md` - Full TTL documentation
 
 ## Testing Strategy
 
@@ -274,13 +293,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 8: Message TTL and Expiration**. Contributors should focus on:
+The highest priority is **Phase 9: Queue Length Limits**. Contributors should focus on:
 
-1. Per-message TTL via `expiration` property
-2. Per-queue TTL via `x-message-ttl` argument
-3. Message expiration tracking and removal
-4. Integration with Dead Letter Exchange for expired messages
-5. Queue-level expiration policy (`x-expires`)
+1. Max-length configuration via `x-max-length` argument
+2. Message drop strategy (drop-head vs reject-publish)
+3. Max-length dead lettering with `maxlen` reason
+4. Integration with existing message routing
+5. Testing with RabbitMQ client compatibility
 
 ### **Getting Started**
 
@@ -301,10 +320,10 @@ The highest priority is **Phase 8: Message TTL and Expiration**. Contributors sh
 
 ## Progress Tracking
 
-**Last Updated**: November 15, 2025  
-**Current Focus**: Phase 8 - Message TTL and Expiration  
-**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE, BASIC, TX class methods, and Dead Letter Exchanges  
-**Latest Release**: v0.12.0 - Dead Letter Exchange Support  
-**Next Milestone**: Message and queue TTL implementation with expiration-based dead lettering
+**Last Updated**: November 16, 2025  
+**Current Focus**: Phase 9 - Queue Length Limits  
+**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE, BASIC, TX class methods, Dead Letter Exchanges, and Message TTL  
+**Latest Release**: v0.13.0 - Message TTL and Expiration Support  
+**Next Milestone**: Queue length limits with max-length dead lettering
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

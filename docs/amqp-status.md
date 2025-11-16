@@ -136,6 +136,35 @@ Status levels:
 
 ---
 
+## RabbitMQ Extensions
+
+Beyond core AMQP 0.9.1, OtterMQ implements popular RabbitMQ extensions:
+
+| Extension | Status | Configuration | Documentation |
+|-----------|--------|---------------|---------------|
+| **Dead Letter Exchange (DLX)** | ✅ Full | `OTTERMQ_ENABLE_DLX=true` | [DLX Guide](./dead-letter-exchange) |
+| **Message TTL** | ✅ Full | `OTTERMQ_ENABLE_TTL=true` | [TTL Guide](./message-ttl) |
+
+### Extension Details
+
+#### Dead Letter Exchange (DLX)
+
+- Queue arguments: `x-dead-letter-exchange`, `x-dead-letter-routing-key`
+- Death reasons: `rejected`, `expired`, `maxlen` (future)
+- Full `x-death` header tracking with count, time, reason, original queue/exchange
+- Compatible with all RabbitMQ clients
+
+#### Message TTL and Expiration
+
+- Per-message TTL: `Expiration` property (milliseconds as string)
+- Per-queue TTL: `x-message-ttl` queue argument
+- Precedence: Per-message TTL takes priority over per-queue TTL
+- Lazy expiration: Checked at retrieval time (delivery, basic.get, requeue)
+- DLX integration: Expired messages routed to DLX with reason `"expired"`
+- Compatible with RabbitMQ TTL semantics
+
+---
+
 **Notes:**
 
 - Keep this table in sync with the implementation in `internal/core/amqp/*` and `internal/core/broker/*`.

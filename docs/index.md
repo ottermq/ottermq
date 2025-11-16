@@ -27,12 +27,13 @@ This site tracks project status and documentation for users and contributors. Fo
 - Message acknowledgments, rejections, and recovery
 - Pluggable persistence layer (JSON today; Memento WAL planned)
 - Built-in management UI (Vue + Quasar)
-- **Dead Letter Exchange (DLX)** - RabbitMQ-compatible error handling and message routing
-- Dead Letter Exchange: [DLX Guide](./dead-letter-exchange)
+- Supports **multiple virtual hosts** for tenant isolation
+- Low memory footprint with smart buffering and backpressure
 
-**RabbitMQ Extensions**:
+### RabbitMQ Extensions
 
-- **Dead Letter Exchange (DLX)** - Error handling and message routing ([DLX Guide](./dead-letter-exchange))
+- [**Dead Letter Exchange (DLX)**](./dead-letter-exchange): Route failed/rejected messages for retry or logging
+- [**Message TTL and Expiration**](./message-ttl): Time-To-Live for messages with per-message and per-queue TTL support
 
 ## Getting started
 
