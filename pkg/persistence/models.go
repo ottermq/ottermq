@@ -22,7 +22,9 @@ type Message struct {
 	ID         string            `json:"id"`
 	Body       []byte            `json:"body"`
 	Properties MessageProperties `json:"properties"`
-	EnqueuedAt int64             `json:"enqueued_at"`
+	// EnqueuedAt stores the Unix timestamp in milliseconds when the message was enqueued.
+	// Note: This differs from the Timestamp field in MessageProperties, which uses Unix seconds.
+	EnqueuedAt int64 `json:"enqueued_at"`
 }
 
 // Basic queue/exchange properties - universal concepts
