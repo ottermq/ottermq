@@ -313,20 +313,9 @@ func (vh *VHost) handleTTLExpiration(msg Message, q *Queue) bool {
 		}
 		if expired {
 			// verify if dlx argument is configured
-			if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
-				vh.mu.Lock()
-				args := q.Props.Arguments
-				vh.mu.Unlock()
-				dlx, dlxExists := args["x-dead-letter-exchange"].(string)
-
-				if dlxExists && dlx != "" {
-					err := vh.DeadLetterer.DeadLetter(msg, q, REASON_EXPIRED)
-					if err == nil {
-						log.Debug().Msg("Dead-lettering succeeded")
-						return expired
-					}
-					log.Error().Err(err).Msg("Dead-lettering failed")
-				}
+			ok := vh.handleDeadLetter(q, msg, REASON_EXPIRED)
+			if !ok {
+				return expired
 			}
 
 			// Skip delivery

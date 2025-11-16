@@ -27,8 +27,10 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 	ch.mu.Unlock()
 
 	for _, record := range unackedMessages {
-		// Expire if needed
-		if vh.handleTTLExpiration(record.Message, vh.Queues[record.QueueName]) {
+		vh.mu.Lock()
+		q := vh.Queues[record.QueueName]
+		vh.mu.Unlock()
+		if q != nil && vh.handleTTLExpiration(record.Message, q) {
 			continue
 		}
 		if requeue {
