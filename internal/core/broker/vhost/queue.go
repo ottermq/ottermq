@@ -65,6 +65,37 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 				q.count--
 				q.mu.Unlock()
 
+				// Verify if TTL is enabled
+				if vh.ActiveExtensions["ttl"] && vh.TTLManager != nil {
+					// Verify message expiration before delivery
+					expired, err := vh.TTLManager.CheckExpiration(&msg, q)
+					if err != nil && err != ErrNoTTLConfigured {
+						log.Error().Err(err).Str("queue", q.Name).Str("msg_id", msg.ID).Msg("Error checking message expiration")
+					}
+					if expired {
+						// verify if dlx argument is configured
+						if vh.ActiveExtensions["dlx"] && vh.DeadLetterer != nil {
+							vh.mu.Lock()
+							args := q.Props.Arguments
+							vh.mu.Unlock()
+							dlx, dlxExists := args["x-dead-letter-exchange"].(string)
+
+							if dlxExists && dlx != "" {
+								err := vh.DeadLetterer.DeadLetter(msg, q, REASON_REJECTED)
+								if err == nil {
+									log.Debug().Msg("Dead-lettering succeeded")
+									continue
+								}
+								log.Error().Err(err).Msg("Dead-lettering failed")
+							}
+						}
+
+						// Skip delivery
+						// message is discarded due to expiration
+						continue
+					}
+				}
+
 				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
 				consumers := vh.GetActiveConsumersForQueue(q.Name)
 
