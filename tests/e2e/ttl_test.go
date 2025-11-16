@@ -491,6 +491,10 @@ func TestTTL_PersistentMessage_DeadLettered(t *testing.T) {
 	// Wait for expiration
 	time.Sleep(200 * time.Millisecond)
 
+	// Try to consume from main queue to trigger lazy expiration check
+	mainMsgs := tc.StartConsumer(mainQueue.Name, "", true)
+	tc.ExpectNoMessage(mainMsgs, 500*time.Millisecond)
+
 	// Check DLQ
 	dlqMsgs := tc.StartConsumer(dlq.Name, "", false)
 	deadMsg, ok := tc.ConsumeWithTimeout(dlqMsgs, 2*time.Second)

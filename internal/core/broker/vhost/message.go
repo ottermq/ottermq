@@ -233,19 +233,24 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
 func (vh *VHost) GetMessage(queueName string) *Message {
 	vh.mu.Lock()
-	defer vh.mu.Unlock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
+		vh.mu.Unlock()
 		log.Error().Str("queue", queueName).Msg("Queue not found")
 		return nil
 	}
 	msg := queue.Pop()
 	if msg == nil {
+		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")
 		return nil
 	}
+	// Must unlock before handleTTLExpiration which may call Publish (DLX)
+	vh.mu.Unlock()
+
 	// verify the expiration
 	if vh.handleTTLExpiration(*msg, queue) {
+		log.Debug().Str("queue", queueName).Str("msg_id", msg.ID).Msg("Message expired upon retrieval")
 		return nil
 	}
 	return msg
