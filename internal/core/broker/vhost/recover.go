@@ -55,13 +55,7 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 				if err != nil {
 					// Delivery failed, requeue to avoid message loss
 					log.Debug().Err(err).Msg("Failed to redeliver recovered message, requeuing")
-					vh.mu.Lock()
-					q := vh.Queues[record.QueueName]
-					vh.mu.Unlock()
-					if q != nil {
-						vh.markAsRedelivered(record.Message.ID)
-						q.Push(record.Message)
-					}
+					vh.requeueMessage(record)
 				}
 			} else {
 				// consumer no longer exists, requeue
@@ -78,6 +72,7 @@ func (vh *VHost) requeueMessage(record *DeliveryRecord) {
 	queue := vh.Queues[record.QueueName]
 	vh.mu.Unlock()
 	if queue != nil {
+		vh.handleTTLExpiration(record.Message, queue)
 		vh.markAsRedelivered(record.Message.ID)
 		queue.Push(record.Message)
 	}
