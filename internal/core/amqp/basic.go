@@ -486,7 +486,7 @@ func parseBasicQosFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: content,
 	}
-	log.Printf("[DEBUG] BasicQos fomated: %+v \n", content)
+	log.Trace().Interface("content", content).Msgf("basic.qos formatted")
 	return request, nil
 }
 
@@ -645,7 +645,7 @@ func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] BasicPublish fomated: %+v \n", msg)
+	log.Trace().Interface("msg", msg).Msg("basic.publish formatted")
 	return request, nil
 }
 
