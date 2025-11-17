@@ -342,6 +342,7 @@ func (vh *VHost) handleTTLExpiration(msg Message, q *Queue) bool {
 	return expired
 }
 
+// deleteMessage removes the message from persistence if it is persistent
 func (vh *VHost) deleteMessage(msg Message, q *Queue) {
 	if msg.Properties.DeliveryMode == amqp.PERSISTENT {
 		if vh.persist != nil {

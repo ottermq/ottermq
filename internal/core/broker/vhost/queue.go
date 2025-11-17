@@ -334,8 +334,9 @@ func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 }
 
 func (q *Queue) Push(msg Message) {
-	// Enforce maxLength if set
-	q.vh.QueueLengthLimiter.EnforceMaxLength(q)
+	if q.maxLength > 0 && q.vh != nil {
+		q.vh.QueueLengthLimiter.EnforceMaxLength(q)
+	}
 	q.push(msg)
 }
 

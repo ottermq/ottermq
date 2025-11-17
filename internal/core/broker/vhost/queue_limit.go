@@ -26,9 +26,11 @@ func (qll *DefaultQueueLengthLimiter) EnforceQueueLengthLimit(queue *Queue) {
 	for uint32(queue.count) > queue.maxLength {
 		// Remove oldest message
 		oldest := queue.popUnlocked()
-		if oldest != nil {
-			qll.vh.handleDeadLetter(queue, *oldest, REASON_MAX_LENGTH)
+		if oldest == nil {
+			break
 		}
+		qll.vh.handleDeadLetter(queue, *oldest, REASON_MAX_LENGTH)
+		qll.vh.deleteMessage(*oldest, queue)
 	}
 }
 
