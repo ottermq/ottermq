@@ -54,6 +54,7 @@ type VHostOptions struct {
 	Persistence     persistence.Persistence
 	EnableDLX       bool
 	EnableTTL       bool
+	EnableQLL       bool
 }
 
 func NewVhost(vhostName string, options VHostOptions) *VHost {
@@ -97,6 +98,12 @@ func (vh *VHost) setupExtensions(options VHostOptions) {
 		vh.TTLManager = &DefaultTTLManager{vh: vh}
 	} else {
 		vh.TTLManager = &NoOpTTLManager{}
+	}
+	if options.EnableQLL {
+		vh.ActiveExtensions["qll"] = true
+		vh.QueueLengthLimiter = &DefaultQueueLengthLimiter{vh: vh}
+	} else {
+		vh.QueueLengthLimiter = &NoOpQueueLengthLimiter{}
 	}
 }
 
