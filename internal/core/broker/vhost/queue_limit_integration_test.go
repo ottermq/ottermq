@@ -61,3 +61,103 @@ func TestMaxLengthIntegration(t *testing.T) {
 		t.Errorf("Expected queue to be empty, got length %d", queue.Len())
 	}
 }
+
+// TestMaxLengthWithDLX tests max-length with dead letter exchange
+func TestMaxLengthWithDLX(t *testing.T) {
+	// Create VHost
+	vh := &VHost{
+		Name:      "test",
+		Queues:    make(map[string]*Queue),
+		Exchanges: make(map[string]*Exchange),
+		persist:   &MockPersistence{},
+		ActiveExtensions: map[string]bool{
+			"qll": true,
+			"dlx": true,
+		},
+	}
+	vh.QueueLengthLimiter = &DefaultQueueLengthLimiter{vh: vh}
+	vh.DeadLetterer = &DeadLetter{vh: vh}
+
+	// Create DLX exchange and queue
+	dlx := &Exchange{
+		Name: "dlx",
+		Typ:  DIRECT,
+		Props: &ExchangeProperties{
+			Internal: false,
+		},
+		Bindings: map[string][]*Binding{
+			"evicted": {},
+		},
+	}
+	vh.Exchanges["dlx"] = dlx
+
+	dlq := NewQueue("dlq", 100, vh)
+	dlq.vh = vh
+	dlq.Props = &QueueProperties{Arguments: make(QueueArgs)}
+	vh.Queues["dlq"] = dlq
+
+	// Bind DLQ to DLX
+	dlx.Bindings["evicted"] = []*Binding{{Queue: dlq, RoutingKey: "evicted"}}
+
+	// Create main queue with max-length=3 and DLX
+	mainQueue := NewQueue("main-queue", 100, vh)
+	mainQueue.maxLength = 3
+	mainQueue.vh = vh
+	mainQueue.Props = &QueueProperties{
+		Arguments: QueueArgs{
+			"x-dead-letter-exchange":    "dlx",
+			"x-dead-letter-routing-key": "evicted",
+			"x-max-length":              int32(3),
+		},
+	}
+	vh.Queues["main-queue"] = mainQueue
+
+	// Push 6 messages
+	for i := range 6 {
+		msg := Message{
+			ID:         string(rune('a' + i)),
+			Body:       []byte{byte('0' + i)},
+			EnqueuedAt: time.Now(),
+			Properties: amqp.BasicProperties{},
+		}
+		mainQueue.Push(msg)
+	}
+
+	// Main queue should have 3 newest messages
+	if mainQueue.Len() != 3 {
+		t.Errorf("Expected main queue length 3, got %d", mainQueue.Len())
+	}
+
+	// DLQ should have 3 oldest evicted messages
+	if dlq.Len() != 3 {
+		t.Errorf("Expected DLQ length 3, got %d", dlq.Len())
+	}
+
+	// Verify main queue has newest messages ('d', 'e', 'f')
+	for i := range 3 {
+		msg := mainQueue.Pop()
+		if msg == nil {
+			t.Fatalf("Expected message in main queue at position %d, got nil", i)
+		}
+		expectedID := string(rune('d' + i))
+		if msg.ID != expectedID {
+			t.Errorf("Expected main queue message ID '%s', got '%s'", expectedID, msg.ID)
+		}
+	}
+
+	// Verify DLQ has oldest messages ('a', 'b', 'c')
+	for i := range 3 {
+		msg := dlq.Pop()
+		if msg == nil {
+			t.Fatalf("Expected message in DLQ at position %d, got nil", i)
+		}
+		expectedID := string(rune('a' + i))
+		if msg.ID != expectedID {
+			t.Errorf("Expected DLQ message ID '%s', got '%s'", expectedID, msg.ID)
+		}
+		// Verify x-death headers
+		if msg.Properties.Headers == nil {
+			t.Error("Expected x-death headers in DLQ message")
+		}
+	}
+}
