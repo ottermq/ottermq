@@ -1,5 +1,7 @@
 package vhost
 
+import "github.com/rs/zerolog/log"
+
 // QueueLengthLimit (QLL) extension implementation
 
 type QueueLengthLimiter interface {
@@ -24,15 +26,32 @@ func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 		return // No max length set
 	}
 
-	concurrentCount := uint32(queue.count)
-	if concurrentCount <= queue.maxLength {
-		return // Within limit
+	currentCount := uint32(queue.count)
+	if currentCount < queue.maxLength {
+		return // Within limit - room for at least one more message
 	}
-	excess := concurrentCount - queue.maxLength
-	for range excess {
+
+	// Calculate how many messages to evict to make room for one more
+	// If we're at limit (count == maxLength), evict 1
+	// If over limit, evict (count - maxLength) + 1
+	excess := (currentCount - queue.maxLength) + 1
+
+	log.Debug().
+		Str("queue", queue.Name).
+		Uint32("current", currentCount).
+		Uint32("max_length", queue.maxLength).
+		Uint32("evicting", excess).
+		Msg("Enforcing queue length limit")
+
+	for i := uint32(0); i < excess; i++ {
 		// Remove oldest message
 		oldest := queue.popUnlocked()
 		if oldest == nil {
+			log.Warn().
+				Str("queue", queue.Name).
+				Uint32("expected", excess).
+				Uint32("evicted", i).
+				Msg("Queue became empty during enforcement")
 			break
 		}
 		qll.vh.handleDeadLetter(queue, *oldest, REASON_MAX_LENGTH)
