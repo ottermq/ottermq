@@ -180,8 +180,11 @@ func TestMaxLen_TransactionCommit(t *testing.T) {
 // TestMaxLen_RequeueRespected verifies requeued messages respect max-length
 // DISABLED: This test has race conditions related to consumer cancellation and auto-delete queues
 // The core QLL functionality is tested in other tests.
-func TestMaxLen_RequeueRespected_DISABLED(t *testing.T) {
-	t.Skip("Test disabled due to race conditions - core QLL functionality is tested elsewhere")
+func TestMaxLen_RequeueRespected(t *testing.T) {
+	t.Skip(`Test disabled: reveals missing AMQP feature - automatic requeue of unacked messages on consumer cancel.
+		When a consumer is canceled while messages are in-flight (delivered but not acked), those messages
+		should be automatically requeued. Current implementation loses them. Core QLL functionality is
+		tested and working in other tests.`)
 	tc := NewTestConnection(t, brokerURL)
 	defer tc.Close()
 
@@ -258,14 +261,18 @@ func TestMaxLen_RequeueRespected_DISABLED(t *testing.T) {
 	// Should have 3 messages in queue (requeued one was evicted or new one replaced oldest)
 	mainMsgs := tc.StartConsumer(queue.Name, "", true)
 	receivedCount := 0
+	var receivedBodies []string
 	for i := 0; i < 4; i++ { // Try to get up to 4
 		msg, ok := tc.ConsumeWithTimeout(mainMsgs, 500*time.Millisecond)
 		if !ok {
 			break
 		}
 		receivedCount++
-		t.Logf("Received: %s", msg.Body)
+		body := string(msg.Body)
+		receivedBodies = append(receivedBodies, body)
+		t.Logf("Received: %s", body)
 	}
+	t.Logf("Received messages: %v", receivedBodies)
 	assert.Equal(t, 3, receivedCount, "should have exactly 3 messages in queue")
 }
 
