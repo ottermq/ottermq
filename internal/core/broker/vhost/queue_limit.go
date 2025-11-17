@@ -6,9 +6,9 @@ type QueueLengthLimiter interface {
 	EnforceMaxLength(queue *Queue)
 }
 
-type NoOpQueueLengthLimit struct{}
+type NoOpQueueLengthLimiter struct{}
 
-func (qll *NoOpQueueLengthLimit) EnforceQueueLengthLimit(queue *Queue) {
+func (qll *NoOpQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 	// No-op
 }
 
@@ -16,7 +16,7 @@ type DefaultQueueLengthLimiter struct {
 	vh *VHost
 }
 
-func (qll *DefaultQueueLengthLimiter) EnforceQueueLengthLimit(queue *Queue) {
+func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 	queue.mu.Lock()
 	defer queue.mu.Unlock()
 
@@ -29,7 +29,7 @@ func (qll *DefaultQueueLengthLimiter) EnforceQueueLengthLimit(queue *Queue) {
 		return // Within limit
 	}
 	excess := concurrentCount - queue.maxLength
-	for i := uint32(0); i < excess; i++ {
+	for range excess {
 		// Remove oldest message
 		oldest := queue.popUnlocked()
 		if oldest == nil {
@@ -47,7 +47,7 @@ func parseMaxLengthArgument(args map[string]interface{}) (uint32, bool) {
 	}
 
 	value, ok := convertToPositiveInt64(maxLen)
-	if ok {
+	if ok && value > 0 {
 		return uint32(value), true
 	}
 	return 0, false
