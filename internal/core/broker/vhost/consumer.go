@@ -197,13 +197,20 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 		}
 	}
 	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
-		queue := vh.Queues[consumer.QueueName]
-		queue.stopDeliveryLoop()
-		// verify if the queue can be auto-deleted
-		if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
-			log.Printf("Failed to check auto-delete queue: %v", err)
-		} else if deleted {
-			log.Printf("Queue %s was auto-deleted", queue.Name)
+		queue, exists := vh.Queues[consumer.QueueName]
+		if exists {
+			// Release lock before stopping delivery loop to prevent deadlock
+			// (delivery loop may call vh.GetActiveConsumersForQueue which needs vh.mu)
+			vh.mu.Unlock()
+			queue.stopDeliveryLoop()
+			vh.mu.Lock()
+
+			// verify if the queue can be auto-deleted
+			if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
+				log.Printf("Failed to check auto-delete queue: %v", err)
+			} else if deleted {
+				log.Printf("Queue %s was auto-deleted", queue.Name)
+			}
 		}
 	}
 
