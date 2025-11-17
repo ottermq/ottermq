@@ -20,14 +20,15 @@ type DefaultQueueLengthLimiter struct {
 
 func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 	queue.mu.Lock()
-	defer queue.mu.Unlock()
 
 	if queue.maxLength == 0 {
+		queue.mu.Unlock()
 		return // No max length set
 	}
 
 	currentCount := uint32(queue.count)
 	if currentCount < queue.maxLength {
+		queue.mu.Unlock()
 		return // Within limit - room for at least one more message
 	}
 
@@ -43,8 +44,9 @@ func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 		Uint32("evicting", excess).
 		Msg("Enforcing queue length limit")
 
+	// Pop all messages that need to be evicted while holding the lock
+	evictedMessages := make([]Message, 0, excess)
 	for i := range excess {
-		// Remove oldest message
 		oldest := queue.popUnlocked()
 		if oldest == nil {
 			log.Warn().
@@ -54,8 +56,17 @@ func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 				Msg("Queue became empty during enforcement")
 			break
 		}
-		qll.vh.handleDeadLetter(queue, *oldest, REASON_MAX_LENGTH)
-		qll.vh.deleteMessage(*oldest, queue)
+		evictedMessages = append(evictedMessages, *oldest)
+	}
+
+	// Release the queue lock BEFORE calling external functions that may acquire other locks
+	// This prevents deadlock with vh.mu in handleDeadLetter
+	queue.mu.Unlock()
+
+	// Process evicted messages without holding queue.mu
+	for _, msg := range evictedMessages {
+		qll.vh.handleDeadLetter(queue, msg, REASON_MAX_LENGTH)
+		qll.vh.deleteMessage(msg, queue)
 	}
 }
 
