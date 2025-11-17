@@ -23,7 +23,13 @@ func (qll *DefaultQueueLengthLimiter) EnforceQueueLengthLimit(queue *Queue) {
 	if queue.maxLength == 0 {
 		return // No max length set
 	}
-	for uint32(queue.count) > queue.maxLength {
+
+	concurrentCount := uint32(queue.count)
+	if concurrentCount <= queue.maxLength {
+		return // Within limit
+	}
+	excess := concurrentCount - queue.maxLength
+	for i := uint32(0); i < excess; i++ {
 		// Remove oldest message
 		oldest := queue.popUnlocked()
 		if oldest == nil {
