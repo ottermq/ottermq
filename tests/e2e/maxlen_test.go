@@ -29,7 +29,7 @@ func TestMaxLen_BasicOverflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Publish 10 messages
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		err = tc.Ch.Publish("", queue.Name, false, false, amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(fmt.Sprintf("message-%d", i)),
