@@ -210,9 +210,10 @@ func TestDefaultQueueLengthLimiter_EnforceMaxLength_ExactLimit(t *testing.T) {
 
 	limiter.EnforceMaxLength(queue)
 
-	// All messages should remain
-	if queue.count != 10 {
-		t.Errorf("Expected count 10, got %d", queue.count)
+	// Should evict 1 message to make room for incoming message
+	// Leaving 9 messages in queue (ready to accept one more)
+	if queue.count != 9 {
+		t.Errorf("Expected count 9 after enforcement (to make room), got %d", queue.count)
 	}
 }
 
@@ -248,16 +249,18 @@ func TestDefaultQueueLengthLimiter_EnforceMaxLength_OverLimit(t *testing.T) {
 
 	limiter.EnforceMaxLength(queue)
 
-	// Should have exactly 5 messages remaining
-	if queue.count != 5 {
-		t.Errorf("Expected count 5 after enforcement, got %d", queue.count)
+	// Should evict 6 messages: (10 - 5) + 1 = 6 to evict
+	// Leaving 4 messages in queue (ready to accept one more to reach limit of 5)
+	if queue.count != 4 {
+		t.Errorf("Expected count 4 after enforcement (to make room), got %d", queue.count)
 	}
 
-	// Verify the oldest messages were removed
+	// Verify the 6 oldest messages ('a' to 'f') were removed
+	// Remaining should be 'g', 'h', 'i', 'j'
 	remainingMsg := <-queue.messages
 	queue.count--
-	if remainingMsg.ID != "f" { // 'a' to 'e' should be removed, 'f' should be first
-		t.Errorf("Expected oldest remaining message to have ID 'f', got '%s'", remainingMsg.ID)
+	if remainingMsg.ID != "g" { // 'a' to 'f' removed, 'g' should be first
+		t.Errorf("Expected oldest remaining message to have ID 'g', got '%s'", remainingMsg.ID)
 	}
 }
 
@@ -314,9 +317,10 @@ func TestDefaultQueueLengthLimiter_EnforceMaxLength_LargeExcess(t *testing.T) {
 
 	limiter.EnforceMaxLength(queue)
 
-	// Should have exactly 10 messages remaining
-	if queue.count != 10 {
-		t.Errorf("Expected count 10 after enforcement, got %d", queue.count)
+	// Should evict 91 messages: (100 - 10) + 1 = 91
+	// Leaving 9 messages in queue (ready to accept one more)
+	if queue.count != 9 {
+		t.Errorf("Expected count 9 after enforcement (to make room), got %d", queue.count)
 	}
 }
 
