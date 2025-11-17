@@ -42,8 +42,9 @@ type VHost struct {
 	ChannelTransactions map[ConnectionChannelKey]*ChannelTransactionState
 
 	// Dead letter handler
-	DeadLetterer DeadLetterer
-	TTLManager   TTLManager
+	DeadLetterer       DeadLetterer
+	TTLManager         TTLManager
+	QueueLengthLimiter QueueLengthLimiter
 
 	ActiveExtensions map[string]bool
 }
@@ -158,7 +159,7 @@ func (vh *VHost) loadPersistedState() {
 			skippedQueues[queue.Name] = true
 			continue
 		}
-		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize)
+		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize, vh)
 		vh.Queues[queue.Name].Props = &QueueProperties{
 			Durable:    queue.Properties.Durable,
 			AutoDelete: queue.Properties.AutoDelete,

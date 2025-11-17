@@ -10,7 +10,7 @@ import (
 
 func TestQueueCapacityExceeds1000(t *testing.T) {
 	// Create a test queue with a buffer size of 100000
-	queue := NewQueue("testQueue", 100000)
+	queue := NewQueue("testQueue", 100000, nil)
 
 	// Try to push more than 1000 messages
 	t.Logf("Starting to push 2000 messages to queue...")
@@ -55,7 +55,7 @@ func TestDeleteQueue_AutoDeleteDirectExchange(t *testing.T) {
 	}
 	vh.Exchanges["ex_direct"] = ex
 	// Create queue and bind (use NewQueue to avoid nil channel)
-	q := NewQueue("q_direct", 10)
+	q := NewQueue("q_direct", 10, vh)
 	vh.Queues["q_direct"] = q
 	ex.Bindings["rk"] = []*Binding{{Queue: q}}
 
@@ -85,7 +85,7 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 	}
 	vh.Exchanges["ex_fanout"] = ex
 	// Create queue and bind (use NewQueue to avoid nil channel)
-	q := NewQueue("q_fanout", 10)
+	q := NewQueue("q_fanout", 10, vh)
 	vh.Queues["q_fanout"] = q
 	ex.Bindings[""] = []*Binding{{Queue: q}}
 

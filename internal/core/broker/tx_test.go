@@ -28,7 +28,7 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 	vh := vhost.NewVhost("test-vhost", options)
 
 	// Create a test queue
-	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100)
+	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100, vh)
 	vh.Queues["test-queue"].Props = &vhost.QueueProperties{
 		Passive:    false,
 		Durable:    false,

@@ -22,10 +22,15 @@ type Queue struct {
 	count     int              `json:"-"`
 	mu        sync.Mutex       `json:"-"`
 	OwnerConn net.Conn         `json:"-"`
+
+	vh *VHost `json:"-"` // Reference to parent VHost
 	/* Delivery */
 	deliveryCtx    context.Context    `json:"-"`
 	deliveryCancel context.CancelFunc `json:"-"`
 	delivering     bool
+
+	/* Extension */
+	maxLength uint32 `json:"-"`
 }
 
 type QueueProperties struct {
@@ -36,7 +41,7 @@ type QueueProperties struct {
 	Arguments  QueueArgs `json:"arguments"`
 }
 
-func NewQueue(name string, bufferSize int) *Queue {
+func NewQueue(name string, bufferSize int, vh *VHost) *Queue {
 
 	return &Queue{
 		Name:       name,
@@ -44,6 +49,8 @@ func NewQueue(name string, bufferSize int) *Queue {
 		messages:   make(chan Message, bufferSize),
 		count:      0,
 		delivering: false,
+		maxLength:  0,
+		vh:         vh,
 	}
 }
 
@@ -200,7 +207,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 		props = NewQueueProperties()
 	}
 	// DLX properties comes directly from arguments: single source of truth
-	queue := NewQueue(name, vh.queueBufferSize)
+	queue := NewQueue(name, vh.queueBufferSize, vh)
 	queue.Props = props
 
 	if props.Exclusive {
@@ -214,8 +221,22 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 		}
 	}
 
+	setQueueMaxLength(props, queue, name)
+
 	log.Debug().Str("queue", name).Msg("Created queue")
 	return queue, nil
+}
+
+// setQueueMaxLength sets the maxLength field of the queue based on its properties
+func setQueueMaxLength(props *QueueProperties, queue *Queue, name string) {
+	if props.Arguments == nil {
+		queue.maxLength = 0
+		return
+	}
+	if maxLen, ok := parseMaxLengthArgument(props.Arguments); ok {
+		queue.maxLength = maxLen
+		log.Debug().Str("queue", name).Uint32("max_length", queue.maxLength).Msg("Set max length for queue")
+	}
 }
 
 func NewQueueProperties() *QueueProperties {
@@ -313,6 +334,12 @@ func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 }
 
 func (q *Queue) Push(msg Message) {
+	// Enforce maxLength if set
+	q.vh.QueueLengthLimiter.EnforceMaxLength(q)
+	q.push(msg)
+}
+
+func (q *Queue) push(msg Message) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {

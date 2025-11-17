@@ -23,8 +23,9 @@ type Config struct {
 	QueueBufferSize      int
 
 	// Extensions
-	EnableDLX bool
-	EnableTTL bool
+	EnableDLX bool // Dead-Letter Exchange
+	EnableTTL bool // Time-To-Live
+	EnableQLL bool // Queue Length Limit
 
 	// Plugins
 	EnableWebAPI  bool
@@ -60,6 +61,7 @@ func LoadConfig(version string) *Config {
 
 		EnableDLX: getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
 		EnableTTL: getEnvAsBool("OTTERMQ_ENABLE_TTL", true),
+		EnableQLL: getEnvAsBool("OTTERMQ_ENABLE_QLL", true),
 
 		EnableWebAPI:  getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
 		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
