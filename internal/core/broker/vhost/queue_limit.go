@@ -43,7 +43,7 @@ func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 		Uint32("evicting", excess).
 		Msg("Enforcing queue length limit")
 
-	for i := uint32(0); i < excess; i++ {
+	for i := range excess {
 		// Remove oldest message
 		oldest := queue.popUnlocked()
 		if oldest == nil {
