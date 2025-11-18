@@ -477,7 +477,7 @@ func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint
 
 ---
 
-### 👉 Phase 4: Implement Consumer Cancel Requeue (30 minutes)
+### ✅ Phase 4: Implement Consumer Cancel Requeue (30 minutes)
 
 **File:** `internal/core/broker/vhost/consumer.go`
 
@@ -607,11 +607,12 @@ func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumer
 
 ---
 
-### Phase 5: Update Tests (60 minutes)
+### ✅ Phase 5: Update Tests (60 minutes)
 
 #### Files to Update
 
 **Test files requiring structure updates:**
+
 - `ack_test.go`: 8 test functions
 - `nack_test.go`: 6 test functions  
 - `recover_test.go`: 4 test functions

@@ -123,7 +123,7 @@ func (vh *VHost) GetUnackedMessageCountsAllQueues() map[string]int {
 	counts := make(map[string]int)
 	for _, channelState := range vh.ChannelDeliveries {
 		channelState.mu.Lock()
-		for _, record := range channelState.Unacked {
+		for _, record := range channelState.UnackedByTag {
 			counts[record.QueueName]++
 		}
 		channelState.mu.Unlock()
@@ -143,7 +143,7 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	}
 
 	channelState.mu.Lock()
-	count := len(channelState.Unacked)
+	count := len(channelState.UnackedByTag)
 	channelState.mu.Unlock()
 
 	return count
