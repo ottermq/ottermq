@@ -175,7 +175,6 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
 	tag1 := ch.LastDeliveryTag
-	// ch.Unacked[tag1] = &DeliveryRecord{DeliveryTag: tag1}
 	ch.UnackedByTag[tag1] = &DeliveryRecord{DeliveryTag: tag1}
 	if ch.UnackedByConsumer[c.Tag] == nil {
 		ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)

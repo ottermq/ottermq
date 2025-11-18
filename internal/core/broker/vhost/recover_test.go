@@ -48,7 +48,6 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	}
 	ch.UnackedByConsumer["ctag1"][1] = record
 
-	//
 	record2 := &DeliveryRecord{
 		DeliveryTag: 2,
 		ConsumerTag: "ctag1",
