@@ -19,11 +19,11 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 	}
 
 	ch.mu.Lock()
-	unackedMessages := make([]*DeliveryRecord, 0, len(ch.Unacked))
-	for _, record := range ch.Unacked {
-		unackedMessages = append(unackedMessages, record)
-	}
-	ch.Unacked = make(map[uint64]*DeliveryRecord)
+	unackedMessages := fetchUnackedMessages(ch)
+
+	// Clear both indexes
+	ch.UnackedByConsumer = make(map[string]map[uint64]*DeliveryRecord)
+	ch.UnackedByTag = make(map[uint64]*DeliveryRecord)
 	ch.mu.Unlock()
 
 	for _, record := range unackedMessages {

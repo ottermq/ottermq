@@ -221,7 +221,7 @@ func (vh *VHost) shouldThrottle(consumer *Consumer, channelState *ChannelDeliver
 
 func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint16 {
 	channelState.mu.Lock()
-	unackedCount := len(channelState.Unacked)
+	unackedCount := len(channelState.UnackedByTag)
 	channelState.mu.Unlock()
 	return uint16(unackedCount)
 }
@@ -229,18 +229,17 @@ func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint
 func (vh *VHost) getUnackedCountConsumer(channelState *ChannelDeliveryState, consumer *Consumer) uint16 {
 	channelState.mu.Lock()
 	defer channelState.mu.Unlock()
-	unackedCount := 0
-	for _, record := range channelState.Unacked {
-		if record.ConsumerTag == consumer.Tag {
-			unackedCount++
-		}
+	consumerMap, exists := channelState.UnackedByConsumer[consumer.Tag]
+	if !exists {
+		return 0
 	}
-	return uint16(unackedCount)
+	return uint16(len(consumerMap))
 }
 
 func (vh *VHost) getChannelDeliveryState(connection net.Conn, channel uint16) *ChannelDeliveryState {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
 	key := ConnectionChannelKey{connection, channel}
 	return vh.ChannelDeliveries[key]
 }

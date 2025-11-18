@@ -357,9 +357,9 @@ if track {
 
 ---
 
-### 👉 Phase 3: Update Read Operations (45 minutes)
+### ✅ Phase 3: Update Read Operations (45 minutes)
 
-#### Step 3.1: Iterate all in `CleanupChannel()`
+#### ✅ Step 3.1: Iterate all in `CleanupChannel()`
 
 **File:** `internal/core/broker/vhost/consumer.go` (~line 262)
 
@@ -385,7 +385,7 @@ for _, consumerMap := range state.UnackedByConsumer {
 }
 ```
 
-#### Step 3.2: Iterate all in `HandleBasicRecover()`
+#### ✅ Step 3.2: Iterate all in `HandleBasicRecover()`
 
 **File:** `internal/core/broker/vhost/recover.go` (~line 22)
 
@@ -420,7 +420,7 @@ ch.UnackedByTag = make(map[uint64]*DeliveryRecord)
 ch.mu.Unlock()
 ```
 
-#### Step 3.3: Count unacked by consumer (QoS enforcement)
+#### ✅ Step 3.3: Count unacked by consumer (QoS enforcement)
 
 **File:** `internal/core/broker/vhost/delivery.go` (~line 206)
 
@@ -452,7 +452,7 @@ func (vh *VHost) getUnackedCountConsumer(channelState *ChannelDeliveryState, con
 }
 ```
 
-#### Step 3.4: Count all unacked (channel-level QoS)
+#### ✅ Step 3.4: Count all unacked (channel-level QoS)
 
 **File:** `internal/core/broker/vhost/delivery.go` (~line 198)
 
@@ -477,11 +477,11 @@ func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint
 
 ---
 
-### Phase 4: Implement Consumer Cancel Requeue (30 minutes)
+### 👉 Phase 4: Implement Consumer Cancel Requeue (30 minutes)
 
 **File:** `internal/core/broker/vhost/consumer.go`
 
-#### Step 4.1: Add requeue logic to `CancelConsumer()`
+#### ✅ Step 4.1: Add requeue logic to `CancelConsumer()`
 
 ```go
 func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
@@ -546,7 +546,7 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 }
 ```
 
-#### Step 4.2: Add helper function `requeueUnackedForConsumer()`
+#### ✅ Step 4.2: Add helper function `requeueUnackedForConsumer()`
 
 ```go
 // requeueUnackedForConsumer requeues all unacked messages for a specific consumer.
