@@ -238,7 +238,7 @@ func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumer
 	state.mu.Lock()
 
 	consumerUnacked := state.UnackedByConsumer[consumerTag]
-	if consumerUnacked == nil || len(consumerUnacked) == 0 {
+	if len(consumerUnacked) == 0 {
 		state.mu.Unlock()
 		return // No unacked messages for this consumer
 	}
