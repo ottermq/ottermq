@@ -251,7 +251,7 @@ func TestConsumerCancel_NoAckConsumer_NoRequeue(t *testing.T) {
 	}
 
 	// Should only get 2 messages (the 3 auto-acked ones are gone)
-	// Note: Due to delivery loop behavior, we might get 0 if the queue stops delivering
+	// Note: Due to delivery loop behavior, we might get anywhere from 0 to 2 messages (3 were auto-acked and removed)
 	assert.LessOrEqual(t, receivedCount, 2, "should receive at most 2 remaining messages (3 were auto-acked)")
 }
 
