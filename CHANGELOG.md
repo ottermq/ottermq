@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AMQP Spec Compliance**: Consumer cancel now properly requeues all unacked messages with redelivered flag set
 - **Race Conditions**: Fixed multiple race conditions in queue delivery loop and consumer cancellation
 - **Deadlocks**: Resolved deadlock in message publishing path when enforcing queue length limits
-- Test `TestMaxLen_RequeueRespected` re-enabled and passing after implementing missing AMQP feature
+- Test `TestMaxLen_RequeueRespected` re-enabled and passing after implementing consumer cancel auto-requeue feature
 - Test `TestHandleBasicNack_Multiple_Boundary_DiscardPersistent` fixed by correcting queue name mismatch
 
 ### Changed
