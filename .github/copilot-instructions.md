@@ -124,3 +124,48 @@ PR checklist for protocol changes:
 - [ ] Added/updated notes on limitations, TODOs, or partial compliance
 - [ ] Cross-referenced the related code areas (`internal/core/amqp/*`, `internal/core/broker/*`) where applicable
 - [ ] If API or UI behavior changed, ensured Swagger docs (`make docs`) and any UI docs are updated
+
+## CHANGELOG Management
+
+Starting from the time of this documentation update, OtterMQ uses `CHANGELOG.md` to track all notable changes following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+
+**Historical Context:**
+- Prior to this resolution (through v0.13.0), release notes were maintained exclusively in [GitHub Release descriptions](https://github.com/ottermq/ottermq/releases)
+- The `CHANGELOG.md` file now serves as the single source of truth for change documentation
+- Historical releases (v0.13.0 and earlier) have been backfilled into `CHANGELOG.md` from GitHub releases
+
+**Workflow for Changes:**
+1. **During Development**: Update the `[Unreleased]` section in `CHANGELOG.md` as features/fixes are implemented
+2. **Before Release**: Move unreleased changes to a new version section with the release date
+3. **On Release**: 
+   - Create GitHub Release with the same notes from CHANGELOG.md
+   - Tag the release version
+   - Update version links at the bottom of CHANGELOG.md
+
+**CHANGELOG Structure:**
+```markdown
+## [Unreleased]
+### Added
+- New features
+
+### Changed
+- Changes to existing functionality
+
+### Fixed
+- Bug fixes
+
+### Performance
+- Performance improvements (when significant)
+
+## [X.Y.Z] - YYYY-MM-DD
+### Added
+...
+```
+
+**PR Checklist for Contributors:**
+- [ ] Updated `CHANGELOG.md` under the `[Unreleased]` section
+- [ ] Categorized changes appropriately (Added/Changed/Fixed/Performance)
+- [ ] Used descriptive bullet points with context (not just "fixed bug")
+- [ ] Referenced issue numbers where applicable
+
+When working on features or bug fixes, always update the CHANGELOG.md file to maintain project history and ease release preparation.

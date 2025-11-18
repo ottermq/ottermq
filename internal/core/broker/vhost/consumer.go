@@ -188,6 +188,12 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	consumer.Active = false
 	delete(vh.Consumers, key)
 
+	// Requeue unacked messages for this consumer
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	if state := vh.ChannelDeliveries[channelKey]; state != nil {
+		vh.requeueUnackedForConsumer(state, consumer.Tag, consumer.QueueName)
+	}
+
 	// Remove from ConsumersByQueue
 	consumersForQueue := vh.ConsumersByQueue[consumer.QueueName]
 	for i, c := range consumersForQueue {
@@ -199,8 +205,6 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
 		queue, exists := vh.Queues[consumer.QueueName]
 		if exists {
-			// Release lock before stopping delivery loop to prevent deadlock
-			// (delivery loop may call vh.GetActiveConsumersForQueue which needs vh.mu)
 			vh.mu.Unlock()
 			queue.stopDeliveryLoop()
 			vh.mu.Lock()
@@ -215,7 +219,7 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	}
 
 	// Remove from ConsumersByChannel (connection-scoped)
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	channelKey = ConnectionChannelKey{consumer.Connection, consumer.Channel}
 	consumersForChannel := vh.ConsumersByChannel[channelKey]
 	for i, c := range consumersForChannel {
 		if c.Tag == tag {
@@ -225,6 +229,59 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	}
 
 	return nil
+}
+
+// requeueUnackedForConsumer requeues all unacked messages for a specific consumer.
+// This is called when a consumer is canceled per AMQP spec.
+// The vh.mu lock MUST be held by caller.
+func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumerTag, queueName string) {
+	state.mu.Lock()
+
+	consumerUnacked := state.UnackedByConsumer[consumerTag]
+	if len(consumerUnacked) == 0 {
+		state.mu.Unlock()
+		return // No unacked messages for this consumer
+	}
+
+	// retrieve from nested index
+	delete(state.UnackedByConsumer, consumerTag)
+
+	// Remove from flat index
+	for deliveryTag := range consumerUnacked {
+		delete(state.UnackedByTag, deliveryTag)
+	}
+
+	// Copy recordsToRequeue for processing outside lock
+	recordsToRequeue := make([]*DeliveryRecord, 0, len(consumerUnacked))
+	for _, record := range consumerUnacked {
+		recordsToRequeue = append(recordsToRequeue, record)
+	}
+	state.mu.Unlock()
+
+	// Requeue messages (outside state lock to avoid deadlock with queue.Push)
+	queue, exists := vh.Queues[queueName]
+	if !exists {
+		log.Warn().
+			Str("consumer", consumerTag).
+			Str("queue", queueName).
+			Int("count", len(recordsToRequeue)).
+			Msg("Cannot requeue unacked messages: queue not found")
+		return
+	}
+
+	log.Debug().
+		Str("consumer", consumerTag).
+		Str("queue", queueName).
+		Int("count", len(recordsToRequeue)).
+		Msg("Requeuing unacked messages for canceled consumer")
+
+	for _, record := range recordsToRequeue {
+		// Mark as redelivered for next delivery
+		vh.markAsRedelivered(record.Message.ID)
+
+		// requeue to original queue
+		queue.Push(record.Message)
+	}
 }
 
 // checkAutoDeleteQueueUnlocked checks if a queue is auto-delete and has no consumers, and deletes it if so.
@@ -258,15 +315,12 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 
 	if state := vh.ChannelDeliveries[channelKey]; state != nil {
 		state.mu.Lock()
-		// copy records to avoid modification during iteration
-		records := make([]*DeliveryRecord, 0, len(state.Unacked))
-		for _, record := range state.Unacked {
-			records = append(records, record)
-		}
+		unackedMessages := fetchUnackedMessages(state)
+
 		state.mu.Unlock()
 
 		// Requeue unacknowledged messages
-		for _, record := range records {
+		for _, record := range unackedMessages {
 			queue, exists := vh.Queues[record.QueueName]
 			if exists {
 				queue.Push(record.Message)
@@ -285,6 +339,23 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 		txState.Unlock()
 		delete(vh.ChannelTransactions, channelKey)
 	}
+}
+
+// fetchUnackedMessages retrieves all unacknowledged delivery records from the channel delivery state.
+func fetchUnackedMessages(state *ChannelDeliveryState) []*DeliveryRecord {
+	// Count total unacked messages
+	totalUnacked := 0
+	for _, consumeMap := range state.UnackedByConsumer {
+		totalUnacked += len(consumeMap)
+	}
+
+	records := make([]*DeliveryRecord, 0, totalUnacked)
+	for _, consumeMap := range state.UnackedByConsumer {
+		for _, record := range consumeMap {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 func cancelAllConsumers(vh *VHost, channelKey ConnectionChannelKey) bool {
