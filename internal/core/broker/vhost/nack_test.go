@@ -100,7 +100,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Register consumer
-	c := newTestConsumer(conn, 2, "q-noack", false)
+	c := newTestConsumer(conn, 2, "q1", false)
 
 	// tags 1..4, mark 1 and 2 as persistent to check deletion
 	msgs := []Message{
