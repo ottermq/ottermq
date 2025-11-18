@@ -18,9 +18,16 @@ type DeliveryRecord struct {
 }
 
 type ChannelDeliveryState struct {
-	mu                    sync.Mutex
-	LastDeliveryTag       uint64
-	Unacked               map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
+	mu              sync.Mutex
+	LastDeliveryTag uint64
+
+	// Dual-index for unacked messages
+	// Primary index: nested by consumer tag for O(1) lookups when acknowledging
+	UnackedByConsumer map[string]map[uint64]*DeliveryRecord // consumerTag -> (deliveryTag -> DeliveryRecord)
+
+	// Secondary index: flat map for O(1) deliveryTag lookups (ack/nack)
+	UnackedByTag map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
+
 	GlobalPrefetchCount   uint16
 	NextPrefetchCount     uint16 // to be applied on the next consumer start
 	PrefetchGlobal        bool
@@ -86,14 +93,29 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 
 	track := !consumer.Props.NoAck // only track when manual ack is required
 	if track {
-		ch.Unacked[tag] = &DeliveryRecord{
+		record := &DeliveryRecord{
 			DeliveryTag: tag,
 			ConsumerTag: consumer.Tag,
 			QueueName:   consumer.QueueName,
 			Message:     msg,
 			Persistent:  msg.Properties.DeliveryMode == amqp.PERSISTENT,
 		}
+
+		// Dual-index: add to both maps
+		ch.UnackedByTag[tag] = record
+
+		if ch.UnackedByConsumer[consumer.Tag] == nil {
+			ch.UnackedByConsumer[consumer.Tag] = make(map[uint64]*DeliveryRecord)
+		}
+		ch.UnackedByConsumer[consumer.Tag][tag] = record
+
+		log.Debug().
+			Uint64("delivery_tag", tag).
+			Str("consumer", consumer.Tag).
+			Str("queue", consumer.QueueName).
+			Msg("Tracking delivery for manual ack")
 	}
+
 	ch.mu.Unlock()
 	amqpMsg := msg.ToAMQPMessage()
 	// Create frames and append them as a single slice
@@ -113,7 +135,8 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 		log.Error().Err(err).Msg("Failed to send frames")
 		if track {
 			ch.mu.Lock()
-			delete(ch.Unacked, tag)
+			deleteUnackedDelivery(ch, tag, consumer.Tag)
+
 			ch.mu.Unlock()
 		}
 		return err
@@ -138,9 +161,10 @@ func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *Ch
 	ch := vh.ChannelDeliveries[channelKey]
 	if ch == nil {
 		ch = &ChannelDeliveryState{
-			Unacked:        make(map[uint64]*DeliveryRecord),
-			unackedChanged: make(chan struct{}, 1),
-			FlowActive:     true,
+			UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+			UnackedByTag:      make(map[uint64]*DeliveryRecord),
+			unackedChanged:    make(chan struct{}, 1),
+			FlowActive:        true,
 		}
 		vh.ChannelDeliveries[channelKey] = ch
 	}
@@ -197,7 +221,7 @@ func (vh *VHost) shouldThrottle(consumer *Consumer, channelState *ChannelDeliver
 
 func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint16 {
 	channelState.mu.Lock()
-	unackedCount := len(channelState.Unacked)
+	unackedCount := len(channelState.UnackedByTag)
 	channelState.mu.Unlock()
 	return uint16(unackedCount)
 }
@@ -205,18 +229,17 @@ func (vh *VHost) getUnackedCountChannel(channelState *ChannelDeliveryState) uint
 func (vh *VHost) getUnackedCountConsumer(channelState *ChannelDeliveryState, consumer *Consumer) uint16 {
 	channelState.mu.Lock()
 	defer channelState.mu.Unlock()
-	unackedCount := 0
-	for _, record := range channelState.Unacked {
-		if record.ConsumerTag == consumer.Tag {
-			unackedCount++
-		}
+	consumerMap, exists := channelState.UnackedByConsumer[consumer.Tag]
+	if !exists {
+		return 0
 	}
-	return uint16(unackedCount)
+	return uint16(len(consumerMap))
 }
 
 func (vh *VHost) getChannelDeliveryState(connection net.Conn, channel uint16) *ChannelDeliveryState {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
 	key := ConnectionChannelKey{connection, channel}
 	return vh.ChannelDeliveries[key]
 }
@@ -226,18 +249,30 @@ func (ch *ChannelDeliveryState) TrackDelivery(noAck bool, msg *Message, queue st
 	defer ch.mu.Unlock()
 	ch.LastDeliveryTag++
 	deliveryTag := ch.LastDeliveryTag
+	consumerTag := BASIC_GET_SENTINEL // Basic.Get uses sentinel value
 
 	// Track the delivery if manual ack is required
 	if !noAck {
 		record := &DeliveryRecord{
 			DeliveryTag: deliveryTag,
-			ConsumerTag: "",
+			ConsumerTag: consumerTag,
 			Message:     *msg,
 			QueueName:   queue,
 			Persistent:  msg.Properties.DeliveryMode == amqp.PERSISTENT,
 		}
-		ch.Unacked[deliveryTag] = record
-		log.Debug().Uint64("delivery_tag", deliveryTag).Msg("Tracking Basic.Get delivery for manual ack")
+		// Dual-index: add to both maps
+		ch.UnackedByTag[deliveryTag] = record
+
+		if ch.UnackedByConsumer[consumerTag] == nil {
+			ch.UnackedByConsumer[consumerTag] = make(map[uint64]*DeliveryRecord)
+		}
+		ch.UnackedByConsumer[consumerTag][deliveryTag] = record
+
+		log.Debug().
+			Uint64("delivery_tag", deliveryTag).
+			Str("consumer", consumerTag).
+			Str("queue", queue).
+			Msg("Tracking Basic.Get delivery for manual ack")
 	}
 	return deliveryTag
 }

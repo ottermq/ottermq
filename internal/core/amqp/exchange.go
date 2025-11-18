@@ -125,7 +125,7 @@ func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
+	log.Trace().Interface("msg", msg).Msg("exchange.declare formatted")
 	return request, nil
 }
 
@@ -168,6 +168,6 @@ func parseExchangeDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
+	log.Trace().Interface("msg", msg).Msg("exchange.delete formatted")
 	return request, nil
 }

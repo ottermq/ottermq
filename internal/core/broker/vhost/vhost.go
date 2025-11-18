@@ -12,6 +12,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// BASIC_GET_SENTINEL is used as the ConsumerTag for deliveries made via Basic.Get
+	// (synchronous pull mode) which don't have an associated consumer. This allows
+	// us to track these deliveries separately in the dual-index UnackedByConsumer map.
+	BASIC_GET_SENTINEL = "__basic_get__"
+)
+
 type VHost struct {
 	Name               string                     `json:"name"`
 	Id                 string                     `json:"id"`
@@ -54,6 +61,7 @@ type VHostOptions struct {
 	Persistence     persistence.Persistence
 	EnableDLX       bool
 	EnableTTL       bool
+	EnableQLL       bool
 }
 
 func NewVhost(vhostName string, options VHostOptions) *VHost {
@@ -98,6 +106,12 @@ func (vh *VHost) setupExtensions(options VHostOptions) {
 	} else {
 		vh.TTLManager = &NoOpTTLManager{}
 	}
+	if options.EnableQLL {
+		vh.ActiveExtensions["qll"] = true
+		vh.QueueLengthLimiter = &DefaultQueueLengthLimiter{vh: vh}
+	} else {
+		vh.QueueLengthLimiter = &NoOpQueueLengthLimiter{}
+	}
 }
 
 func (vh *VHost) SetFramer(framer amqp.Framer) {
@@ -116,7 +130,7 @@ func (vh *VHost) GetUnackedMessageCountsAllQueues() map[string]int {
 	counts := make(map[string]int)
 	for _, channelState := range vh.ChannelDeliveries {
 		channelState.mu.Lock()
-		for _, record := range channelState.Unacked {
+		for _, record := range channelState.UnackedByTag {
 			counts[record.QueueName]++
 		}
 		channelState.mu.Unlock()
@@ -136,7 +150,7 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	}
 
 	channelState.mu.Lock()
-	count := len(channelState.Unacked)
+	count := len(channelState.UnackedByTag)
 	channelState.mu.Unlock()
 
 	return count

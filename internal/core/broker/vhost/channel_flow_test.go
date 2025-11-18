@@ -221,12 +221,17 @@ func TestShouldThrottle_FlowAndQoS(t *testing.T) {
 	channelState.FlowActive = true
 	channelState.mu.Lock()
 	for i := uint64(1); i <= 5; i++ {
-		channelState.Unacked[i] = &DeliveryRecord{
+		record := &DeliveryRecord{
 			DeliveryTag: i,
 			ConsumerTag: consumer.Tag,
 			QueueName:   consumer.QueueName,
 			Message:     Message{ID: "test"},
 		}
+		channelState.UnackedByTag[i] = record
+		if channelState.UnackedByConsumer[consumer.Tag] == nil {
+			channelState.UnackedByConsumer[consumer.Tag] = make(map[uint64]*DeliveryRecord)
+		}
+		channelState.UnackedByConsumer[consumer.Tag][i] = record
 	}
 	channelState.mu.Unlock()
 

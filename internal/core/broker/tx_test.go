@@ -314,11 +314,12 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
-		Unacked:         make(map[uint64]*vhost.DeliveryRecord),
-		LastDeliveryTag: 0,
+		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
+		LastDeliveryTag:   0,
 	}
 
-	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
+	vh.ChannelDeliveries[channelKey].UnackedByTag[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
 		Message: vhost.Message{
 			ID:   "test-msg-1",
@@ -326,6 +327,10 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 		},
 		QueueName: "test-queue",
 	}
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][1] = vh.ChannelDeliveries[channelKey].UnackedByTag[1]
 
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
@@ -348,8 +353,8 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	}
 
 	// Verify message is still in unacked map (not removed yet)
-	if len(vh.ChannelDeliveries[channelKey].Unacked) != 1 {
-		t.Errorf("Expected 1 unacked message, got %d", len(vh.ChannelDeliveries[channelKey].Unacked))
+	if len(vh.ChannelDeliveries[channelKey].UnackedByTag) != 1 {
+		t.Errorf("Expected 1 unacked message, got %d", len(vh.ChannelDeliveries[channelKey].UnackedByTag))
 	}
 
 	// Verify ACK is in buffer
@@ -376,11 +381,12 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
-		Unacked:         make(map[uint64]*vhost.DeliveryRecord),
-		LastDeliveryTag: 0,
+		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
+		LastDeliveryTag:   0,
 	}
 
-	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
+	vh.ChannelDeliveries[channelKey].UnackedByTag[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
 		Message: vhost.Message{
 			ID:   "test-msg-1",
@@ -388,7 +394,10 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 		},
 		QueueName: "test-queue",
 	}
-
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][1] = vh.ChannelDeliveries[channelKey].UnackedByTag[1]
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -433,11 +442,12 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
-		Unacked:         make(map[uint64]*vhost.DeliveryRecord),
-		LastDeliveryTag: 0,
+		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
+		LastDeliveryTag:   0,
 	}
 
-	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
+	vh.ChannelDeliveries[channelKey].UnackedByTag[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
 		Message: vhost.Message{
 			ID:   "test-msg-1",
@@ -445,6 +455,10 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 		},
 		QueueName: "test-queue",
 	}
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][1] = vh.ChannelDeliveries[channelKey].UnackedByTag[1]
 
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
@@ -548,12 +562,13 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	// Setup: Create multiple unacked messages
 	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
-		Unacked:         make(map[uint64]*vhost.DeliveryRecord),
-		LastDeliveryTag: 0,
+		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
+		LastDeliveryTag:   0,
 	}
 
 	for i := uint64(1); i <= 3; i++ {
-		vh.ChannelDeliveries[channelKey].Unacked[i] = &vhost.DeliveryRecord{
+		vh.ChannelDeliveries[channelKey].UnackedByTag[i] = &vhost.DeliveryRecord{
 			DeliveryTag: i,
 			Message: vhost.Message{
 				ID:   "test-msg",
@@ -561,6 +576,12 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 			},
 			QueueName: "test-queue",
 		}
+	}
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	for i := uint64(1); i <= 3; i++ {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][i] = vh.ChannelDeliveries[channelKey].UnackedByTag[i]
 	}
 
 	// Enter transaction mode
@@ -579,8 +600,8 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	}
 
 	// Verify messages are still unacked before commit
-	if len(vh.ChannelDeliveries[channelKey].Unacked) != 3 {
-		t.Errorf("Expected 3 unacked messages before commit, got %d", len(vh.ChannelDeliveries[channelKey].Unacked))
+	if len(vh.ChannelDeliveries[channelKey].UnackedByTag) != 3 {
+		t.Errorf("Expected 3 unacked messages before commit, got %d", len(vh.ChannelDeliveries[channelKey].UnackedByTag))
 	}
 
 	// Commit transaction
@@ -594,8 +615,8 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	}
 
 	// Verify all messages were acked
-	if len(vh.ChannelDeliveries[channelKey].Unacked) != 0 {
-		t.Errorf("Expected 0 unacked messages after commit, got %d", len(vh.ChannelDeliveries[channelKey].Unacked))
+	if len(vh.ChannelDeliveries[channelKey].UnackedByTag) != 0 {
+		t.Errorf("Expected 0 unacked messages after commit, got %d", len(vh.ChannelDeliveries[channelKey].UnackedByTag))
 	}
 
 	// Verify buffer was cleared
@@ -1042,20 +1063,29 @@ func TestCommit_MixedOperations(t *testing.T) {
 	// Setup: Create unacked messages
 	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
-		Unacked:         make(map[uint64]*vhost.DeliveryRecord),
-		LastDeliveryTag: 0,
+		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
+		LastDeliveryTag:   0,
 	}
 
-	vh.ChannelDeliveries[channelKey].Unacked[1] = &vhost.DeliveryRecord{
+	vh.ChannelDeliveries[channelKey].UnackedByTag[1] = &vhost.DeliveryRecord{
 		DeliveryTag: 1,
 		Message:     vhost.Message{ID: "msg-1", Body: []byte("test")},
 		QueueName:   "test-queue",
 	}
-	vh.ChannelDeliveries[channelKey].Unacked[2] = &vhost.DeliveryRecord{
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][1] = vh.ChannelDeliveries[channelKey].UnackedByTag[1]
+	vh.ChannelDeliveries[channelKey].UnackedByTag[2] = &vhost.DeliveryRecord{
 		DeliveryTag: 2,
 		Message:     vhost.Message{ID: "msg-2", Body: []byte("test")},
 		QueueName:   "test-queue",
 	}
+	if vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] == nil {
+		vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"] = make(map[uint64]*vhost.DeliveryRecord)
+	}
+	vh.ChannelDeliveries[channelKey].UnackedByConsumer["ctag1"][2] = vh.ChannelDeliveries[channelKey].UnackedByTag[2]
 
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
@@ -1089,7 +1119,7 @@ func TestCommit_MixedOperations(t *testing.T) {
 	}
 
 	// Verify ack was processed (message 1 should be removed from unacked)
-	if _, exists := vh.ChannelDeliveries[channelKey].Unacked[1]; exists {
+	if _, exists := vh.ChannelDeliveries[channelKey].UnackedByTag[1]; exists {
 		t.Error("Message 1 should have been acked and removed from unacked map")
 	}
 }

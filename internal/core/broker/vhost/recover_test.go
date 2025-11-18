@@ -23,7 +23,10 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 
 	// Setup channel delivery state with unacked messages
 	key := ConnectionChannelKey{conn, 1}
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
@@ -33,18 +36,29 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	m2 := Message{ID: "msg2", Body: []byte("test2")}
 
 	ch.mu.Lock()
-	ch.Unacked[1] = &DeliveryRecord{
+	record := &DeliveryRecord{
 		DeliveryTag: 1,
 		ConsumerTag: "ctag1",
 		QueueName:   "q1",
 		Message:     m1,
 	}
-	ch.Unacked[2] = &DeliveryRecord{
+	ch.UnackedByTag[1] = record
+	if ch.UnackedByConsumer["ctag1"] == nil {
+		ch.UnackedByConsumer["ctag1"] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer["ctag1"][1] = record
+
+	record2 := &DeliveryRecord{
 		DeliveryTag: 2,
 		ConsumerTag: "ctag1",
 		QueueName:   "q1",
 		Message:     m2,
 	}
+	ch.UnackedByTag[2] = record2
+	if ch.UnackedByConsumer["ctag1"] == nil {
+		ch.UnackedByConsumer["ctag1"] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer["ctag1"][2] = record2
 	ch.mu.Unlock()
 
 	// Call recover with requeue=true
@@ -54,7 +68,7 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 
 	// Verify unacked is cleared
 	ch.mu.Lock()
-	unackedCount := len(ch.Unacked)
+	unackedCount := len(ch.UnackedByTag)
 	ch.mu.Unlock()
 	if unackedCount != 0 {
 		t.Errorf("expected 0 unacked after recover, got %d", unackedCount)
@@ -108,7 +122,10 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	vh.framer = &testutil.MockFramer{}
 
 	// Setup channel delivery state with unacked message
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[channelKey] = ch
 	vh.mu.Unlock()
@@ -116,12 +133,16 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
 	ch.LastDeliveryTag = 1 // Set counter so next delivery gets tag 2
-	ch.Unacked[1] = &DeliveryRecord{
+	ch.UnackedByTag[1] = &DeliveryRecord{
 		DeliveryTag: 1,
 		ConsumerTag: "ctag1",
 		QueueName:   "q1",
 		Message:     m1,
 	}
+	if ch.UnackedByConsumer["ctag1"] == nil {
+		ch.UnackedByConsumer["ctag1"] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer["ctag1"][1] = ch.UnackedByTag[1]
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
@@ -131,10 +152,10 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 
 	// Verify new delivery was created with new tag (old tag 1 was cleared, new tag assigned)
 	ch.mu.Lock()
-	_, oldExists := ch.Unacked[1]
-	newUnackedCount := len(ch.Unacked)
+	_, oldExists := ch.UnackedByTag[1]
+	newUnackedCount := len(ch.UnackedByTag)
 	var newTag uint64
-	for tag := range ch.Unacked {
+	for tag := range ch.UnackedByTag {
 		newTag = tag
 		break
 	}
@@ -167,19 +188,26 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 
 	// Setup channel delivery state with unacked message, but NO consumer
 	key := ConnectionChannelKey{conn, 1}
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
 
 	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
-	ch.Unacked[1] = &DeliveryRecord{
+	ch.UnackedByTag[1] = &DeliveryRecord{
 		DeliveryTag: 1,
 		ConsumerTag: "ctag-missing",
 		QueueName:   "q1",
 		Message:     m1,
 	}
+	if ch.UnackedByConsumer["ctag-missing"] == nil {
+		ch.UnackedByConsumer["ctag-missing"] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer["ctag-missing"][1] = ch.UnackedByTag[1]
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
@@ -189,7 +217,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 
 	// Verify unacked is cleared
 	ch.mu.Lock()
-	unackedCount := len(ch.Unacked)
+	unackedCount := len(ch.UnackedByTag)
 	ch.mu.Unlock()
 	if unackedCount != 0 {
 		t.Errorf("expected 0 unacked after recover, got %d", unackedCount)
@@ -241,19 +269,27 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	vh.framer = &testutil.MockFramer{SendError: &net.OpError{Op: "write", Err: net.ErrClosed}}
 
 	// Setup channel delivery state with unacked message
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[channelKey] = ch
 	vh.mu.Unlock()
 
 	m1 := Message{ID: "msg1", Body: []byte("test1")}
 	ch.mu.Lock()
-	ch.Unacked[1] = &DeliveryRecord{
+	ch.UnackedByTag[1] = &DeliveryRecord{
 		DeliveryTag: 1,
 		ConsumerTag: "ctag1",
 		QueueName:   "q1",
 		Message:     m1,
 	}
+	if ch.UnackedByConsumer["ctag1"] == nil {
+		ch.UnackedByConsumer["ctag1"] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer["ctag1"][1] = ch.UnackedByTag[1]
+
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
@@ -263,7 +299,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 
 	// Verify old unacked is cleared
 	ch.mu.Lock()
-	unackedCount := len(ch.Unacked)
+	unackedCount := len(ch.UnackedByTag)
 	ch.mu.Unlock()
 	if unackedCount != 0 {
 		t.Errorf("expected 0 unacked after failed redelivery, got %d", unackedCount)
@@ -316,5 +352,76 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 	// Verify it's cleared
 	if vh.ShouldRedeliver("msg1") {
 		t.Error("msg1 should not be marked after clearing")
+	}
+}
+
+func TestHandleBasicRecover_RequeueFalse_BasicGetSentinel(t *testing.T) {
+	// Test that Basic.Get deliveries (with BASIC_GET_SENTINEL) are requeued
+	// when Basic.Recover(requeue=false) is called, since they have no consumer
+	// to redeliver to.
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
+	var conn net.Conn = nil
+
+	// Create queue
+	q, err := vh.CreateQueue("q1", nil, conn)
+	if err != nil {
+		t.Fatalf("CreateQueue failed: %v", err)
+	}
+
+	// Setup channel delivery state with Basic.Get unacked message (using sentinel)
+	key := ConnectionChannelKey{conn, 1}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
+	vh.mu.Lock()
+	vh.ChannelDeliveries[key] = ch
+	vh.mu.Unlock()
+
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
+	ch.mu.Lock()
+	record := &DeliveryRecord{
+		DeliveryTag: 1,
+		ConsumerTag: BASIC_GET_SENTINEL, // Basic.Get uses sentinel
+		QueueName:   "q1",
+		Message:     m1,
+	}
+	ch.UnackedByTag[1] = record
+	if ch.UnackedByConsumer[BASIC_GET_SENTINEL] == nil {
+		ch.UnackedByConsumer[BASIC_GET_SENTINEL] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[BASIC_GET_SENTINEL][1] = record
+	ch.mu.Unlock()
+
+	// Call recover with requeue=false
+	// Since BASIC_GET_SENTINEL has no consumer, it should requeue the message
+	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+		t.Fatalf("HandleBasicRecover failed: %v", err)
+	}
+
+	// Verify unacked is cleared
+	ch.mu.Lock()
+	unackedCount := len(ch.UnackedByTag)
+	sentinelUnacked := len(ch.UnackedByConsumer[BASIC_GET_SENTINEL])
+	ch.mu.Unlock()
+	if unackedCount != 0 {
+		t.Errorf("expected 0 unacked after recover, got %d", unackedCount)
+	}
+	if sentinelUnacked != 0 {
+		t.Errorf("expected 0 sentinel unacked after recover, got %d", sentinelUnacked)
+	}
+
+	// Verify message was requeued (not redelivered, since Basic.Get has no consumer)
+	if q.Len() != 1 {
+		t.Errorf("expected 1 message requeued (Basic.Get has no consumer), got %d", q.Len())
+	}
+
+	// Verify message marked as redelivered
+	if !vh.ShouldRedeliver("msg1") {
+		t.Error("msg1 should be marked for redelivery")
 	}
 }

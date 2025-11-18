@@ -127,7 +127,12 @@ func convertToPersistedProperties(amqpProps amqp.BasicProperties) persistence.Me
 func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+	return vh.publishUnlocked(exchangeName, routingKey, msg)
+}
 
+// publishUnlocked performs message publishing without acquiring vh.mu
+// MUST be called with vh.mu already locked
+func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) (string, error) {
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
@@ -143,6 +148,10 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 	log.Trace().Str("id", msg.ID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(msg.Body)).Interface("properties", msg.Properties).Msg("Publishing message")
 
 	msgProps := convertToPersistedProperties(msg.Properties)
+
+	// Collect all target queues while holding the lock
+	var targetQueues []*Queue
+
 	switch exchange.Typ {
 	case DIRECT:
 		bindings, ok := exchange.Bindings[routingKey]
@@ -151,22 +160,8 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
 		for _, binding := range bindings {
-			queue := binding.Queue
-			err := vh.saveMessageIfDurable(SaveMessageRequest{
-				Props:      &msg.Properties,
-				Queue:      queue,
-				RoutingKey: routingKey,
-				MsgID:      msg.ID,
-				Body:       msg.Body,
-				MsgProps:   msgProps,
-			})
-			if err != nil {
-				return "", err
-			}
-
-			queue.Push(*msg)
+			targetQueues = append(targetQueues, binding.Queue)
 		}
-		return msg.ID, nil
 
 	case FANOUT:
 		routingKey = ""
@@ -176,25 +171,11 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
 		for _, binding := range bindings {
-			queue := binding.Queue
-			err := vh.saveMessageIfDurable(SaveMessageRequest{
-				Props:      &msg.Properties,
-				Queue:      queue,
-				RoutingKey: routingKey,
-				MsgID:      msg.ID,
-				Body:       msg.Body,
-				MsgProps:   msgProps,
-			})
-			if err != nil {
-				return "", err
-			}
-
-			queue.Push(*msg)
+			targetQueues = append(targetQueues, binding.Queue)
 		}
-		return msg.ID, nil
+
 	case TOPIC:
 		matchedQueues := make(map[*Queue]struct{})
-
 		for bindingKey, bindings := range exchange.Bindings {
 			if MatchTopic(routingKey, bindingKey) {
 				for _, binding := range bindings {
@@ -211,24 +192,41 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 		}
 
 		for queue := range matchedQueues {
-			err := vh.saveMessageIfDurable(SaveMessageRequest{
-				Props:      &msg.Properties,
-				Queue:      queue,
-				RoutingKey: routingKey,
-				MsgID:      msg.ID,
-				Body:       msg.Body,
-				MsgProps:   msgProps,
-			})
-			if err != nil {
-				return "", err
-			}
-
-			queue.Push(*msg)
+			targetQueues = append(targetQueues, queue)
 		}
-		return msg.ID, nil
+
 	default:
 		return "", fmt.Errorf("exchange type '%s' not supported yet", exchange.Typ)
 	}
+
+	// Persist messages while still holding the lock (needs queue metadata)
+	for _, queue := range targetQueues {
+		err := vh.saveMessageIfDurable(SaveMessageRequest{
+			Props:      &msg.Properties,
+			Queue:      queue,
+			RoutingKey: routingKey,
+			MsgID:      msg.ID,
+			Body:       msg.Body,
+			MsgProps:   msgProps,
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Release lock BEFORE calling queue.Push() to avoid deadlock during QLL enforcement
+	vh.mu.Unlock()
+
+	// Push messages to queues without holding vh.mu
+	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
+	for _, queue := range targetQueues {
+		queue.Push(*msg)
+	}
+
+	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
+	vh.mu.Lock()
+
+	return msg.ID, nil
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {

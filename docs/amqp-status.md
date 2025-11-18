@@ -58,6 +58,15 @@ Status levels:
 - ✅ `basic.consume` respects flow state (async delivery can be paused)
 - ✅ Thread-safe flow state management
 
+**QoS and Consumer Management:**
+
+- ✅ Per-consumer prefetch limits (O(1) counting)
+- ✅ Channel-level global prefetch limits
+- ✅ Automatic requeue on consumer cancel (AMQP spec compliant)
+- ✅ Redelivered flag set correctly on requeued messages
+- ✅ O(1) consumer cancel performance (dual-index tracking)
+- ✅ Multiple consumers per channel with independent unacked tracking
+
 ## exchange
 
 | Method | Status | Notes |
@@ -95,11 +104,11 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| basic.qos | ✅ | |
+| basic.qos | ✅ | Per-consumer and channel-level prefetch supported |
 | basic.qos-ok | ✅ | |
 | basic.consume | ✅ | ‼️`noLocal` not supported (same as RabbitMQ)  |
 | basic.consume-ok | ✅ | |
-| basic.cancel | ✅ | |
+| basic.cancel | ✅ | Automatically requeues unacked messages per AMQP spec |
 | basic.cancel-ok | ✅ | |
 | basic.publish | ✅ | |
 | basic.return | ✅ | ‼️`immediate` flag is deprecated and will not be implemented |

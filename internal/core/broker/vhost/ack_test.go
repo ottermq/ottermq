@@ -34,7 +34,10 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 
 	// Manually simulate two deliveries by recording unacked entries
 	key := ConnectionChannelKey{conn, c.Channel}
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
@@ -46,15 +49,25 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
 	t1 := ch.LastDeliveryTag
-	ch.Unacked[t1] = &DeliveryRecord{DeliveryTag: t1, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m1}
+	record := &DeliveryRecord{DeliveryTag: t1, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m1}
+	ch.UnackedByTag[t1] = record
+	if ch.UnackedByConsumer[c.Tag] == nil {
+		ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[c.Tag][t1] = record
 
 	ch.LastDeliveryTag++
 	t2 := ch.LastDeliveryTag
-	ch.Unacked[t2] = &DeliveryRecord{DeliveryTag: t2, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m2}
+	record = &DeliveryRecord{DeliveryTag: t2, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m2}
+	ch.UnackedByTag[t2] = record
+	if ch.UnackedByConsumer[c.Tag] == nil {
+		ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[c.Tag][t2] = record
 	ch.mu.Unlock()
 
-	if len(ch.Unacked) != 2 {
-		t.Fatalf("expected 2 unacked, got %d", len(ch.Unacked))
+	if len(ch.UnackedByTag) != 2 {
+		t.Fatalf("expected 2 unacked, got %d", len(ch.UnackedByTag))
 	}
 
 	// Ack first only (single)
@@ -64,10 +77,10 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
-	if _, ok := ch.Unacked[t1]; ok {
+	if _, ok := ch.UnackedByTag[t1]; ok {
 		t.Fatalf("delivery tag %d should be removed after ack", t1)
 	}
-	if _, ok := ch.Unacked[t2]; !ok {
+	if _, ok := ch.UnackedByTag[t2]; !ok {
 		t.Fatalf("delivery tag %d should remain unacked", t2)
 	}
 }
@@ -80,23 +93,33 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 	vh := NewVhost("test-vhost", options)
 	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 1}
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
+	// Register consumer
+	c := newTestConsumer(conn, 1, "q-multi", false)
+	// Simulate deliveries to track unacked messages
 
 	// create 3 tags
 	ch.mu.Lock()
 	for i := 0; i < 3; i++ {
 		ch.LastDeliveryTag++
 		tag := ch.LastDeliveryTag
-		ch.Unacked[tag] = &DeliveryRecord{DeliveryTag: tag}
+		record := &DeliveryRecord{DeliveryTag: tag}
+		ch.UnackedByTag[tag] = record
+		if ch.UnackedByConsumer[c.Tag] == nil {
+			ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)
+		}
 	}
 	ch.mu.Unlock()
 
-	if len(ch.Unacked) != 3 {
-		t.Fatalf("expected 3 unacked, got %d", len(ch.Unacked))
+	if len(ch.UnackedByTag) != 3 {
+		t.Fatalf("expected 3 unacked, got %d", len(ch.UnackedByTag))
 	}
 
 	// multiple ack up to second tag
@@ -107,10 +130,10 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
-	if len(ch.Unacked) != 1 {
-		t.Fatalf("expected 1 unacked remaining, got %d", len(ch.Unacked))
+	if len(ch.UnackedByTag) != 1 {
+		t.Fatalf("expected 1 unacked remaining, got %d", len(ch.UnackedByTag))
 	}
-	if _, ok := ch.Unacked[3]; !ok {
+	if _, ok := ch.UnackedByTag[3]; !ok {
 		t.Fatalf("expected tag 3 to remain")
 	}
 }
@@ -137,16 +160,26 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 	var conn net.Conn = nil
 	key := ConnectionChannelKey{conn, 2}
 
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
+
+	// Register consumer
+	c := newTestConsumer(conn, 2, "q-noack", false)
 
 	// Simulate manual-ack delivery — stored
 	ch.mu.Lock()
 	ch.LastDeliveryTag++
 	tag1 := ch.LastDeliveryTag
-	ch.Unacked[tag1] = &DeliveryRecord{DeliveryTag: tag1}
+	ch.UnackedByTag[tag1] = &DeliveryRecord{DeliveryTag: tag1}
+	if ch.UnackedByConsumer[c.Tag] == nil {
+		ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[c.Tag][tag1] = ch.UnackedByTag[tag1]
 	ch.mu.Unlock()
 
 	// Simulate auto-ack delivery — not stored
@@ -155,8 +188,8 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 	// intentionally do NOT store second tag to simulate NoAck=true
 	ch.mu.Unlock()
 
-	if len(ch.Unacked) != 1 {
-		t.Fatalf("expected only 1 unacked stored (manual ack), got %d", len(ch.Unacked))
+	if len(ch.UnackedByTag) != 1 {
+		t.Fatalf("expected only 1 unacked stored (manual ack), got %d", len(ch.UnackedByTag))
 	}
 }
 
@@ -175,15 +208,26 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 
 	// Prepare an unacked record on channel (conn=nil, ch=3)
 	key := ConnectionChannelKey{conn, 3}
-	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
 	vh.mu.Lock()
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
 
+	// Register consumer
+	c := newTestConsumer(conn, 3, q.Name, false)
+
 	msg := Message{ID: "mx", Body: []byte("x")}
 	ch.mu.Lock()
 	ch.LastDeliveryTag = 1
-	ch.Unacked[1] = &DeliveryRecord{DeliveryTag: 1, QueueName: q.Name, Message: msg}
+	record := &DeliveryRecord{DeliveryTag: 1, QueueName: q.Name, Message: msg}
+	ch.UnackedByTag[1] = record
+	if ch.UnackedByConsumer[c.Tag] == nil {
+		ch.UnackedByConsumer[c.Tag] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[c.Tag][1] = record
 	ch.mu.Unlock()
 
 	// Cleanup should requeue the unacked message into q

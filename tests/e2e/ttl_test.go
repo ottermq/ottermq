@@ -357,11 +357,11 @@ func TestTTL_Requeue_ExpiredNotRequeued(t *testing.T) {
 	defer tc.Close()
 
 	// Setup DLX
-	dlx := "test-dlx-requeue"
+	dlx := "test-dlx-ttl-requeue"
 	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	dlq, err := tc.Ch.QueueDeclare("test-dlq-requeue", false, true, false, false, nil)
+	dlq, err := tc.Ch.QueueDeclare("test-dlq-ttl-requeue", false, true, false, false, nil)
 	require.NoError(t, err)
 
 	err = tc.Ch.QueueBind(dlq.Name, "expired", dlx, false, nil)
