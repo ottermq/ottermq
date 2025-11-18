@@ -178,13 +178,7 @@ func TestMaxLen_TransactionCommit(t *testing.T) {
 }
 
 // TestMaxLen_RequeueRespected verifies requeued messages respect max-length
-// DISABLED: This test has race conditions related to consumer cancellation and auto-delete queues
-// The core QLL functionality is tested in other tests.
 func TestMaxLen_RequeueRespected(t *testing.T) {
-	t.Skip(`Test disabled: reveals missing AMQP feature - automatic requeue of unacked messages on consumer cancel.
-		When a consumer is canceled while messages are in-flight (delivered but not acked), those messages
-		should be automatically requeued. Current implementation loses them. Core QLL functionality is
-		tested and working in other tests.`)
 	tc := NewTestConnection(t, brokerURL)
 	defer tc.Close()
 
