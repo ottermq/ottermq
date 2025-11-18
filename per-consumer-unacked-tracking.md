@@ -719,10 +719,12 @@ type ChannelDeliveryState struct {
 ### Memory Analysis
 
 **Before:**
+
 - 1 pointer per delivery tag in flat map
 - Example: 10,000 unacked = 10,000 pointers
 
 **After:**
+
 - 1 pointer in flat map + 1 pointer in nested map (same record)
 - Example: 10,000 unacked = 20,000 pointers to same 10,000 records
 
@@ -817,44 +819,44 @@ Expected: 100-1000x speedup for high prefetch scenarios
 
 ## Implementation Checklist
 
-- [ ] Phase 1: Add new structure (45 min)
-  - [ ] Update struct definition
-  - [ ] Update `GetOrCreateChannelDelivery()`
-  - [ ] Update `HandleBasicQos()`
+- [x] Phase 1: Add new structure (45 min)
+  - [x] Update struct definition
+  - [x] Update `GetOrCreateChannelDelivery()`
+  - [x] Update `HandleBasicQos()`
   
-- [ ] Phase 2: Update write operations (60 min)
-  - [ ] `deliverToConsumer()` insert
-  - [ ] `TrackDelivery()` insert
-  - [ ] `popUnackedRecords()` delete
-  - [ ] `deliverToConsumer()` delete on error
+- [x] Phase 2: Update write operations (60 min)
+  - [x] `deliverToConsumer()` insert
+  - [x] `TrackDelivery()` insert
+  - [x] `popUnackedRecords()` delete
+  - [x] `deliverToConsumer()` delete on error
   
-- [ ] Phase 3: Update read operations (45 min)
-  - [ ] `CleanupChannel()` iterate
-  - [ ] `HandleBasicRecover()` iterate
-  - [ ] `getUnackedCountConsumer()` count
-  - [ ] `getUnackedCountChannel()` count
+- [x] Phase 3: Update read operations (45 min)
+  - [x] `CleanupChannel()` iterate
+  - [x] `HandleBasicRecover()` iterate
+  - [x] `getUnackedCountConsumer()` count
+  - [x] `getUnackedCountChannel()` count
   
-- [ ] Phase 4: Implement consumer cancel requeue (30 min)
-  - [ ] Add requeue call to `CancelConsumer()`
-  - [ ] Implement `requeueUnackedForConsumer()`
+- [x] Phase 4: Implement consumer cancel requeue (30 min)
+  - [x] Add requeue call to `CancelConsumer()`
+  - [x] Implement `requeueUnackedForConsumer()`
   
-- [ ] Phase 5: Update tests (60 min)
-  - [ ] Update `ack_test.go`
-  - [ ] Update `nack_test.go`
-  - [ ] Update `recover_test.go`
-  - [ ] Update `channel_flow_test.go`
-  - [ ] Create `consumer_cancel_test.go`
-  - [ ] Re-enable `TestMaxLen_RequeueRespected`
+- [x] Phase 5: Update tests (60 min)
+  - [x] Update `ack_test.go`
+  - [x] Update `nack_test.go`
+  - [x] Update `recover_test.go`
+  - [x] Update `channel_flow_test.go`
+  - [x] Create `consumer_cancel_test.go` (6 comprehensive E2E tests)
+  - [x] Re-enable `TestMaxLen_RequeueRespected`
   
 - [ ] Phase 6: Cleanup (15 min)
-  - [ ] Add inline documentation
+  - [x] Add inline documentation
   - [ ] Update AMQP status doc
   - [ ] Add changelog entry
   
-- [ ] Verification
-  - [ ] Run unit tests: `go test ./internal/core/broker/vhost/...`
-  - [ ] Run E2E tests: `go test ./tests/e2e/...`
-  - [ ] Run with race detector: `go test -race ./...`
+- [x] Verification
+  - [x] Run unit tests: `go test ./internal/core/broker/vhost/...` - ALL PASS
+  - [x] Run E2E tests: `go test ./tests/e2e/...` - ALL PASS
+  - [x] Run with race detector: `go test -race ./...` - NO WARNINGS
   - [ ] Performance benchmark
   - [ ] Code review
 
@@ -868,13 +870,19 @@ Expected: 100-1000x speedup for high prefetch scenarios
 
 - ✅ All existing tests pass with no logic changes
 - ✅ `TestMaxLen_RequeueRespected` passes when re-enabled
-- ✅ 3 new consumer cancel tests pass
+- ✅ 6 new consumer cancel E2E tests created and passing:
+  - `TestConsumerCancel_RequeuesUnacked` - Core functionality
+  - `TestConsumerCancel_OnlyRequeuesToOriginalQueue` - Queue isolation
+  - `TestConsumerCancel_NoAckConsumer_NoRequeue` - NoAck edge case
+  - `TestConsumerCancel_HighPrefetch` - Performance with 500 unacked
+  - `TestConsumerCancel_MultipleConsumersSameChannel` - Consumer independence
+  - `TestConsumerCancel_WithRedeliveredFlag` - Redelivered flag correctness
 - ✅ No regressions in E2E test suite
 
 ### Performance
 
-- ✅ Consumer cancel with 1000 unacked completes in <1ms (vs ~100ms before)
-- ✅ QoS counting with 1000 unacked completes in <1μs (vs ~100μs before)
+- ✅ Consumer cancel with 500 unacked completes in <1ms (vs ~100ms expected before)
+- ⏳ QoS counting benchmark (pending)
 - ✅ No measurable performance regression in ack/nack operations
 
 ### Code Quality
