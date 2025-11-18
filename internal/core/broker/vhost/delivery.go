@@ -249,7 +249,7 @@ func (ch *ChannelDeliveryState) TrackDelivery(noAck bool, msg *Message, queue st
 	defer ch.mu.Unlock()
 	ch.LastDeliveryTag++
 	deliveryTag := ch.LastDeliveryTag
-	consumerTag := "" // Unknown in this context
+	consumerTag := BASIC_GET_SENTINEL // Basic.Get uses sentinel value
 
 	// Track the delivery if manual ack is required
 	if !noAck {

@@ -37,6 +37,14 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
 			vh.requeueMessage(record)
 		} else {
+			// Basic.Recover with requeue=false: redeliver to original consumer
+			// Skip Basic.Get deliveries (sentinel value) - they have no consumer to redeliver to
+			if record.ConsumerTag == BASIC_GET_SENTINEL {
+				log.Debug().Msg("Skipping Basic.Get delivery on Basic.Recover(requeue=false), requeuing")
+				vh.requeueMessage(record)
+				continue
+			}
+
 			vh.mu.Lock()
 			consumerKey := ConnectionChannelKey{conn, channel}
 			consumers := vh.ConsumersByChannel[consumerKey]

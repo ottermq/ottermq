@@ -233,7 +233,8 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 
 // requeueUnackedForConsumer requeues all unacked messages for a specific consumer.
 // This is called when a consumer is canceled per AMQP spec.
-// The vh.mu lock MUST be held by caller.
+// The caller MUST hold vh.mu for the entire duration of this function, including after state.mu is released,
+// because vh.Queues is accessed after state.mu is unlocked.
 func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumerTag, queueName string) {
 	state.mu.Lock()
 

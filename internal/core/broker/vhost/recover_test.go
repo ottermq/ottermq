@@ -355,3 +355,74 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 		t.Error("msg1 should not be marked after clearing")
 	}
 }
+
+func TestHandleBasicRecover_RequeueFalse_BasicGetSentinel(t *testing.T) {
+	// Test that Basic.Get deliveries (with BASIC_GET_SENTINEL) are requeued
+	// when Basic.Recover(requeue=false) is called, since they have no consumer
+	// to redeliver to.
+	var options = VHostOptions{
+		QueueBufferSize: 1000,
+		Persistence:     nil,
+	}
+	vh := NewVhost("test-vhost", options)
+	var conn net.Conn = nil
+
+	// Create queue
+	q, err := vh.CreateQueue("q1", nil, conn)
+	if err != nil {
+		t.Fatalf("CreateQueue failed: %v", err)
+	}
+
+	// Setup channel delivery state with Basic.Get unacked message (using sentinel)
+	key := ConnectionChannelKey{conn, 1}
+	ch := &ChannelDeliveryState{
+		UnackedByTag:      make(map[uint64]*DeliveryRecord),
+		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+	}
+	vh.mu.Lock()
+	vh.ChannelDeliveries[key] = ch
+	vh.mu.Unlock()
+
+	m1 := Message{ID: "msg1", Body: []byte("test1")}
+	ch.mu.Lock()
+	record := &DeliveryRecord{
+		DeliveryTag: 1,
+		ConsumerTag: BASIC_GET_SENTINEL, // Basic.Get uses sentinel
+		QueueName:   "q1",
+		Message:     m1,
+	}
+	ch.UnackedByTag[1] = record
+	if ch.UnackedByConsumer[BASIC_GET_SENTINEL] == nil {
+		ch.UnackedByConsumer[BASIC_GET_SENTINEL] = make(map[uint64]*DeliveryRecord)
+	}
+	ch.UnackedByConsumer[BASIC_GET_SENTINEL][1] = record
+	ch.mu.Unlock()
+
+	// Call recover with requeue=false
+	// Since BASIC_GET_SENTINEL has no consumer, it should requeue the message
+	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+		t.Fatalf("HandleBasicRecover failed: %v", err)
+	}
+
+	// Verify unacked is cleared
+	ch.mu.Lock()
+	unackedCount := len(ch.UnackedByTag)
+	sentinelUnacked := len(ch.UnackedByConsumer[BASIC_GET_SENTINEL])
+	ch.mu.Unlock()
+	if unackedCount != 0 {
+		t.Errorf("expected 0 unacked after recover, got %d", unackedCount)
+	}
+	if sentinelUnacked != 0 {
+		t.Errorf("expected 0 sentinel unacked after recover, got %d", sentinelUnacked)
+	}
+
+	// Verify message was requeued (not redelivered, since Basic.Get has no consumer)
+	if q.Len() != 1 {
+		t.Errorf("expected 1 message requeued (Basic.Get has no consumer), got %d", q.Len())
+	}
+
+	// Verify message marked as redelivered
+	if !vh.ShouldRedeliver("msg1") {
+		t.Error("msg1 should be marked for redelivery")
+	}
+}

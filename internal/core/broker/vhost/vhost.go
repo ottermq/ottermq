@@ -12,6 +12,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// BASIC_GET_SENTINEL is used as the ConsumerTag for deliveries made via Basic.Get
+	// (synchronous pull mode) which don't have an associated consumer. This allows
+	// us to track these deliveries separately in the dual-index UnackedByConsumer map.
+	BASIC_GET_SENTINEL = "__basic_get__"
+)
+
 type VHost struct {
 	Name               string                     `json:"name"`
 	Id                 string                     `json:"id"`
