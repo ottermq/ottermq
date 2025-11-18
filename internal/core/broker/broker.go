@@ -65,6 +65,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		Persistence:     b.persist,
 		EnableDLX:       config.EnableDLX,
 		EnableTTL:       config.EnableTTL,
+		EnableQLL:       config.EnableQLL,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/", options)
 	b.framer = &amqp.DefaultFramer{}

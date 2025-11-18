@@ -28,6 +28,8 @@ type Queue struct {
 	deliveryCtx    context.Context    `json:"-"`
 	deliveryCancel context.CancelFunc `json:"-"`
 	delivering     bool
+	deliveryWg     sync.WaitGroup `json:"-"` // Tracks delivery loop completion
+	deliveryMu     sync.Mutex     `json:"-"` // Protects delivering flag
 
 	/* Extension */
 	maxLength uint32 `json:"-"`
@@ -55,22 +57,46 @@ func NewQueue(name string, bufferSize int, vh *VHost) *Queue {
 }
 
 func (q *Queue) startDeliveryLoop(vh *VHost) {
+	q.deliveryMu.Lock()
 	if q.delivering {
+		q.deliveryMu.Unlock()
 		return // already running
 	}
 	q.deliveryCtx, q.deliveryCancel = context.WithCancel(context.Background())
 	q.delivering = true
+	q.deliveryWg.Add(1)
+	q.deliveryMu.Unlock()
+
 	go func() {
+		defer q.deliveryWg.Done()
 		for {
 			select {
 			case <-q.deliveryCtx.Done():
 				log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
-				q.delivering = false
 				return
 			case msg := <-q.messages:
 				q.mu.Lock()
 				q.count--
 				q.mu.Unlock()
+
+				// Check if we're shutting down - if so, put message back and exit
+				select {
+				case <-q.deliveryCtx.Done():
+					log.Debug().Str("queue", q.Name).Msg("Delivery loop cancelled, requeuing message and stopping")
+					// Put the message back before exiting
+					q.mu.Lock()
+					q.count++
+					q.mu.Unlock()
+					// Use non-blocking send since channel might be closed
+					select {
+					case q.messages <- msg:
+					default:
+						log.Warn().Str("queue", q.Name).Msg("Could not requeue message on shutdown - channel full or closed")
+					}
+					return
+				default:
+					// Continue with delivery
+				}
 
 				// Verify if TTL is enabled
 				if vh.handleTTLExpiration(msg, q) {
@@ -83,9 +109,16 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 				// No consumers available, requeue and wait
 				if len(consumers) == 0 {
 					log.Debug().Str("queue", q.Name).Msg("No consumers available, requeuing message")
-					q.Push(msg)
-					time.Sleep(100 * time.Millisecond)
-					continue
+					// Check if context was cancelled before requeuing
+					select {
+					case <-q.deliveryCtx.Done():
+						log.Debug().Str("queue", q.Name).Msg("Delivery loop stopped, not requeuing")
+						return
+					default:
+						q.Push(msg)
+						time.Sleep(100 * time.Millisecond)
+						continue
+					}
 				}
 
 				delivered := false
@@ -115,8 +148,14 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 							// Refresh consumer list and retry
 							consumers = vh.GetActiveConsumersForQueue(q.Name)
 							if len(consumers) == 0 {
-								q.Push(msg)
-								delivered = true // Exit loop
+								// Check if context was cancelled before requeuing
+								select {
+								case <-q.deliveryCtx.Done():
+									delivered = true // Exit loop without requeuing
+								default:
+									q.Push(msg)
+									delivered = true // Exit loop
+								}
 							}
 							break // Retry with new consumer list
 						}
@@ -164,11 +203,20 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 }
 
 func (q *Queue) stopDeliveryLoop() {
+	q.deliveryMu.Lock()
 	if !q.delivering {
+		q.deliveryMu.Unlock()
 		return
 	}
 	q.deliveryCancel()
+	q.deliveryMu.Unlock()
+
+	// Wait for delivery loop to actually stop
+	q.deliveryWg.Wait()
+
+	q.deliveryMu.Lock()
 	q.delivering = false
+	q.deliveryMu.Unlock()
 }
 
 func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn) (*Queue, error) {
@@ -266,6 +314,10 @@ func (vh *VHost) deleteQueuebyNameUnlocked(name string) error {
 		)
 	}
 
+	// Stop delivery loop first, wait for it to complete
+	queue.stopDeliveryLoop()
+
+	// Now safe to close the messages channel
 	close(queue.messages)
 	// verify if there are any bindings to this queue and remove them
 	for _, exchange := range vh.Exchanges {

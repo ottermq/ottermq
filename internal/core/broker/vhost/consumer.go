@@ -49,7 +49,6 @@ func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, p
 
 func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 	vh.mu.Lock()
-	defer vh.mu.Unlock()
 
 	// Apply consumer prefetch if it was set via QoS(global = false)
 	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
@@ -62,6 +61,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 	// Check if queue exists
 	_, ok := vh.Queues[consumer.QueueName]
 	if !ok {
+		vh.mu.Unlock()
 		return "", errors.NewChannelError(
 			fmt.Sprintf("no queue '%s' in vhost '%s'", consumer.QueueName, vh.Name),
 			uint16(amqp.NOT_FOUND),
@@ -82,6 +82,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 			}
 			retries++
 			if retries >= maxRetries {
+				vh.mu.Unlock()
 				// return fmt.Errorf("failed to generate unique consumer tag after %d attempts", maxRetries)
 				return "", errors.NewChannelError(
 					"failed to generate unique consumer tag",
@@ -95,6 +96,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 		key = ConsumerKey{consumer.Channel, consumer.Tag}
 		// Check for duplicates
 		if _, exists := vh.Consumers[key]; exists {
+			vh.mu.Unlock()
 			return consumer.Tag, errors.NewChannelError(
 				fmt.Sprintf("consumer tag '%s' already exists on channel %d", key.Tag, key.Channel),
 				uint16(amqp.PRECONDITION_FAILED),
@@ -109,6 +111,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 	if existingConsumers, exists := vh.ConsumersByQueue[consumer.QueueName]; exists {
 		for _, c := range existingConsumers {
 			if c.Props.Exclusive {
+				vh.mu.Unlock()
 				return "", errors.NewChannelError(
 					fmt.Sprintf("exclusive consumer already exists for queue %s", consumer.QueueName),
 					uint16(amqp.PRECONDITION_FAILED),
@@ -118,6 +121,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 			}
 		}
 		if consumer.Props.Exclusive && len(existingConsumers) > 0 {
+			vh.mu.Unlock()
 			// TODO: return a channel exception error - 405
 			// return fmt.Errorf("cannot add exclusive consumer when other consumers exist for queue %s", consumer.QueueName)
 			return consumer.Tag, errors.NewChannelError(
@@ -151,9 +155,16 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 		consumer,
 	)
 
-	// start delivery routine if not already running
+	// Check if we need to start delivery routine
 	queue := vh.Queues[consumer.QueueName]
-	if len(vh.ConsumersByQueue[queue.Name]) == 1 {
+	shouldStartDelivery := len(vh.ConsumersByQueue[queue.Name]) == 1
+
+	// Release the lock BEFORE starting the delivery loop to avoid deadlock
+	// The delivery loop may need to acquire locks on both vh and queue
+	vh.mu.Unlock()
+
+	// start delivery routine if not already running
+	if shouldStartDelivery {
 		go queue.startDeliveryLoop(vh)
 	}
 
@@ -186,13 +197,20 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 		}
 	}
 	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
-		queue := vh.Queues[consumer.QueueName]
-		queue.stopDeliveryLoop()
-		// verify if the queue can be auto-deleted
-		if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
-			log.Printf("Failed to check auto-delete queue: %v", err)
-		} else if deleted {
-			log.Printf("Queue %s was auto-deleted", queue.Name)
+		queue, exists := vh.Queues[consumer.QueueName]
+		if exists {
+			// Release lock before stopping delivery loop to prevent deadlock
+			// (delivery loop may call vh.GetActiveConsumersForQueue which needs vh.mu)
+			vh.mu.Unlock()
+			queue.stopDeliveryLoop()
+			vh.mu.Lock()
+
+			// verify if the queue can be auto-deleted
+			if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
+				log.Printf("Failed to check auto-delete queue: %v", err)
+			} else if deleted {
+				log.Printf("Queue %s was auto-deleted", queue.Name)
+			}
 		}
 	}
 
