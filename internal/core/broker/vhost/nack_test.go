@@ -36,7 +36,6 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	// add one unacked record
 	msg := Message{ID: "m5", Body: []byte("x")}
 	ch.mu.Lock()
-	// ch.Unacked[5] = &DeliveryRecord{
 	record := &DeliveryRecord{
 		DeliveryTag: 5,
 		ConsumerTag: "ctag",
@@ -107,10 +106,6 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 		{ID: "m1"}, {ID: "m2"}, {ID: "m3"}, {ID: "m4"},
 	}
 	ch.mu.Lock()
-	// ch.Unacked[1] = &DeliveryRecord{DeliveryTag: 1, ConsumerTag: "c", QueueName: "q1", Message: msgs[0], Persistent: true}
-	// ch.Unacked[2] = &DeliveryRecord{DeliveryTag: 2, ConsumerTag: "c", QueueName: "q1", Message: msgs[1], Persistent: true}
-	// ch.Unacked[3] = &DeliveryRecord{DeliveryTag: 3, ConsumerTag: "c", QueueName: "q1", Message: msgs[2], Persistent: false}
-	// ch.Unacked[4] = &DeliveryRecord{DeliveryTag: 4, ConsumerTag: "c", QueueName: "q1", Message: msgs[3], Persistent: false}
 	for i, msg := range msgs {
 		deliveryTag := uint64(i + 1)
 		record := &DeliveryRecord{
@@ -135,10 +130,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 
 	// Expect tags 1,2 removed; 3,4 remain
 	ch.mu.Lock()
-	// _, ex1 := ch.Unacked[1]
-	// _, ex2 := ch.Unacked[2]
-	// _, ex3 := ch.Unacked[3]
-	// _, ex4 := ch.Unacked[4]
+
 	for i := 1; i <= 4; i++ {
 		deliveryTag := uint64(i)
 		_, exists := ch.UnackedByTag[deliveryTag]
@@ -154,13 +146,6 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 		}
 	}
 	ch.mu.Unlock()
-
-	// if ex1 || ex2 {
-	// 	t.Error("expected tags 1 and 2 to be removed")
-	// }
-	// if !ex3 || !ex4 {
-	// 	t.Error("expected tags 3 and 4 to remain")
-	// }
 
 	// Expect persistence deletions for m1 and m2
 	if len(sp.DeletedMessagesDetailed) != 2 {
@@ -210,7 +195,6 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 	// tags 1..4
 	ch.mu.Lock()
 	for i := uint64(1); i <= 4; i++ {
-		// ch.Unacked[i] = &DeliveryRecord{DeliveryTag: i, ConsumerTag: "c", QueueName: "q1", Message: Message{ID: "m"}}
 		ch.UnackedByTag[i] = &DeliveryRecord{DeliveryTag: i, ConsumerTag: "c", QueueName: "q1", Message: Message{ID: "m"}}
 		if ch.UnackedByConsumer["c"] == nil {
 			ch.UnackedByConsumer["c"] = make(map[uint64]*DeliveryRecord)
@@ -225,10 +209,7 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 
 	// 1 and 2 removed, 3 and 4 remain
 	ch.mu.Lock()
-	// _, ex1 := ch.Unacked[1]
-	// _, ex2 := ch.Unacked[2]
-	// _, ex3 := ch.Unacked[3]
-	// _, ex4 := ch.Unacked[4]
+
 	for i := 1; i <= 4; i++ {
 		deliveryTag := uint64(i)
 		_, exists := ch.UnackedByTag[deliveryTag]
@@ -244,11 +225,4 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 		}
 	}
 	ch.mu.Unlock()
-
-	// if ex1 || ex2 {
-	// 	t.Error("expected tags 1 and 2 to be removed")
-	// }
-	// if !ex3 || !ex4 {
-	// 	t.Error("expected tags 3 and 4 to remain")
-	// }
 }

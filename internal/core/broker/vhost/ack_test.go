@@ -19,15 +19,6 @@ func newTestConsumer(conn net.Conn, ch uint16, queue string, noAck bool) *Consum
 	}
 }
 
-// testTrackUnacked is a test helper to track an unacked message in both indexes
-func testTrackUnacked(ch *ChannelDeliveryState, tag uint64, consumerTag string, record *DeliveryRecord) {
-	ch.UnackedByTag[tag] = record
-	if ch.UnackedByConsumer[consumerTag] == nil {
-		ch.UnackedByConsumer[consumerTag] = make(map[uint64]*DeliveryRecord)
-	}
-	ch.UnackedByConsumer[consumerTag][tag] = record
-}
-
 func TestChannelDeliveryState_SingleAck(t *testing.T) {
 	var options = VHostOptions{
 		QueueBufferSize: 1000,
@@ -67,7 +58,6 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 
 	ch.LastDeliveryTag++
 	t2 := ch.LastDeliveryTag
-	// ch.Unacked[t2] = &DeliveryRecord{DeliveryTag: t2, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m2}
 	record = &DeliveryRecord{DeliveryTag: t2, ConsumerTag: c.Tag, QueueName: c.QueueName, Message: m2}
 	ch.UnackedByTag[t2] = record
 	if ch.UnackedByConsumer[c.Tag] == nil {
@@ -120,7 +110,6 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		ch.LastDeliveryTag++
 		tag := ch.LastDeliveryTag
-		// ch.Unacked[tag] = &DeliveryRecord{DeliveryTag: tag}
 		record := &DeliveryRecord{DeliveryTag: tag}
 		ch.UnackedByTag[tag] = record
 		if ch.UnackedByConsumer[c.Tag] == nil {
@@ -234,7 +223,6 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 	msg := Message{ID: "mx", Body: []byte("x")}
 	ch.mu.Lock()
 	ch.LastDeliveryTag = 1
-	// ch.Unacked[1] = &DeliveryRecord{DeliveryTag: 1, QueueName: q.Name, Message: msg}
 	record := &DeliveryRecord{DeliveryTag: 1, QueueName: q.Name, Message: msg}
 	ch.UnackedByTag[1] = record
 	if ch.UnackedByConsumer[c.Tag] == nil {

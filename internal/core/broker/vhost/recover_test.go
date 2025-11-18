@@ -36,7 +36,6 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	m2 := Message{ID: "msg2", Body: []byte("test2")}
 
 	ch.mu.Lock()
-	// ch.Unacked[1] = &DeliveryRecord{
 	record := &DeliveryRecord{
 		DeliveryTag: 1,
 		ConsumerTag: "ctag1",
