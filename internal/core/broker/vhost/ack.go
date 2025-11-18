@@ -42,18 +42,27 @@ func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag ui
 
 	ch.mu.Lock()
 	if multiple {
-		for tag, record := range ch.Unacked {
+		// Multiple=true: must scan flat map for numeric ordering
+		for tag, record := range ch.UnackedByTag {
 			log.Debug().Uint64("tag", tag).Msg("Checking unacked tag for multiple ack")
 			if tag <= deliveryTag {
 				removed = append(removed, record)
-				delete(ch.Unacked, tag)
+
+				deleteUnackedDelivery(ch, tag, record.ConsumerTag)
+
 				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
 	} else {
-		if record, exists := ch.Unacked[deliveryTag]; exists {
+		// Single ack: O(1) lookup in flat map
+		if record, exists := ch.UnackedByTag[deliveryTag]; exists {
+			// TODO: refactor to avoid code duplication with above
 			removed = append(removed, record)
-			delete(ch.Unacked, deliveryTag)
+
+			// Remove from both maps
+			deleteUnackedDelivery(ch, deliveryTag, record.ConsumerTag)
+
+			log.Debug().Uint64("tag", deliveryTag).Msg("Removed unacked tag for single ack")
 		}
 	}
 	// Notify any waiters that unacked state has changed
@@ -64,6 +73,18 @@ func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag ui
 
 	ch.mu.Unlock()
 	return removed, nil
+}
+
+func deleteUnackedDelivery(ch *ChannelDeliveryState, tag uint64, consumerTag string) {
+	delete(ch.UnackedByTag, tag)
+
+	// Remove from consumer's nested map
+	if consumerMap, exists := ch.UnackedByConsumer[consumerTag]; exists {
+		delete(consumerMap, tag)
+		if len(consumerMap) == 0 {
+			delete(ch.UnackedByConsumer, consumerTag)
+		}
+	}
 }
 
 func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag uint64, requeue bool) error {
@@ -148,9 +169,10 @@ func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uin
 	// fetch the channel delivery state if global is true
 	if state == nil {
 		state = &ChannelDeliveryState{
-			Unacked:        make(map[uint64]*DeliveryRecord),
-			unackedChanged: make(chan struct{}, 1),
-			FlowActive:     true, // Default to flow active
+			UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
+			UnackedByTag:      make(map[uint64]*DeliveryRecord),
+			unackedChanged:    make(chan struct{}, 1),
+			FlowActive:        true, // Default to flow active
 		}
 		vh.ChannelDeliveries[key] = state
 	}

@@ -125,7 +125,7 @@ type ChannelDeliveryState struct {
 
 **File:** `internal/core/broker/vhost/delivery.go`
 
-#### Step 1.1: Update struct definition
+#### ✅ Step 1.1: Update struct definition
 
 ```go
 type ChannelDeliveryState struct {
@@ -145,7 +145,7 @@ type ChannelDeliveryState struct {
 }
 ```
 
-#### Step 1.2: Update initialization in `GetOrCreateChannelDelivery()`
+#### ✅ Step 1.2: Update initialization in `GetOrCreateChannelDelivery()`
 
 ```go
 func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *ChannelDeliveryState {
@@ -165,7 +165,7 @@ func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *Ch
 }
 ```
 
-#### Step 1.3: Update initialization in `HandleBasicQos()`
+#### ✅ Step 1.3: Update initialization in `HandleBasicQos()`
 
 ```go
 if state == nil {
@@ -181,9 +181,9 @@ if state == nil {
 
 ---
 
-### Phase 2: Update Write Operations (60 minutes)
+### ✅ Phase 2: Update Write Operations (60 minutes)
 
-#### Step 2.1: Insert operation in `deliverToConsumer()`
+#### ✅ Step 2.1: Insert operation in `deliverToConsumer()`
 
 **File:** `internal/core/broker/vhost/delivery.go` (~line 89)
 
@@ -221,7 +221,7 @@ if track {
 }
 ```
 
-#### Step 2.2: Insert operation in `TrackDelivery()` (Basic.Get)
+#### ✅ Step 2.2: Insert operation in `TrackDelivery()` (Basic.Get)
 
 **File:** `internal/core/broker/vhost/delivery.go` (~line 239)
 
@@ -262,7 +262,7 @@ if !noAck {
 }
 ```
 
-#### Step 2.3: Delete operation in `popUnackedRecords()`
+#### ✅ Step 2.3: Delete operation in `popUnackedRecords()`
 
 **File:** `internal/core/broker/vhost/ack.go` (~line 45)
 
@@ -329,7 +329,7 @@ if multiple {
 ch.mu.Unlock()
 ```
 
-#### Step 2.4: Delete on failed delivery in `deliverToConsumer()`
+#### ✅ Step 2.4: Delete on failed delivery in `deliverToConsumer()`
 
 **File:** `internal/core/broker/vhost/delivery.go` (~line 116)
 
@@ -357,7 +357,7 @@ if track {
 
 ---
 
-### Phase 3: Update Read Operations (45 minutes)
+### 👉 Phase 3: Update Read Operations (45 minutes)
 
 #### Step 3.1: Iterate all in `CleanupChannel()`
 
