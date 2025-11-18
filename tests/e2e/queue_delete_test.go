@@ -66,13 +66,9 @@ func TestQueueDelete_Success_ReturnsMessageCount(t *testing.T) {
 	}
 }
 
-// FIXME: This test currently hangs due to RabbitMQ client library behavior
-// When broker sends channel.close in response to QueueDelete, the client's
-// QueueDelete call blocks indefinitely instead of returning with an error.
-// The broker implementation is correct (sends proper 403 ACCESS_REFUSED),
-// but we need a different testing approach.
+// TestQueueDelete_Exclusive_NonOwner_AccessRefused verifies that attempting to delete
+// an exclusive queue from a connection other than the owner results in ACCESS_REFUSED error.
 func TestQueueDelete_Exclusive_NonOwner_AccessRefused(t *testing.T) {
-	t.Skip("Skipping due to client library blocking issue - broker impl is correct")
 
 	// Use unique queue name to avoid conflicts
 	queueName := fmt.Sprintf("e2e.qdel.excl.%d", time.Now().UnixNano())
