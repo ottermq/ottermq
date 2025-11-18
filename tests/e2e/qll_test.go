@@ -183,11 +183,11 @@ func TestMaxLen_RequeueRespected(t *testing.T) {
 	defer tc.Close()
 
 	// Setup DLX for overflow detection
-	dlx := "test-dlx-requeue"
+	dlx := "test-dlx-maxlen-requeue"
 	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	dlq, err := tc.Ch.QueueDeclare("test-dlq-requeue", false, false, false, false, nil)
+	dlq, err := tc.Ch.QueueDeclare("test-dlq-maxlen-requeue", false, false, false, false, nil)
 	require.NoError(t, err)
 
 	err = tc.Ch.QueueBind(dlq.Name, "evicted", dlx, false, nil)
