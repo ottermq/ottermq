@@ -46,13 +46,13 @@ func (qll *DefaultQueueLengthLimiter) EnforceMaxLength(queue *Queue) {
 
 	// Pop all messages that need to be evicted while holding the lock
 	evictedMessages := make([]Message, 0, excess)
-	for i := range excess {
+	for evictedCount := range excess {
 		oldest := queue.popUnlocked()
 		if oldest == nil {
 			log.Warn().
 				Str("queue", queue.Name).
 				Uint32("expected", excess).
-				Uint32("evicted", i).
+				Uint32("evicted", evictedCount).
 				Msg("Queue became empty during enforcement")
 			break
 		}
