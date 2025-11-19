@@ -10,6 +10,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type Alias map[string](string)
+
+const DEFAULT_EXCHANGE_ALIAS = "(AMQP default)"
+
+var defaultAlias Alias = Alias{
+	DEFAULT_EXCHANGE:       DEFAULT_EXCHANGE_ALIAS,
+	EMPTY_EXCHANGE:         DEFAULT_EXCHANGE_ALIAS,
+	DEFAULT_EXCHANGE_ALIAS: DEFAULT_EXCHANGE,
+}
+
+func (e *Exchange) NameOrAlias() string {
+	if alias, ok := defaultAlias[e.Name]; ok {
+		return alias
+	}
+	return e.Name
+}
+
 type Exchange struct {
 	Name     string                `json:"name"`
 	Typ      ExchangeType          `json:"type"`
