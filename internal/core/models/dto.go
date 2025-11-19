@@ -41,6 +41,12 @@ func MapListConnectionsDTO(connections []amqp.ConnectionInfo) []ConnectionInfoDT
 	return listConnectonsDTO
 }
 
+type ChannelDTO struct {
+}
+
+type VHostDTO struct {
+}
+
 type ExchangeDTO struct {
 	VHostName string `json:"vhost"`
 	Name      string `json:"name"`
@@ -60,4 +66,10 @@ type BindingDTO struct {
 	VHostId   string              `json:"vhost_id"`
 	Exchange  string              `json:"exchange"`
 	Bindings  map[string][]string `json:"bindings"`
+}
+
+type ConsumerDTO struct {
+}
+
+type OverviewDTO struct {
 }
