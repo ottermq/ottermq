@@ -13,10 +13,10 @@ type CreateQueueRequest struct {
 	Arguments  map[string]any `json:"arguments,omitempty"`
 
 	// Convenience fields (auto-mapped to arguments)
-	MaxLength            *int32 `json:"max_length,omitempty"`
-	MessageTTL           *int64 `json:"message_ttl,omitempty"`
-	DeadLetterExchange   string `json:"x-dead-letter-exchange,omitempty"`
-	DeadLetterRoutingKey string `json:"x-dead-letter-routing-key,omitempty"`
+	MaxLength            *int32  `json:"max_length,omitempty"`
+	MessageTTL           *int64  `json:"message_ttl,omitempty"`
+	DeadLetterExchange   *string `json:"x-dead-letter-exchange,omitempty"`
+	DeadLetterRoutingKey *string `json:"x-dead-letter-routing-key,omitempty"`
 }
 
 type CreateExchangeRequest struct {
