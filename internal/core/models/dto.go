@@ -41,9 +41,6 @@ func MapListConnectionsDTO(connections []amqp.ConnectionInfo) []ConnectionInfoDT
 	return listConnectonsDTO
 }
 
-type ChannelDTO struct {
-}
-
 type VHostDTO struct {
 }
 
@@ -126,6 +123,20 @@ type ChannelDetails struct {
 	Number         uint16 `json:"number"`
 	ConnectionName string `json:"connection_name"`
 	User           string `json:"user"`
+}
+
+type ChannelDTO struct {
+	Number              uint16 `json:"number"`
+	ConnectionName      string `json:"connection_name"`
+	VHost               string `json:"vhost"`
+	User                string `json:"user"`
+	State               string `json:"state"` // "running", "flow"
+	UnackedCount        int    `json:"messages_unacknowledged"`
+	ConsumerCount       int    `json:"consumer_count"`
+	PrefetchCount       uint16 `json:"prefetch_count"`
+	GlobalPrefetchCount uint16 `json:"global_prefetch_count"`
+	InTransaction       bool   `json:"in_transaction"`
+	ConfirmMode         bool   `json:"confirm"`
 }
 
 type BindingDTO struct {
