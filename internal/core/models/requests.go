@@ -25,9 +25,11 @@ type CreateExchangeRequest struct {
 	VHost        string `json:"vhost"` // Optional; defaults to "/"
 
 	// Properties
+	Passive    bool           `json:"passive"`
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
-	Exclusive  bool           `json:"exclusive"`
+	Internal   bool           `json:"internal"`
+	NoWait     bool           `json:"no_wait"` // not needed for management API. Included for completeness
 	Arguments  map[string]any `json:"arguments,omitempty"`
 }
 
