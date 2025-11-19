@@ -52,9 +52,9 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 	exchangeDto := models.ExchangeDTO{
-		VHostName: "/", // Assuming a default vhost for simplicity
-		Name:      request.ExchangeName,
-		Type:      request.ExchangeType,
+		VHost: "/", // Assuming a default vhost for simplicity
+		Name:  request.ExchangeName,
+		Type:  request.ExchangeType,
 	}
 
 	err := b.ManagerApi.CreateExchange(exchangeDto)
