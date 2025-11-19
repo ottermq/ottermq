@@ -28,7 +28,7 @@ This document outlines a comprehensive refactoring of OtterMQ's Management API t
 
 ### Proposed Architecture
 
-```
+```sh
 ┌─────────────────────────────────────────────────────────┐
 │                   HTTP API Layer                         │
 │  (Validation, HTTP concerns, error handling)            │
