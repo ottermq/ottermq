@@ -49,7 +49,7 @@ func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 		for xn := range names {
 			if exchange, ok := vh.Exchanges[xn]; ok {
 				exchanges = append(exchanges, models.ExchangeDTO{
-					VHostName: vh.Name,
+					VHost: vh.Name,
 					Name: func(xname string) string {
 						if alias, ok := defaultAlias[xname]; ok {
 							return alias
@@ -81,9 +81,9 @@ func (a DefaultManagerApi) GetExchange(vhostName, exchangeName string) (*vhost.E
 
 func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	b := a.broker
-	vh := b.GetVHost(dto.VHostName)
+	vh := b.GetVHost(dto.VHost)
 	if vh == nil {
-		return fmt.Errorf("vhost %s not found", dto.VHostName)
+		return fmt.Errorf("vhost %s not found", dto.VHost)
 	}
 	typ, err := vhost.ParseExchangeType(dto.Type)
 	if err != nil {

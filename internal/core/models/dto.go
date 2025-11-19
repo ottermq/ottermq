@@ -48,9 +48,27 @@ type VHostDTO struct {
 }
 
 type ExchangeDTO struct {
-	VHostName string `json:"vhost"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
+	// Identity
+	VHost string `json:"vhost"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+
+	// Properties/flags
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Internal   bool           `json:"internal"`
+	Arguments  map[string]any `json:"arguments_count"`
+
+	// Stats
+	MessageStatsIn  *MessageStats `json:"message_stats_in,omitempty"`
+	MessageStatsOut *MessageStats `json:"message_stats_out,omitempty"`
+}
+
+type MessageStats struct {
+	PublishCount int     `json:"publish"`
+	PublishRate  float64 `json:"publish_details.rate"`
+	DeliverCount int64   `json:"deliver_get"`
+	DeliverRate  float64 `json:"deliver_get_details.rate"`
 }
 
 type QueueDTO struct {
