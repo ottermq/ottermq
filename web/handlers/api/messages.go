@@ -34,7 +34,7 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 
 	msg := amqp091.Publishing{
 		ContentType: "text/plain",
-		Body:        []byte(request.Message),
+		Body:        []byte(request.Payload),
 	}
 	err := ch.Publish(
 		exchange,
