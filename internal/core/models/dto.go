@@ -47,30 +47,6 @@ type ChannelDTO struct {
 type VHostDTO struct {
 }
 
-type ExchangeDTO struct {
-	// Identity
-	VHost string `json:"vhost"`
-	Name  string `json:"name"`
-	Type  string `json:"type"`
-
-	// Properties/flags
-	Durable    bool           `json:"durable"`
-	AutoDelete bool           `json:"auto_delete"`
-	Internal   bool           `json:"internal"`
-	Arguments  map[string]any `json:"arguments_count"`
-
-	// Stats
-	MessageStatsIn  *MessageStats `json:"message_stats_in,omitempty"`
-	MessageStatsOut *MessageStats `json:"message_stats_out,omitempty"`
-}
-
-type MessageStats struct {
-	PublishCount int     `json:"publish"`
-	PublishRate  float64 `json:"publish_details.rate"`
-	DeliverCount int64   `json:"deliver_get"`
-	DeliverRate  float64 `json:"deliver_get_details.rate"`
-}
-
 type QueueDTO struct {
 	// Identity
 	VHost string `json:"vhost"`
@@ -111,14 +87,52 @@ type QueueDTO struct {
 	PersistenceEnabled bool   `json:"persistence_enabled"`
 }
 
+type ExchangeDTO struct {
+	// Identity
+	VHost string `json:"vhost"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+
+	// Properties/flags
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Internal   bool           `json:"internal"`
+	Arguments  map[string]any `json:"arguments_count"`
+
+	// Stats
+	MessageStatsIn  *MessageStats `json:"message_stats_in,omitempty"`
+	MessageStatsOut *MessageStats `json:"message_stats_out,omitempty"`
+}
+
+type MessageStats struct {
+	PublishCount int     `json:"publish"`
+	PublishRate  float64 `json:"publish_details.rate"`
+	DeliverCount int64   `json:"deliver_get"`
+	DeliverRate  float64 `json:"deliver_get_details.rate"`
+}
+
+type ConsumerDTO struct {
+	ConsumerTag    string         `json:"consumer_tag"`
+	QueueName      string         `json:"queue_name"`
+	ChannelDetails ChannelDetails `json:"channel_details"`
+	AckRequired    bool           `json:"ack_required"` // !NoAck
+	Exclusive      bool           `json:"exclusive"`
+	PrefetchCount  int            `json:"prefetch_count"`
+	Active         bool           `json:"active"`
+	Arguments      map[string]any `json:"arguments_count"`
+}
+
+type ChannelDetails struct {
+	Number         uint16 `json:"number"`
+	ConnectionName string `json:"connection_name"`
+	User           string `json:"user"`
+}
+
 type BindingDTO struct {
 	VHostName string              `json:"vhost"`
 	VHostId   string              `json:"vhost_id"`
 	Exchange  string              `json:"exchange"`
 	Bindings  map[string][]string `json:"bindings"`
-}
-
-type ConsumerDTO struct {
 }
 
 type OverviewDTO struct {
