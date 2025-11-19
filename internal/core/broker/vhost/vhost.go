@@ -189,6 +189,13 @@ func (vh *VHost) GetAllExchanges() []*Exchange {
 	return exchanges
 }
 
+// GetExchange retrieves an exchange by name.
+func (vh *VHost) GetExchange(exchangeName string) *Exchange {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.Exchanges[exchangeName]
+}
+
 // GetAllQueues returns a copy of all queues in this vhost.
 func (vh *VHost) GetAllQueues() []*Queue {
 	vh.mu.Lock()
