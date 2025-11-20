@@ -10,6 +10,7 @@ type CreateQueueRequest struct {
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Exclusive  bool           `json:"exclusive"`
+	NoWait     bool           `json:"no_wait"` // not needed for management API. Included for completeness
 	Arguments  map[string]any `json:"arguments,omitempty"`
 
 	// Convenience fields (auto-mapped to arguments)
