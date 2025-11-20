@@ -20,15 +20,7 @@ var defaultAlias Alias = Alias{
 }
 
 type ManagerApi interface {
-	ListExchanges() []models.ExchangeDTO
-	CreateExchange(dto models.ExchangeDTO) error
-	GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error)
-	GetExchangeUniqueNames() map[string]bool
-	ListQueues() ([]models.QueueDTO, error)
-	DeleteQueue(vhostName, queueName string) error
-	GetTotalQueues() int
 	ListConnections() []models.ConnectionInfoDTO
-	ListBindings(vhostName, exchangeName string) map[string][]string
 }
 
 func NewDefaultManagerApi(broker *Broker) *DefaultManagerApi {
@@ -39,6 +31,7 @@ type DefaultManagerApi struct {
 	broker *Broker
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	b := a.broker
 	names := a.GetExchangeUniqueNames()
@@ -64,6 +57,7 @@ func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	return exchanges
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error) {
 	b := a.broker
 	vh := b.GetVHost(vhostName)
@@ -79,6 +73,7 @@ func (a DefaultManagerApi) GetExchange(vhostName, exchangeName string) (*vhost.E
 	return exchange, nil
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	b := a.broker
 	vh := b.GetVHost(dto.VHost)
@@ -98,6 +93,7 @@ func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	return vh.CreateExchange(dto.Name, typ, nil)
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) GetExchangeUniqueNames() map[string]bool {
 	b := a.broker
 	b.mu.Lock()
@@ -113,6 +109,7 @@ func (a DefaultManagerApi) GetExchangeUniqueNames() map[string]bool {
 	return exchangeNames
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 	b := a.broker
 	queues := make([]models.QueueDTO, 0, a.GetTotalQueues())
@@ -132,6 +129,7 @@ func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 	return queues, nil
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) DeleteQueue(vhostName, queueName string) error {
 	b := a.broker
 	vh := b.GetVHost(vhostName)
@@ -141,6 +139,7 @@ func (a DefaultManagerApi) DeleteQueue(vhostName, queueName string) error {
 	return vh.DeleteQueuebyName(queueName)
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) GetTotalQueues() int {
 	b := a.broker
 	b.mu.Lock()
@@ -168,6 +167,7 @@ func (a DefaultManagerApi) ListConnections() []models.ConnectionInfoDTO {
 	return connectionsDTO
 }
 
+// Deprecated: use management service instead
 func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[string][]string {
 	b := a.broker
 	vh := b.GetVHost(vhostName)
@@ -186,6 +186,11 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 		return nil
 	}
 
+	return listBindingsForExchange(exchange)
+}
+
+// Deprecated: use management service instead
+func listBindingsForExchange(exchange *vhost.Exchange) map[string][]string {
 	switch exchange.Typ {
 	case vhost.DIRECT:
 		bindings := make(map[string][]string)
@@ -216,7 +221,7 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 		}
 		return bindings
 	default:
-		log.Debug().Str("exchange", exchangeName).Str("type", string(exchange.Typ)).Msg("Unsupported exchange type for listing bindings")
+		log.Debug().Str("exchange", exchange.Name).Str("type", string(exchange.Typ)).Msg("Unsupported exchange type for listing bindings")
 		return nil
 	}
 }

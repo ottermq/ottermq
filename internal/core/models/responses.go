@@ -25,5 +25,5 @@ type QueueDeleteResponse struct {
 }
 
 type BindingListResponse struct {
-	Bindings map[string][]string `json:"bindings"`
+	Bindings []BindingDTO `json:"bindings"`
 }
