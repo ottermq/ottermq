@@ -43,6 +43,14 @@ type CreateBindingRequest struct {
 	Arguments   map[string]any `json:"arguments,omitempty"`
 }
 
+type DeleteBindingRequest struct {
+	VHost       string         `json:"vhost"`                           // Optional; defaults to "/"
+	Source      string         `json:"source" validate:"required"`      // Exchange
+	Destination string         `json:"destination" validate:"required"` // Queue (?or Exchange too??)
+	RoutingKey  string         `json:"routing_key"`
+	Arguments   map[string]any `json:"arguments,omitempty"`
+}
+
 type PublishMessageRequest struct {
 	VHost        string `json:"vhost"` // Optional; defaults to "/"
 	ExchangeName string `json:"exchange" validate:"required"`
@@ -67,10 +75,4 @@ type PublishMessageRequest struct {
 	// Routing flags
 	Mandatory bool `json:"mandatory"`
 	Immediate bool `json:"immediate"` // Deprecated in AMQP 0-9-1 (included for compatibility)
-}
-
-type DeleteBindingRequest struct {
-	ExchangeName string `json:"exchange_name"`
-	QueueName    string `json:"queue_name"`
-	RoutingKey   string `json:"routing_key"`
 }

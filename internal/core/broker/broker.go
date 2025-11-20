@@ -38,7 +38,7 @@ type Broker struct {
 	rootCancel   context.CancelFunc
 	persist      persistence.Persistence
 	Ready        chan struct{} // Signals when the broker is ready to accept connections
-	Management   *management.Service
+	Management   management.ManagementService
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
