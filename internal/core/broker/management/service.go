@@ -1,7 +1,6 @@
 package management
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
@@ -12,7 +11,7 @@ type ManagementService interface {
 	// Queues
 	ListQueues(vhost string) ([]models.QueueDTO, error)
 	GetQueue(vhost, name string) (*models.QueueDTO, error)
-	CreateQueue(vhost string, req models.CreateQueueRequest) (*models.QueueDTO, error)
+	CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error)
 	DeleteQueue(vhost, name string, ifUnused, ifEmpty bool) error
 	PurgeQueues(vhost, name string) (int, error)
 
@@ -56,9 +55,9 @@ type ManagementService interface {
 }
 
 type Service struct {
-	broker *broker.Broker
+	broker BrokerProvider
 }
 
-func NewService(b *broker.Broker) *Service {
+func NewService(b BrokerProvider) *Service {
 	return &Service{broker: b}
 }
