@@ -18,10 +18,10 @@ import (
 // @Router /connections [get]
 // @Security BearerAuth
 func ListConnections(c *fiber.Ctx, b *broker.Broker) error {
-	connections := b.ManagerApi.ListConnections()
-	if connections == nil {
+	connections, err := b.Management.ListConnections()
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "Failed to list connections",
+			Error: "Failed to list connections: " + err.Error(),
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.ConnectionListResponse{
