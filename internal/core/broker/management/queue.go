@@ -50,9 +50,21 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 
 func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error) {
 	vhostName := req.VHost
+	if vhostName == "" {
+		vhostName = "/"
+	}
+
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
+	}
+
+	// Not necessary to check for existing queue here;
+	// CreateQueue handles that, verifying properties if passive.
+
+	if req.Exclusive {
+		// Exclusive queues cannot be created via the management API
+		return nil, fmt.Errorf("cannot create exclusive queue via management API")
 	}
 
 	// Build arguments from convenience fields
@@ -89,6 +101,11 @@ func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, 
 		return nil, err
 	}
 
+	err = vh.BindToDefaultExchange(req.QueueName)
+	if err != nil {
+		return nil, err
+	}
+
 	dto := s.queueToDTO(vh, queue, 0, 0)
 	return &dto, nil
 }
@@ -97,6 +114,11 @@ func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty boo
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return fmt.Errorf("vhost '%s' not found", vhostName)
+	}
+
+	queue := vh.GetQueue(queueName)
+	if queue == nil {
+		return nil // Idempotent delete
 	}
 
 	// Check conditions
@@ -108,8 +130,7 @@ func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty boo
 	}
 
 	if ifEmpty {
-		queue := vh.GetQueue(queueName)
-		if queue != nil && queue.Len() > 0 {
+		if queue.Len() > 0 {
 			return fmt.Errorf("queue '%s' has %d messages, cannot delete (if-empty)", queueName, queue.Len())
 		}
 	}
@@ -118,7 +139,7 @@ func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty boo
 
 }
 
-func (s *Service) PurgeQueues(vhostName, queueName string) (int, error) {
+func (s *Service) PurgeQueue(vhostName, queueName string) (int, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return 0, fmt.Errorf("vhost '%s' not found", vhostName)
@@ -157,14 +178,37 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 		dto.DeadLetterRoutingKey = &dlrk
 	}
 
-	// Extract TTL
-	if maxLen, ok := queue.Props.Arguments["x-message-ttl"]; ok {
-		switch v := maxLen.(type) {
+	// Extract Max Length
+	if val, ok := queue.Props.Arguments["x-max-length"]; ok {
+		switch v := val.(type) {
 		case int32:
 			dto.MaxLength = &v
 		case int:
 			val := int32(v)
 			dto.MaxLength = &val
+		case int64:
+			val := int32(v)
+			dto.MaxLength = &val
+		case float64:
+			val := int32(v)
+			dto.MaxLength = &val
+		}
+	}
+
+	// Extract TTL
+	if val, ok := queue.Props.Arguments["x-message-ttl"]; ok {
+		switch v := val.(type) {
+		case int64:
+			dto.MessageTTL = &v
+		case int32:
+			val := int64(v)
+			dto.MessageTTL = &val
+		case int:
+			val := int64(v)
+			dto.MessageTTL = &val
+		case float64:
+			val := int64(v)
+			dto.MessageTTL = &val
 		}
 	}
 	return dto
