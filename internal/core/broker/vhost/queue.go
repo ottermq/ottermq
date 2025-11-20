@@ -231,19 +231,14 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	defer vh.mu.Unlock()
 
 	// Passive declaration: error if queue doesn't exist
-	if props != nil && props.Passive {
-		queue := vh.Queues[name]
-		if queue == nil {
-			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
-			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
-		} else {
-			log.Debug().Str("queue", name).Msg("Passive queue declare: queue exists")
-			return queue, nil
-		}
+	existing, err := vh.retrievePassiveQueue(props, name)
+	if err != nil {
+		return nil, err
 	}
 
 	// Queue already exists: validate compatibility
-	if existing, ok := vh.Queues[name]; ok {
+	// Idempotent if properties match
+	if existing != nil {
 		if existing.Props == nil || props == nil {
 			return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
 		}
@@ -255,6 +250,10 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 		}
 		log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
 		return existing, nil
+	}
+
+	if name == "" {
+		name = generateRandomQueueName()
 	}
 
 	// Create new queue
@@ -486,4 +485,23 @@ func (q *Queue) StreamPurge(process func(*Message)) uint32 {
 		purged++
 	}
 	return purged
+}
+
+// retrievePassiveQueue checks if a passive queue declaration is requested and retrieves the queue if it exists.
+func (vh *VHost) retrievePassiveQueue(props *QueueProperties, name string) (*Queue, error) {
+	if props != nil && props.Passive {
+		queue := vh.Queues[name]
+		if queue == nil {
+			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
+			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
+		} else {
+			log.Debug().Str("queue", name).Msg("Passive queue declare: queue exists")
+			return queue, nil
+		}
+	}
+	return nil, nil
+}
+
+func generateRandomQueueName() string {
+	return "amq.gen-" + generatePseudoRandomString(16)
 }
