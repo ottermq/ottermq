@@ -31,7 +31,6 @@ type Broker struct {
 	Connections  map[net.Conn]*amqp.ConnectionInfo `json:"-"`
 	mu           sync.Mutex                        `json:"-"`
 	framer       amqp.Framer
-	ManagerApi   ManagerApi // Obsolete, use management.Service instead
 	ShuttingDown atomic.Bool
 	ActiveConns  sync.WaitGroup
 	rootCtx      context.Context
@@ -72,7 +71,6 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	b.VHosts["/"] = vhost.NewVhost("/", options)
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
-	b.ManagerApi = &DefaultManagerApi{b}
 	b.Management = management.NewService(b)
 	return b
 }
@@ -267,6 +265,16 @@ func (b *Broker) ListVHosts() []*vhost.VHost {
 		vhosts = append(vhosts, vh)
 	}
 	return vhosts
+}
+
+func (b *Broker) ListConnections() []amqp.ConnectionInfo {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	connections := make([]amqp.ConnectionInfo, 0, len(b.Connections))
+	for _, c := range b.Connections {
+		connections = append(connections, *c)
+	}
+	return connections
 }
 
 func (b *Broker) Shutdown() {
