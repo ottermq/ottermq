@@ -5,7 +5,6 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/rabbitmq/amqp091-go"
 )
 
 // ListExchanges godoc
@@ -20,8 +19,8 @@ import (
 // @Router /exchanges [get]
 // @Security BearerAuth
 func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
-	exchanges := b.ManagerApi.ListExchanges()
-	if exchanges == nil {
+	exchanges, err := b.Management.ListExchanges("/")
+	if err != nil || exchanges == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to list exchanges",
 		})
@@ -51,13 +50,17 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 			Error: "Invalid or malformed request body: " + err.Error(),
 		})
 	}
-	exchangeDto := models.ExchangeDTO{
-		VHost: "/", // Assuming a default vhost for simplicity
-		Name:  request.ExchangeName,
-		Type:  request.ExchangeType,
+	exchangeDto := models.CreateExchangeRequest{
+		VHost:        "/", // Assuming a default vhost for simplicity
+		ExchangeName: request.ExchangeName,
+		ExchangeType: request.ExchangeType,
+		Durable:      request.Durable,
+		AutoDelete:   request.AutoDelete,
+		Internal:     request.Internal,
+		Arguments:    request.Arguments,
 	}
 
-	err := b.ManagerApi.CreateExchange(exchangeDto)
+	_, err := b.Management.CreateExchange(exchangeDto)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -81,7 +84,7 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /exchanges/{exchange} [delete]
 // @Security BearerAuth
-func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
+func DeleteExchange(c *fiber.Ctx, b *broker.Broker) error {
 	exchangeName := c.Params("exchange")
 	if exchangeName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -89,7 +92,7 @@ func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
 		})
 	}
 
-	err := ch.ExchangeDelete(exchangeName, false, false)
+	err := b.Management.DeleteExchange("/", exchangeName, false)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),

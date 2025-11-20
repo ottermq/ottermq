@@ -176,15 +176,31 @@ func (vh *VHost) GetConsumersByQueue(queueName string) []*Consumer {
 	return vh.ConsumersByQueue[queueName]
 }
 
-func (vh *VHost) GetAllExchanges() []*Exchange {
+// GetExchangeUniqueNames returns a map of unique exchange names across all vhosts.
+// Necessary to avoid duplicates when listing exchanges (e.g., default exchange "" and amqp.default).
+// It lists the default exchange as "(AMQP default)", which is more client-friendly than "" (empty string).
+
+func (vh *VHost) GetExchangeUniqueNames() map[string]bool {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-
-	exchanges := make([]*Exchange, 0, len(vh.Exchanges))
+	exchangeNames := make(map[string]bool)
 	for _, exchange := range vh.Exchanges {
 		if exchange.Name != EMPTY_EXCHANGE {
-			exchanges = append(exchanges, exchange)
+			exchangeNames[exchange.Name] = true
 		}
+	}
+
+	return exchangeNames
+}
+
+// GetAllExchanges returns a slice of all exchanges in this vhost.
+func (vh *VHost) GetAllExchanges() []*Exchange {
+	exchangeNames := vh.GetExchangeUniqueNames()
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	exchanges := make([]*Exchange, 0, len(exchangeNames))
+	for name := range exchangeNames {
+		exchanges = append(exchanges, vh.Exchanges[name])
 	}
 	return exchanges
 }

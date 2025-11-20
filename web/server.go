@@ -107,7 +107,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	})
 
 	apiGrp.Delete("/exchanges/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.DeleteExchange(c, ws.Channel)
+		return api.DeleteExchange(c, ws.Broker)
 	})
 	apiGrp.Get("/bindings/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListBindings(c, ws.Broker)
