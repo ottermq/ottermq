@@ -10,6 +10,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/broker/management"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
@@ -30,13 +31,14 @@ type Broker struct {
 	Connections  map[net.Conn]*amqp.ConnectionInfo `json:"-"`
 	mu           sync.Mutex                        `json:"-"`
 	framer       amqp.Framer
-	ManagerApi   ManagerApi
+	ManagerApi   ManagerApi // Obsolete, use management.Service instead
 	ShuttingDown atomic.Bool
 	ActiveConns  sync.WaitGroup
 	rootCtx      context.Context
 	rootCancel   context.CancelFunc
 	persist      persistence.Persistence
 	Ready        chan struct{} // Signals when the broker is ready to accept connections
+	Management   *management.Service
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -71,6 +73,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
 	b.ManagerApi = &DefaultManagerApi{b}
+	b.Management = management.NewService(b)
 	return b
 }
 
@@ -254,6 +257,16 @@ func (b *Broker) GetVHost(vhostName string) *vhost.VHost {
 		return vhost
 	}
 	return nil
+}
+
+func (b *Broker) ListVHosts() []*vhost.VHost {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vhosts := make([]*vhost.VHost, 0, len(b.VHosts))
+	for _, vh := range b.VHosts {
+		vhosts = append(vhosts, vh)
+	}
+	return vhosts
 }
 
 func (b *Broker) Shutdown() {
