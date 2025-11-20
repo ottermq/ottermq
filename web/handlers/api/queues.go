@@ -20,7 +20,7 @@ import (
 // @Router /queues [get]
 // @Security BearerAuth
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues, err := b.ManagerApi.ListQueues()
+	queues, err := b.Management.ListQueues("/") // Use default vhost for now TODO: allow specifying vhost in the request
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to list queues: " + err.Error(),
@@ -44,7 +44,7 @@ func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /queues [post]
 // @Security BearerAuth
-func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
+func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -57,14 +57,7 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 		})
 	}
 
-	_, err := ch.QueueDeclare(
-		request.QueueName,
-		false, // durable
-		false, // delete when unused
-		true,  // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
+	_, err := b.Management.CreateQueue(request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -98,7 +91,8 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 	}
 
 	// Use default vhost TODO: allow specifying vhost in the request
-	err := b.ManagerApi.DeleteQueue("/", queueName)
+	// TODO: support ifUnused and ifEmpty query parameters
+	err := b.Management.DeleteQueue("/", queueName, false, false)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
