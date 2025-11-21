@@ -17,9 +17,12 @@ func TestListConsumers_MultipleQueues(t *testing.T) {
 	// Add consumers to different queues
 	vh.ConsumersByQueue["queue1"] = []*vhost.Consumer{
 		{
-			Tag:       "consumer1",
-			Channel:   1,
-			QueueName: "queue1",
+			Tag:           "consumer1",
+			Channel:       1,
+			QueueName:     "queue1",
+			Connection:    nil,
+			Active:        true,
+			PrefetchCount: 0,
 			Props: &vhost.ConsumerProperties{
 				NoAck:     false,
 				Exclusive: false,
@@ -29,14 +32,30 @@ func TestListConsumers_MultipleQueues(t *testing.T) {
 	}
 	vh.ConsumersByQueue["queue2"] = []*vhost.Consumer{
 		{
-			Tag:       "consumer2",
-			Channel:   1,
-			QueueName: "queue2",
+			Tag:           "consumer2",
+			Channel:       1,
+			QueueName:     "queue2",
+			Connection:    nil,
+			Active:        true,
+			PrefetchCount: 0,
+			Props: &vhost.ConsumerProperties{
+				NoAck:     false,
+				Exclusive: false,
+				Arguments: map[string]interface{}{},
+			},
 		},
 		{
-			Tag:       "consumer3",
-			Channel:   2,
-			QueueName: "queue2",
+			Tag:           "consumer3",
+			Channel:       2,
+			QueueName:     "queue2",
+			Connection:    nil,
+			Active:        true,
+			PrefetchCount: 0,
+			Props: &vhost.ConsumerProperties{
+				NoAck:     false,
+				Exclusive: false,
+				Arguments: map[string]interface{}{},
+			},
 		},
 	}
 
