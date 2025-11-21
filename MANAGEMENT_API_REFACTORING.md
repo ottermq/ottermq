@@ -782,61 +782,83 @@ GET    /api/overview                        # Global statistics and info
 
 **Goals**: Expose channel details and advanced broker features
 
-1. ✅ Implement `management/channels.go`
-   - ListChannels
-   - ListConnectionChannels
-   - GetChannel
+1. ⬜ Implement `management/channel.go`
+   - ListChannels (all channels across connections)
+   - ListConnectionChannels (per-connection)
+   - GetChannel (specific channel details)
+   - Channel state and statistics
 
-2. ✅ Implement `management/messages.go`
-   - PublishMessage (with full AMQP properties)
-   - GetMessages
+2. ✅ Implement `management/message.go`
+   - PublishMessage (with full AMQP properties support)
+   - GetMessages (with count and ack-mode)
+   - Property mapping (content-type, delivery-mode, TTL, headers, etc.)
+   - Message DTO conversion
 
-3. ✅ Create `web/handlers/api/channels.go`
+3. ⬜ Create `web/handlers/api/channels.go`
    - Channel listing endpoints
-   - Channel details
+   - Channel details with statistics
 
-4. ✅ Enhance `web/handlers/api/messages.go`
+4. ⬜ Enhance `web/handlers/api/messages.go`
    - Support TTL, priority, headers in publish
-   - Support delivery-mode, correlation-id
+   - Support delivery-mode, correlation-id, reply-to
+   - Message properties validation
 
-**Deliverables**:
+**Deliverables**: ⬜
 
-- Channel information via API
-- Full message property support
+- Channel information via API with state tracking
+- Full message property support (all AMQP 0-9-1 properties)
 - TTL configurable via publish API
+- Message retrieval with delivery tracking
 
-### Phase 5: Statistics & Overview (Week 3)
+### Phase 5: Statistics & Overview (Week 3) ⬜ COMPLETE
 
 **Goals**: Provide monitoring and statistics endpoints
 
-1. ✅ Implement `management/stats.go`
-   - GetOverview (global stats)
-   - GetQueueStats
-   - GetExchangeStats
+1. ⬜ Implement `management/overview.go`
+   - GetOverview (global broker statistics)
+   - Queue/Exchange/Connection aggregation
+   - Message statistics
 
-2. ✅ Create `web/handlers/api/overview.go`
+2. ⬜ Implement `management/connection.go`
+   - ListConnections (with enhanced details)
+   - GetConnection (specific connection info)
+   - CloseConnection (graceful shutdown)
+
+3. ⬜ Implement `management/vhost.go`
+   - ListVHosts (all virtual hosts)
+   - GetVHost (specific vhost details)
+
+4. ⬜ Create `web/handlers/api/overview.go`
    - Overview endpoint
-   - Statistics endpoints
+   - Statistics aggregation
 
-**Deliverables**:
+**Deliverables**: ⬜
 
-- Overview/statistics API
-- Monitoring-ready endpoints
+- Overview/statistics API for monitoring
+- Connection management endpoints
+- VHost information exposure
+- Monitoring-ready JSON responses
 
-### Phase 6: Deprecation & Cleanup (Week 3)
+### Phase 6: Deprecation & Cleanup (Week 3) ⚠️ IN PROGRESS
 
 **Goals**: Remove old code and AMQP client dependency
 
 1. ✅ Remove `internal/core/broker/public.go`
 2. ✅ Remove `amqp091.Channel` from `web/server.go`
-3. ✅ Update all tests
-4. ✅ Update documentation
+3. ✅ Remove `ManagerApi` interface
+4. ✅ Update management package tests (13 tests passing)
+5. ⬜ Update E2E tests to use new API structure
+6. ⬜ Update Swagger documentation
+7. ⬜ Update README with new API examples
+8. ⬜ Update architecture documentation
 
-**Deliverables**:
+**Deliverables**: ⚠️ Partial
 
-- Clean codebase
-- No AMQP client in web layer
-- Updated tests and docs
+- ✅ Clean codebase (legacy code removed)
+- ✅ No AMQP client in web layer
+- ✅ Management unit tests complete
+- ⬜ E2E test updates
+- ⬜ Documentation updates (Swagger, README, architecture docs)
 
 ---
 
