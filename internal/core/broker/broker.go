@@ -59,6 +59,8 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	b := &Broker{
 		VHosts:      make(map[string]*vhost.VHost),
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connections: make(map[vhost.ConnectionID]net.Conn),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		config:      config,
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
