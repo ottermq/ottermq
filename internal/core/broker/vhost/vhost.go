@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
@@ -292,4 +293,49 @@ func (vh *VHost) loadPersistedState() {
 			}
 		}
 	}
+}
+
+func (vh *VHost) ListConsumers(cb func(queueName string, consumer Consumer, dtos []models.ConsumerDTO)) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	// Iterate through all queues and their consumers
+	for queueName, queueConsumers := range vh.ConsumersByQueue {
+		for _, consumer := range queueConsumers {
+			cb(queueName, *consumer, nil)
+		}
+	}
+	return nil
+}
+
+type NoConsumersError interface {
+	error
+}
+
+func (vh *VHost) ListQueueConsumers(queueName string, cb func(consumer Consumer, dtos []any)) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	queueConsumers, err := vh.getConsumersByQueue(queueName)
+	if err != nil {
+		return err
+	}
+	if len(queueConsumers) == 0 {
+		return nil // No consumers
+	}
+
+	consumers := make([]any, 0, len(queueConsumers))
+	for _, consumer := range queueConsumers {
+		cb(*consumer, consumers)
+	}
+	return nil
+
+}
+
+func (vh *VHost) getConsumersByQueue(queueName string) ([]*Consumer, error) {
+	queueConsumers, exists := vh.ConsumersByQueue[queueName]
+	if !exists {
+		return nil, nil
+	}
+	return queueConsumers, nil
 }
