@@ -282,3 +282,44 @@ func (b *Broker) Shutdown() {
 		conn.Close()
 	}
 }
+
+func (b *Broker) ListChannels() ([]ChannelInformation, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	channels := make([]ChannelInformation, 0, len(b.Connections))
+	for _, c := range b.Connections {
+		vhost := c.VHostName
+		vh := b.VHosts[vhost]
+		user := c.Client.Config.Username
+		for ck, consumer := range vh.Consumers {
+
+			channelInfo := ChannelInformation{
+				VHost:          vhost,
+				Number:         ck.Channel,
+				ConnectionName: consumer.Connection.RemoteAddr().String(),
+				User:           user,
+				State:          "running",
+				// UnconfirmedCount:   ch.UnconfirmedCount,
+				// UnackedCount:      ch.UnackedCount,
+				// PrefetchCount:      ch.PrefetchCount,
+				// InTransaction:      ch.InTransaction,
+				// ConfirmMode:        ch.ConfirmMode,
+			}
+			channels = append(channels, channelInfo)
+		}
+
+	}
+
+	return channels, nil
+}
+
+type ChannelInformation struct {
+	Number           uint16 `json:"number"`
+	ConnectionName   string `json:"connection_name"`
+	VHost            string `json:"vhost"`
+	User             string `json:"user"`
+	State            string `json:"state"` // "running"
+	UnconfirmedCount int    `json:"unconfirmed_count"`
+	PrefetchCount    uint16 `json:"prefetch_count"`
+	UnackedCount     int    `json:"unacked_count"`
+}
