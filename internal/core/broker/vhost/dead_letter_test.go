@@ -35,16 +35,17 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
+	connID := newTestConsumerConnID()
 
 	// Create DLX exchange and queue
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dead-letter-queue", dlqProps, nil)
+	_, err = vh.CreateQueue("dead-letter-queue", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dead-letter-queue", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dead-letter-queue", "dead", nil, connID)
 	require.NoError(t, err)
 
 	// Create main queue with DLX
@@ -53,7 +54,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create and dead-letter a message
@@ -113,16 +114,17 @@ func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
+	connID := newTestConsumerConnID()
 
 	// Create DLX exchange and queue
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dead-letter-queue", dlqProps, nil)
+	_, err = vh.CreateQueue("dead-letter-queue", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dead-letter-queue", "original.key", nil, nil)
+	err = vh.BindQueue("dlx", "dead-letter-queue", "original.key", nil, connID)
 	require.NoError(t, err)
 
 	// Create main queue with DLX but NO routing key override
@@ -130,7 +132,7 @@ func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 	mainProps.Arguments = map[string]any{
 		"x-dead-letter-exchange": "dlx",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create and dead-letter a message
@@ -161,6 +163,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
+	connID := newTestConsumerConnID()
 
 	// Create DLX chain: queue1 -> dlx1 -> queue2 -> dlx2 -> queue3
 	err := vh.CreateExchange("dlx1", "direct", nil)
@@ -174,7 +177,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx1",
 		"x-dead-letter-routing-key": "to-queue2",
 	}
-	queue1, err := vh.CreateQueue("queue1", props1, nil)
+	queue1, err := vh.CreateQueue("queue1", props1, connID)
 	require.NoError(t, err)
 
 	// Queue 2 (DLX -> dlx2)
@@ -183,17 +186,17 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx2",
 		"x-dead-letter-routing-key": "to-queue3",
 	}
-	queue2, err := vh.CreateQueue("queue2", props2, nil)
+	queue2, err := vh.CreateQueue("queue2", props2, connID)
 	require.NoError(t, err)
 
 	// Queue 3 (no DLX)
-	queue3, err := vh.CreateQueue("queue3", NewQueueProperties(), nil)
+	queue3, err := vh.CreateQueue("queue3", NewQueueProperties(), connID)
 	require.NoError(t, err)
 
 	// Bind queues
-	err = vh.BindQueue("dlx1", "queue2", "to-queue2", nil, nil)
+	err = vh.BindQueue("dlx1", "queue2", "to-queue2", nil, connID)
 	require.NoError(t, err)
-	err = vh.BindQueue("dlx2", "queue3", "to-queue3", nil, nil)
+	err = vh.BindQueue("dlx2", "queue3", "to-queue3", nil, connID)
 	require.NoError(t, err)
 
 	// Create message and dead-letter it twice
@@ -267,14 +270,16 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 		EnableDLX:       true,
 	})
 
+	connID := newTestConsumerConnID()
+
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq", dlqProps, nil)
+	_, err = vh.CreateQueue("dlq", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dlq", "dead", nil, connID)
 	require.NoError(t, err)
 
 	mainProps := NewQueueProperties()
@@ -282,7 +287,7 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create message with CC and BCC headers
@@ -322,14 +327,16 @@ func TestDeadLetter_ExpirationCleared(t *testing.T) {
 		EnableDLX:       true,
 	})
 
+	connID := newTestConsumerConnID()
+
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq", dlqProps, nil)
+	_, err = vh.CreateQueue("dlq", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dlq", "dead", nil, connID)
 	require.NoError(t, err)
 
 	mainProps := NewQueueProperties()
@@ -337,7 +344,7 @@ func TestDeadLetter_ExpirationCleared(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create message with expiration
@@ -373,14 +380,16 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 		EnableDLX:       true,
 	})
 
+	connID := newTestConsumerConnID()
+
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq", dlqProps, nil)
+	_, err = vh.CreateQueue("dlq", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dlq", "dead", nil, connID)
 	require.NoError(t, err)
 
 	mainProps := NewQueueProperties()
@@ -388,7 +397,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	dl := &DeadLetter{vh: vh}
@@ -437,15 +446,16 @@ func TestDeadLetter_NilHeaders(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
+	connID := newTestConsumerConnID()
 
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq", dlqProps, nil)
+	_, err = vh.CreateQueue("dlq", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dlq", "dead", nil, connID)
 	require.NoError(t, err)
 
 	mainProps := NewQueueProperties()
@@ -453,7 +463,7 @@ func TestDeadLetter_NilHeaders(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create message with nil headers
@@ -484,6 +494,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       false, // DLX disabled
 	})
+	connID := newTestConsumerConnID()
 
 	// DeadLetterer should be NoOpDeadLetterer
 	_, ok := vh.DeadLetterer.(*NoOpDeadLetterer)
@@ -494,7 +505,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 	mainProps.Arguments = map[string]any{
 		"x-dead-letter-exchange": "dlx",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	msg := Message{
@@ -513,6 +524,7 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
+	connID := newTestConsumerConnID()
 
 	// Create DLX as topic exchange
 	err := vh.CreateExchange("dlx", "topic", nil)
@@ -520,16 +532,16 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 
 	// Create multiple DLQs bound with different patterns
 	dlq1Props := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq.errors", dlq1Props, nil)
+	_, err = vh.CreateQueue("dlq.errors", dlq1Props, connID)
 	require.NoError(t, err)
 
 	dlq2Props := NewQueueProperties()
-	_, err = vh.CreateQueue("dlq.all", dlq2Props, nil)
+	_, err = vh.CreateQueue("dlq.all", dlq2Props, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq.errors", "error.#", nil, nil)
+	err = vh.BindQueue("dlx", "dlq.errors", "error.#", nil, connID)
 	require.NoError(t, err)
-	err = vh.BindQueue("dlx", "dlq.all", "#", nil, nil)
+	err = vh.BindQueue("dlx", "dlq.all", "#", nil, connID)
 	require.NoError(t, err)
 
 	// Create main queue with topic routing key override
@@ -538,7 +550,7 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "error.critical.timeout",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	msg := Message{
@@ -568,16 +580,16 @@ func TestDeadLetter_PersistentMessage(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
-
+	connID := newTestConsumerConnID()
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)
 
 	dlqProps := NewQueueProperties()
 	dlqProps.Durable = true
-	_, err = vh.CreateQueue("dlq", dlqProps, nil)
+	_, err = vh.CreateQueue("dlq", dlqProps, connID)
 	require.NoError(t, err)
 
-	err = vh.BindQueue("dlx", "dlq", "dead", nil, nil)
+	err = vh.BindQueue("dlx", "dlq", "dead", nil, connID)
 	require.NoError(t, err)
 
 	mainProps := NewQueueProperties()
@@ -586,7 +598,7 @@ func TestDeadLetter_PersistentMessage(t *testing.T) {
 		"x-dead-letter-exchange":    "dlx",
 		"x-dead-letter-routing-key": "dead",
 	}
-	mainQueue, err := vh.CreateQueue("main-queue", mainProps, nil)
+	mainQueue, err := vh.CreateQueue("main-queue", mainProps, connID)
 	require.NoError(t, err)
 
 	// Create persistent message

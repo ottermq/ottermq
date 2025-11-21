@@ -2,13 +2,12 @@ package vhost
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/rs/zerolog/log"
 )
 
-func (vh *VHost) HandleBasicAck(conn net.Conn, channel uint16, deliveryTag uint64, multiple bool) error {
-	toDelete, err := vh.popUnackedRecords(conn, channel, deliveryTag, multiple)
+func (vh *VHost) HandleBasicAck(connID ConnectionID, channel uint16, deliveryTag uint64, multiple bool) error {
+	toDelete, err := vh.popUnackedRecords(connID, channel, deliveryTag, multiple)
 	if err != nil {
 		return err
 	}
@@ -28,8 +27,8 @@ func (vh *VHost) HandleBasicAck(conn net.Conn, channel uint16, deliveryTag uint6
 	return nil
 }
 
-func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag uint64, multiple bool) ([]*DeliveryRecord, error) {
-	key := ConnectionChannelKey{conn, channel}
+func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, deliveryTag uint64, multiple bool) ([]*DeliveryRecord, error) {
+	key := ConnectionChannelKey{connID, channel}
 
 	vh.mu.Lock()
 	ch := vh.ChannelDeliveries[key]
@@ -87,12 +86,12 @@ func deleteUnackedDelivery(ch *ChannelDeliveryState, tag uint64, consumerTag str
 	}
 }
 
-func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag uint64, requeue bool) error {
-	return vh.HandleBasicNack(conn, channel, deliveryTag, false, requeue)
+func (vh *VHost) HandleBasicReject(connID ConnectionID, channel uint16, deliveryTag uint64, requeue bool) error {
+	return vh.HandleBasicNack(connID, channel, deliveryTag, false, requeue)
 }
 
-func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint64, multiple, requeue bool) error {
-	recordsToNack, err := vh.popUnackedRecords(conn, channel, deliveryTag, multiple)
+func (vh *VHost) HandleBasicNack(connID ConnectionID, channel uint16, deliveryTag uint64, multiple, requeue bool) error {
+	recordsToNack, err := vh.popUnackedRecords(connID, channel, deliveryTag, multiple)
 	if err != nil {
 		return err
 	}
@@ -161,10 +160,10 @@ func (vh *VHost) handleDeadLetter(queue *Queue, msg Message, reason ReasonType) 
 	return false
 }
 
-func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uint16, global bool) error {
+func (vh *VHost) HandleBasicQos(connID ConnectionID, channel uint16, prefetchCount uint16, global bool) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	key := ConnectionChannelKey{conn, channel}
+	key := ConnectionChannelKey{connID, channel}
 	state := vh.ChannelDeliveries[key]
 	// fetch the channel delivery state if global is true
 	if state == nil {

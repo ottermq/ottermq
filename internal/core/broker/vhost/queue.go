@@ -3,7 +3,6 @@ package vhost
 import (
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
@@ -21,7 +20,7 @@ type Queue struct {
 	messages  chan Message     `json:"-"`
 	count     int              `json:"-"`
 	mu        sync.Mutex       `json:"-"`
-	OwnerConn net.Conn         `json:"-"`
+	OwnerConn ConnectionID     `json:"-"`
 
 	vh *VHost `json:"-"` // Reference to parent VHost
 	/* Delivery */
@@ -139,7 +138,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 					// Try each consumer once per round
 					for i := 0; i < len(consumers); i++ {
 						consumer := consumers[i]
-						state := vh.getChannelDeliveryState(consumer.Connection, consumer.Channel)
+						state := vh.getChannelDeliveryState(consumer.ConnectionID, consumer.Channel)
 
 						if vh.shouldThrottle(consumer, state) {
 							continue // Try next consumer
@@ -175,7 +174,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 						// Try to get a signal from any consumer's channel
 						var anyState *ChannelDeliveryState
 						for _, c := range consumers {
-							if s := vh.getChannelDeliveryState(c.Connection, c.Channel); s != nil {
+							if s := vh.getChannelDeliveryState(c.ConnectionID, c.Channel); s != nil {
 								anyState = s
 								break
 							}
@@ -226,7 +225,7 @@ func (q *Queue) stopDeliveryLoop() {
 	q.deliveryMu.Unlock()
 }
 
-func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn) (*Queue, error) {
+func (vh *VHost) CreateQueue(name string, props *QueueProperties, connID ConnectionID) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -289,7 +288,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	queue.Props = props
 
 	if props.Exclusive {
-		queue.OwnerConn = conn
+		queue.OwnerConn = connID
 	}
 	vh.Queues[name] = queue
 
@@ -458,7 +457,7 @@ func (q *Queue) Len() int {
 	return q.count
 }
 
-func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
+func (vh *VHost) PurgeQueue(name string, connID ConnectionID) (uint32, error) {
 	vh.mu.Lock()
 	queue, exists := vh.Queues[name]
 	vh.mu.Unlock()
@@ -468,7 +467,7 @@ func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 	}
 
 	// Validate ownership for exclusive queues
-	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+	if queue.Props.Exclusive && queue.OwnerConn != connID {
 		return 0, errors.NewChannelError(
 			fmt.Sprintf("queue '%s' is exclusive to another connection", name),
 			uint16(amqp.ACCESS_REFUSED),

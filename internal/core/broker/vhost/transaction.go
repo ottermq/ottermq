@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"net"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -44,10 +43,10 @@ func (ct *ChannelTransactionState) Unlock() {
 	ct.mu.Unlock()
 }
 
-func (vh *VHost) GetOrCreateTransactionState(channel uint16, conn net.Conn) *ChannelTransactionState {
+func (vh *VHost) GetOrCreateTransactionState(channel uint16, connID ConnectionID) *ChannelTransactionState {
 	key := ConnectionChannelKey{
-		Connection: conn,
-		Channel:    channel,
+		ConnectionID: connID,
+		Channel:      channel,
 	}
 
 	vh.mu.Lock()
@@ -61,10 +60,10 @@ func (vh *VHost) GetOrCreateTransactionState(channel uint16, conn net.Conn) *Cha
 	return txState
 }
 
-func (vh *VHost) GetTransactionState(channel uint16, conn net.Conn) *ChannelTransactionState {
+func (vh *VHost) GetTransactionState(channel uint16, connID ConnectionID) *ChannelTransactionState {
 	key := ConnectionChannelKey{
-		Connection: conn,
-		Channel:    channel,
+		ConnectionID: connID,
+		Channel:      channel,
 	}
 
 	vh.mu.Lock()

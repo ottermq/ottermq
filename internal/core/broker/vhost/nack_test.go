@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
@@ -12,16 +11,16 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 		QueueBufferSize: 1000,
 		Persistence:     nil,
 	}
+	connID := newTestConsumerConnID()
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
 	// create queue
-	q, err := vh.CreateQueue("q1", nil, conn)
+	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// setup channel delivery state
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -31,7 +30,7 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Register consumer
-	c := newTestConsumer(conn, 2, "q-noack", false)
+	c := newTestConsumer(connID, 2, "q-noack", false)
 
 	// add one unacked record
 	msg := Message{ID: "m5", Body: []byte("x")}
@@ -50,7 +49,7 @@ func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
 	ch.UnackedByConsumer[c.Tag][5] = record
 	ch.mu.Unlock()
 
-	if err := vh.HandleBasicNack(conn, 1, 5, false, true); err != nil {
+	if err := vh.HandleBasicNack(connID, 1, 5, false, true); err != nil {
 		t.Fatalf("HandleBasicNack failed: %v", err)
 	}
 
@@ -82,14 +81,15 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 		Persistence:     sp,
 		EnableDLX:       true, // Enable DLX, but queue has no DLX config, so messages will be discarded
 	}
+
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	// ensure queue exists (name referenced in records)
-	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
+	if _, err := vh.CreateQueue("q1", nil, connID); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -99,7 +99,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Register consumer
-	c := newTestConsumer(conn, 2, "q1", false)
+	c := newTestConsumer(connID, 2, "q1", false)
 
 	// tags 1..4, mark 1 and 2 as persistent to check deletion
 	msgs := []Message{
@@ -124,7 +124,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Nack up to tag 2 (<= 2), multiple=true, requeue=false
-	if err := vh.HandleBasicNack(conn, 1, 2, true, false); err != nil {
+	if err := vh.HandleBasicNack(connID, 1, 2, true, false); err != nil {
 		t.Fatalf("HandleBasicNack failed: %v", err)
 	}
 
@@ -165,9 +165,10 @@ func TestHandleBasicNack_NoChannelState(t *testing.T) {
 		QueueBufferSize: 1000,
 		Persistence:     nil,
 	}
+
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
-	err := vh.HandleBasicNack(conn, 1, 1, false, true)
+	connID := newTestConsumerConnID()
+	err := vh.HandleBasicNack(connID, 1, 1, false, true)
 	if err == nil {
 		t.Fatal("expected error when channel state missing, got nil")
 	}
@@ -179,11 +180,11 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
-	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
+	connID := newTestConsumerConnID()
+	if _, err := vh.CreateQueue("q1", nil, connID); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -203,7 +204,7 @@ func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
 	}
 	ch.mu.Unlock()
 
-	if err := vh.HandleBasicNack(conn, 1, 2, true, true); err != nil {
+	if err := vh.HandleBasicNack(connID, 1, 2, true, true); err != nil {
 		t.Fatalf("HandleBasicNack failed: %v", err)
 	}
 

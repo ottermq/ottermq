@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -112,7 +113,8 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
 	if vh != nil {
-		vh.CleanupConnection(conn)
+		connID := vhost.ConnectionID(GenerateConnectionID(conn))
+		vh.CleanupConnection(connID)
 	} else {
 		log.Debug().Str("vhost", vhName).Msg("VHost not found during connection cleanup")
 	}

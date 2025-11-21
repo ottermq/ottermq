@@ -184,7 +184,7 @@ func TestCreateQueue_Idempotency(t *testing.T) {
 // addUnackedMessages simulates unacked messages by inserting DeliveryRecords into
 // a synthetic ChannelDeliveryState for the provided queue name.
 func addUnackedMessages(vh *vhost.VHost, queueName string, count int) {
-	key := vhost.ConnectionChannelKey{Connection: nil, Channel: 1}
+	key := vhost.ConnectionChannelKey{ConnectionID: vhost.MANAGEMENT_CONNECTION_ID, Channel: 0}
 	state, ok := vh.ChannelDeliveries[key]
 	if !ok {
 		state = &vhost.ChannelDeliveryState{

@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
@@ -32,16 +31,15 @@ func TestHandleChannelFlow_ClientInitiated(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel := uint16(1)
-
 	// Test 1: Client pauses flow (active=false)
-	err := vh.HandleChannelFlow(conn, channel, false, false)
+	err := vh.HandleChannelFlow(connID, channel, false, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState := vh.GetChannelFlowState(conn, channel)
+	flowState := vh.GetChannelFlowState(connID, channel)
 	if flowState.FlowActive {
 		t.Error("Expected FlowActive to be false after client paused flow")
 	}
@@ -50,12 +48,12 @@ func TestHandleChannelFlow_ClientInitiated(t *testing.T) {
 	}
 
 	// Test 2: Client resumes flow (active=true)
-	err = vh.HandleChannelFlow(conn, channel, true, false)
+	err = vh.HandleChannelFlow(connID, channel, true, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState = vh.GetChannelFlowState(conn, channel)
+	flowState = vh.GetChannelFlowState(connID, channel)
 	if !flowState.FlowActive {
 		t.Error("Expected FlowActive to be true after client resumed flow")
 	}
@@ -71,16 +69,15 @@ func TestHandleChannelFlow_ServerInitiated(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
 	channel := uint16(1)
-
+	connID := newTestConsumerConnID()
 	// Test: Server pauses flow (active=false, initiated by broker)
-	err := vh.HandleChannelFlow(conn, channel, false, true)
+	err := vh.HandleChannelFlow(connID, channel, false, true)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState := vh.GetChannelFlowState(conn, channel)
+	flowState := vh.GetChannelFlowState(connID, channel)
 	if flowState.FlowActive {
 		t.Error("Expected FlowActive to be false after server paused flow")
 	}
@@ -89,12 +86,12 @@ func TestHandleChannelFlow_ServerInitiated(t *testing.T) {
 	}
 
 	// Test: Server resumes flow
-	err = vh.HandleChannelFlow(conn, channel, true, true)
+	err = vh.HandleChannelFlow(connID, channel, true, true)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState = vh.GetChannelFlowState(conn, channel)
+	flowState = vh.GetChannelFlowState(connID, channel)
 	if !flowState.FlowActive {
 		t.Error("Expected FlowActive to be true after server resumed flow")
 	}
@@ -107,11 +104,10 @@ func TestGetChannelFlowState_NonExistentChannel(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel := uint16(99)
-
 	// Should return default state (active=true, not broker-initiated)
-	flowState := vh.GetChannelFlowState(conn, channel)
+	flowState := vh.GetChannelFlowState(connID, channel)
 	if !flowState.FlowActive {
 		t.Error("Expected FlowActive to be true for non-existent channel (default)")
 	}
@@ -127,10 +123,10 @@ func TestGetOrCreateChannelDelivery_DefaultFlowState(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
 	channel := uint16(1)
+	connID := newTestConsumerConnID()
 
-	channelKey := ConnectionChannelKey{conn, channel}
+	channelKey := ConnectionChannelKey{connID, channel}
 	channelState := vh.GetOrCreateChannelDelivery(channelKey)
 
 	if !channelState.FlowActive {
@@ -148,16 +144,16 @@ func TestShouldThrottle_FlowPaused(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
 	// Create a consumer
 	consumer := &Consumer{
-		Tag:        "test-consumer",
-		Channel:    channel,
-		QueueName:  "test-queue",
-		Connection: conn,
-		Active:     true,
+		Tag:          "test-consumer",
+		Channel:      channel,
+		QueueName:    "test-queue",
+		ConnectionID: connID,
+		Active:       true,
 		Props: &ConsumerProperties{
 			NoAck: false,
 		},
@@ -165,7 +161,7 @@ func TestShouldThrottle_FlowPaused(t *testing.T) {
 	}
 
 	// Get channel state and pause flow
-	channelKey := ConnectionChannelKey{conn, channel}
+	channelKey := ConnectionChannelKey{connID, channel}
 	channelState := vh.GetOrCreateChannelDelivery(channelKey)
 	channelState.FlowActive = false
 
@@ -190,20 +186,20 @@ func TestShouldThrottle_FlowAndQoS(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
 	consumer := &Consumer{
 		Tag:           "test-consumer",
 		Channel:       channel,
 		QueueName:     "test-queue",
-		Connection:    conn,
+		ConnectionID:  connID,
 		Active:        true,
 		Props:         &ConsumerProperties{NoAck: false},
 		PrefetchCount: 5, // QoS limit
 	}
 
-	channelKey := ConnectionChannelKey{conn, channel}
+	channelKey := ConnectionChannelKey{connID, channel}
 	channelState := vh.GetOrCreateChannelDelivery(channelKey)
 
 	// Test 1: Flow active, no unacked messages - should NOT throttle
@@ -253,19 +249,19 @@ func TestHandleChannelFlow_MultipleChannels(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel1 := uint16(1)
 	channel2 := uint16(2)
 
 	// Pause flow on channel 1
-	err := vh.HandleChannelFlow(conn, channel1, false, false)
+	err := vh.HandleChannelFlow(connID, channel1, false, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed for channel 1: %v", err)
 	}
 
 	// Channel 2 should still have active flow (independent)
-	flowState1 := vh.GetChannelFlowState(conn, channel1)
-	flowState2 := vh.GetChannelFlowState(conn, channel2)
+	flowState1 := vh.GetChannelFlowState(connID, channel1)
+	flowState2 := vh.GetChannelFlowState(connID, channel2)
 
 	if flowState1.FlowActive {
 		t.Error("Expected channel 1 flow to be paused")
@@ -275,24 +271,24 @@ func TestHandleChannelFlow_MultipleChannels(t *testing.T) {
 	}
 
 	// Pause flow on channel 2
-	err = vh.HandleChannelFlow(conn, channel2, false, false)
+	err = vh.HandleChannelFlow(connID, channel2, false, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed for channel 2: %v", err)
 	}
 
-	flowState2 = vh.GetChannelFlowState(conn, channel2)
+	flowState2 = vh.GetChannelFlowState(connID, channel2)
 	if flowState2.FlowActive {
 		t.Error("Expected channel 2 flow to be paused")
 	}
 
 	// Resume flow on channel 1 only
-	err = vh.HandleChannelFlow(conn, channel1, true, false)
+	err = vh.HandleChannelFlow(connID, channel1, true, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed for channel 1: %v", err)
 	}
 
-	flowState1 = vh.GetChannelFlowState(conn, channel1)
-	flowState2 = vh.GetChannelFlowState(conn, channel2)
+	flowState1 = vh.GetChannelFlowState(connID, channel1)
+	flowState2 = vh.GetChannelFlowState(connID, channel2)
 
 	if !flowState1.FlowActive {
 		t.Error("Expected channel 1 flow to be active")
@@ -309,27 +305,27 @@ func TestHandleChannelFlow_OverrideInitiator(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
 	// Server initiates flow pause
-	err := vh.HandleChannelFlow(conn, channel, false, true)
+	err := vh.HandleChannelFlow(connID, channel, false, true)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState := vh.GetChannelFlowState(conn, channel)
+	flowState := vh.GetChannelFlowState(connID, channel)
 	if !flowState.FlowInitiatedByBroker {
 		t.Error("Expected FlowInitiatedByBroker to be true")
 	}
 
 	// Client requests flow resume (overrides server's state)
-	err = vh.HandleChannelFlow(conn, channel, true, false)
+	err = vh.HandleChannelFlow(connID, channel, true, false)
 	if err != nil {
 		t.Fatalf("HandleChannelFlow failed: %v", err)
 	}
 
-	flowState = vh.GetChannelFlowState(conn, channel)
+	flowState = vh.GetChannelFlowState(connID, channel)
 	if !flowState.FlowActive {
 		t.Error("Expected FlowActive to be true")
 	}
@@ -345,15 +341,15 @@ func TestShouldThrottle_NilChannelState(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	consumer := &Consumer{
-		Tag:        "test-consumer",
-		Channel:    1,
-		QueueName:  "test-queue",
-		Connection: conn,
-		Active:     true,
-		Props:      &ConsumerProperties{NoAck: false},
+		Tag:          "test-consumer",
+		Channel:      1,
+		QueueName:    "test-queue",
+		ConnectionID: connID,
+		Active:       true,
+		Props:        &ConsumerProperties{NoAck: false},
 	}
 
 	// Should not throttle with nil channel state (no QoS, flow defaults to active)

@@ -71,7 +71,7 @@ func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, 
 	props := createQueueProperties(req)
 
 	// CreateQueue (nil connection = not exclusive via API)
-	queue, err := vh.CreateQueue(req.QueueName, &props, nil)
+	queue, err := vh.CreateQueue(req.QueueName, &props, vhost.MANAGEMENT_CONNECTION_ID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (s *Service) PurgeQueue(vhostName, queueName string) (int, error) {
 		return 0, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 
-	count, err := vh.PurgeQueue(queueName, nil)
+	count, err := vh.PurgeQueue(queueName, vhost.MANAGEMENT_CONNECTION_ID)
 	return int(count), err
 }
 

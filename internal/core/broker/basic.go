@@ -76,8 +76,8 @@ func (b *Broker) basicGetHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 
 	// Get or create the channel delivery state
 	channelKey := vhost.ConnectionChannelKey{
-		Connection: conn,
-		Channel:    request.Channel,
+		ConnectionID: vhost.ConnectionID(GenerateConnectionID(conn)),
+		Channel:      request.Channel,
 	}
 	ch := vh.GetOrCreateChannelDelivery(channelKey)
 
@@ -128,8 +128,8 @@ func (b *Broker) basicQoSHandler(request *amqp.RequestMethodMessage, conn net.Co
 
 	prefetchCount := content.PrefetchCount
 	global := content.Global
-
-	if err := vh.HandleBasicQos(conn, request.Channel, prefetchCount, global); err != nil {
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	if err := vh.HandleBasicQos(connID, request.Channel, prefetchCount, global); err != nil {
 		log.Error().Err(err).Msg("Failed to handle basic.qos")
 	}
 
@@ -238,7 +238,8 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 
 		// Check the flow state of the channel
 		// If the flow is paused, and was inactivated by the broker, raise a channel exception
-		flowState := vh.GetChannelFlowState(conn, channel)
+		connID := vhost.ConnectionID(GenerateConnectionID(conn))
+		flowState := vh.GetChannelFlowState(connID, channel)
 		if !flowState.FlowActive && flowState.FlowInitiatedByBroker {
 			log.Warn().
 				Uint16("channel", channel).
@@ -260,7 +261,8 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 }
 
 func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, exchange string, routingKey string, msg *amqp.Message, mandatory bool) (any, error, bool) {
-	txState := vh.GetTransactionState(channel, conn)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	txState := vh.GetTransactionState(channel, connID)
 	if txState != nil && txState.InTransaction {
 		txState.Lock()
 		defer txState.Unlock()
@@ -293,7 +295,8 @@ func (*Broker) bufferPublishInTransaction(vh *vhost.VHost, channel uint16, conn 
 }
 
 func (*Broker) bufferAcknowledgeTransaction(vh *vhost.VHost, channel uint16, conn net.Conn, deliveryTag uint64, multiple bool, requeue bool, operation vhost.AckOperation) (any, error, bool) {
-	txState := vh.GetTransactionState(channel, conn)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	txState := vh.GetTransactionState(channel, connID)
 	if txState != nil && txState.InTransaction {
 		txState.Lock()
 		defer txState.Unlock()
@@ -373,7 +376,8 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	//  RabbitMQ does not implement it either.
 
 	// If tag is empty, generate a random one
-	consumer := vhost.NewConsumer(conn, request.Channel, queueName, consumerTag, &vhost.ConsumerProperties{
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	consumer := vhost.NewConsumer(connID, request.Channel, queueName, consumerTag, &vhost.ConsumerProperties{
 		NoAck:     noAck,
 		Exclusive: exclusive,
 		Arguments: arguments,
@@ -429,7 +433,8 @@ func (b *Broker) basicAckHandler(newState *amqp.ChannelState, conn net.Conn, vh 
 		return a, err
 	}
 
-	err = vh.HandleBasicAck(conn, channel, deliveryTag, multiple)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	err = vh.HandleBasicAck(connID, channel, deliveryTag, multiple)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to acknowledge message")
 		return nil, err
@@ -454,7 +459,8 @@ func (b *Broker) basicRejectHandler(newState *amqp.ChannelState, conn net.Conn, 
 		return a, err
 	}
 
-	err = vh.HandleBasicReject(conn, request.Channel, deliveryTag, requeue)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	err = vh.HandleBasicReject(connID, request.Channel, deliveryTag, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err
@@ -468,7 +474,8 @@ func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn ne
 	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic recover content")
 	}
-	err := vh.HandleBasicRecover(conn, request.Channel, content.Requeue)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	err := vh.HandleBasicRecover(connID, request.Channel, content.Requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to recover messages")
 		return nil, err
@@ -522,7 +529,8 @@ func (b *Broker) basicNackHandler(newState *amqp.ChannelState, conn net.Conn, vh
 		return a, err
 	}
 
-	err = vh.HandleBasicNack(conn, channel, deliveryTag, multiple, requeue)
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	err = vh.HandleBasicNack(connID, channel, deliveryTag, multiple, requeue)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to reject message")
 		return nil, err

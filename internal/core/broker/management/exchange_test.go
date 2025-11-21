@@ -3,6 +3,7 @@ package management
 import (
 	"testing"
 
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,7 +73,7 @@ func TestDeleteExchange_IfUnused(t *testing.T) {
 	// broker.GetVHost returns *vhost.VHost.
 	// So we are using the package implicitly but not explicitly referring to `vhost` symbol.
 	// Let's remove the import if it's not used.
-	err = vh.BindQueue(exName, qName, "key", nil, nil)
+	err = vh.BindQueue(exName, qName, "key", nil, vhost.MANAGEMENT_CONNECTION_ID)
 	require.NoError(t, err)
 
 	// Try delete with ifUnused=true (should fail)
