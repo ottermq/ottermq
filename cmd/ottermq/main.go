@@ -110,18 +110,11 @@ func main() {
 			EnableUI:      cfg.EnableUI,
 			EnableSwagger: cfg.EnableSwagger,
 		}
-		// initialize amqp client connection
-		conn, err := web.GetBrokerClient(webConfig)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to connect to broker")
-		}
-		defer conn.Close()
 
-		webServer, err = web.NewWebServer(webConfig, b, conn)
+		webServer, err = web.NewWebServer(webConfig, b)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to create web server")
 		}
-		defer webServer.Close()
 
 		// open "server.log" for appending
 		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

@@ -13,15 +13,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 )
 
 type WebServer struct {
-	config  *Config
-	Broker  *broker.Broker
-	Client  *amqp091.Connection
-	Channel *amqp091.Channel
+	config *Config
+	Broker *broker.Broker
 }
 
 type Config struct {
@@ -35,22 +32,10 @@ type Config struct {
 	EnableSwagger bool
 }
 
-func (ws *WebServer) Close() {
-	ws.Channel.Close()
-	ws.Client.Close()
-}
-
-func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connection) (*WebServer, error) {
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, err
-	}
-
+func NewWebServer(config *Config, broker *broker.Broker) (*WebServer, error) {
 	return &WebServer{
-		config:  config,
-		Broker:  broker,
-		Client:  conn,
-		Channel: ch,
+		config: config,
+		Broker: broker,
 	}, nil
 }
 
@@ -92,11 +77,11 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.DeleteQueue(c, ws.Broker)
 	})
 	apiGrp.Post("/queues/:queue/consume", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.GetMessage(c, ws.Channel)
+		return api.GetMessage(c, ws.Broker)
 	})
 	apiGrp.Post("/messages/:id/ack", middleware.JwtMiddleware(ws.config.JwtKey), api.AckMessage)
 	apiGrp.Post("/messages", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.PublishMessage(c, ws.Channel)
+		return api.PublishMessage(c, ws.Broker)
 	})
 
 	apiGrp.Get("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
@@ -113,9 +98,11 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListBindings(c, ws.Broker)
 	})
 	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.BindQueue(c, ws.Channel)
+		return api.BindQueue(c, ws.Broker)
 	})
-	apiGrp.Delete("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), api.DeleteBinding)
+	apiGrp.Delete("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.DeleteBinding(c, ws.Broker)
+	})
 	apiGrp.Get("/connections", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)
 	})

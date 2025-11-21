@@ -7,7 +7,6 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/rabbitmq/amqp091-go"
 )
 
 // BindQueue godoc
@@ -23,21 +22,18 @@ import (
 // @Failure 500 {object} models.ErrorResponse
 // @Router /api/bindings [post]
 // @Security BearerAuth
-func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
+func BindQueue(c *fiber.Ctx, b *broker.Broker) error {
 	var request models.CreateBindingRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: err.Error(),
 		})
 	}
+	if request.VHost == "" {
+		request.VHost = "/"
+	}
 
-	err := ch.QueueBind(
-		request.Destination,
-		request.RoutingKey,
-		request.Source,
-		false, // noWait
-		nil,   // arguments
-	)
+	_, err := b.Management.CreateBinding(request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -102,37 +98,22 @@ func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /bindings [delete]
 // @Security BearerAuth
-func DeleteBinding(c *fiber.Ctx) error {
-	// var request models.DeleteBindingRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(http.StatusBadRequest).JSON(models.ErrorResponse{
-	// 		Error: err.Error(),
-	// 	})
-	// }
-	// command := fmt.Sprintf("DELETE_BINDING %s %s %s",
-	// 	request.ExchangeName,
-	// 	request.QueueName,
-	// 	request.RoutingKey)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(http.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: err.Error(),
-	// 	})
-	// }
+func DeleteBinding(c *fiber.Ctx, b *broker.Broker) error {
+	var request models.DeleteBindingRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
+	if request.VHost == "" {
+		request.VHost = "/"
+	}
+	err := b.Management.DeleteBinding(request)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(http.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(http.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(http.StatusNoContent).Send(nil)
-	// }
-	return nil // just to make the function compile
+	return c.SendStatus(fiber.StatusNoContent)
 }
