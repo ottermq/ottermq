@@ -97,6 +97,12 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 	b.mu.Lock()
 	b.Connections[conn] = connInfo
 	b.mu.Unlock()
+
+	// Register connection ID in bidirectional map
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	b.connectionsMu.Lock()
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
@@ -110,11 +116,20 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	delete(b.Connections, conn)
 	b.mu.Unlock()
 
+	// Remove from bidirectional map
+	b.connectionsMu.Lock()
+	delete(b.connToID, conn)
+	b.connectionsMu.Unlock()
+
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
 	if vh != nil {
-		connID := vhost.ConnectionID(GenerateConnectionID(conn))
-		vh.CleanupConnection(connID)
+		connID, ok := b.GetConnectionID(conn)
+		if ok {
+			vh.CleanupConnection(connID)
+		} else {
+			log.Debug().Msg("Connection ID not found during connection cleanup")
+		}
 	} else {
 		log.Debug().Str("vhost", vhName).Msg("VHost not found during connection cleanup")
 	}

@@ -42,6 +42,7 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
@@ -72,6 +73,10 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 		Channels:  make(map[uint16]*amqp.ChannelState),
 	}
 	broker.Connections[conn].Channels[1] = &amqp.ChannelState{}
+
+	// Register connection ID
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	broker.connToID[conn] = connID
 
 	return broker, mockFramer, conn
 }

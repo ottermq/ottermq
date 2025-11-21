@@ -40,6 +40,7 @@ type Broker struct {
 	Management   management.ManagementService
 
 	connections   map[vhost.ConnectionID]net.Conn
+	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
 	connectionsMu sync.RWMutex
 }
 
@@ -337,6 +338,14 @@ func GenerateConnectionID(conn net.Conn) string {
 	// connID := fmt.Sprintf("%s:%s", conn.RemoteAddr().String(), uuid.New().String()[:8])
 	connID := fmt.Sprintf("%s", conn.RemoteAddr().String())
 	return connID
+}
+
+// GetConnectionID returns the ConnectionID for a given net.Conn
+func (b *Broker) GetConnectionID(conn net.Conn) (vhost.ConnectionID, bool) {
+	b.connectionsMu.RLock()
+	defer b.connectionsMu.RUnlock()
+	connID, ok := b.connToID[conn]
+	return connID, ok
 }
 
 func (b *Broker) SendFrame(connID vhost.ConnectionID, channelID uint16, frame []byte) error {
