@@ -279,6 +279,7 @@ func (b *Broker) ListVHosts() []*vhost.VHost {
 	return vhosts
 }
 
+// ListConnections returns all active connections in the broker.
 func (b *Broker) ListConnections() []amqp.ConnectionInfo {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -295,36 +296,62 @@ func (b *Broker) Shutdown() {
 	}
 }
 
+// ListChannels returns all channels across all connections.
 func (b *Broker) ListChannels() ([]ChannelInformation, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	channels := make([]ChannelInformation, 0, len(b.Connections))
-	for _, c := range b.Connections {
-		vhost := c.VHostName
-		vh := b.VHosts[vhost]
+	for conn, c := range b.Connections {
+		vhostName := c.VHostName
+		vh := b.VHosts[vhostName]
 		user := c.Client.Config.Username
-		for ck, consumer := range vh.Consumers {
+		connID := b.connToID[conn]
+		for channelNum, ch := range c.Channels {
+			channelKey := vhost.ConnectionChannelKey{
+				ConnectionID: connID,
+				Channel:      channelNum,
+			}
 
+			deliveryState := vh.ChannelDeliveries[channelKey]
+			inTransaction := false
+			txState := vh.GetTransactionState(channelNum, connID)
+			if txState != nil {
+				txState.Lock()
+				inTransaction = txState.InTransaction
+				txState.Unlock()
+			}
+			channelStateLabel := getChannelState(deliveryState, ch)
 			channelInfo := ChannelInformation{
-				VHost:          vhost,
-				Number:         ck.Channel,
-				ConnectionName: string(consumer.ConnectionID),
-				User:           user,
-				State:          "running",
-				// UnconfirmedCount:   ch.UnconfirmedCount,
-				// UnackedCount:      ch.UnackedCount,
-				// PrefetchCount:      ch.PrefetchCount,
-				// InTransaction:      ch.InTransaction,
-				// ConfirmMode:        ch.ConfirmMode,
+				VHost:            vhostName,
+				Number:           channelNum,
+				ConnectionName:   string(connID),
+				User:             user,
+				State:            channelStateLabel,
+				UnconfirmedCount: 0, // Relevant only when publisher confirms mode is enabled. Not tracked yet.
+				UnackedCount:     len(deliveryState.UnackedByTag),
+				PrefetchCount:    deliveryState.NextPrefetchCount,
+				InTransaction:    inTransaction,
+				ConfirmMode:      false, // Not implemented yet
 			}
 			channels = append(channels, channelInfo)
 		}
-
 	}
 
 	return channels, nil
 }
 
+// getChannelState returns the state of the channel as a string ("running" or "flow").
+func getChannelState(deliveryState *vhost.ChannelDeliveryState, channelState *amqp.ChannelState) string {
+	if channelState != nil && channelState.ClosingChannel {
+		return "closing"
+	}
+	if deliveryState != nil && !deliveryState.FlowActive {
+		return "flow"
+	}
+	return "running"
+}
+
+// ChannelInformation represents information about a channel.
 type ChannelInformation struct {
 	Number           uint16 `json:"number"`
 	ConnectionName   string `json:"connection_name"`
@@ -334,6 +361,8 @@ type ChannelInformation struct {
 	UnconfirmedCount int    `json:"unconfirmed_count"`
 	PrefetchCount    uint16 `json:"prefetch_count"`
 	UnackedCount     int    `json:"unacked_count"`
+	InTransaction    bool   `json:"in_transaction"`
+	ConfirmMode      bool   `json:"confirm_mode"`
 }
 
 func GenerateConnectionID(conn net.Conn) string {
