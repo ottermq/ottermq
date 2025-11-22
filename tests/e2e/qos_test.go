@@ -17,72 +17,22 @@ const (
 
 // TestQoS_PerConsumer_PrefetchLimit verifies that prefetch count limits message delivery per consumer
 func TestQoS_PerConsumer_PrefetchLimit(t *testing.T) {
-	conn, err := amqp.Dial(brokerURL)
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-	defer conn.Close()
+	tc := NewTestConnection(t, brokerURL)
+	defer tc.Close()
 
-	ch, err := conn.Channel()
-	if err != nil {
-		t.Fatalf("Failed to open channel: %v", err)
-	}
-	defer ch.Close()
-
-	// Declare queue
-	_, err = ch.QueueDeclare(
-		testQueue+"-per-consumer",
-		false, // durable
-		true,  // autoDelete
-		false, // exclusive
-		false, // noWait
-		nil,   // args
-	)
-	if err != nil {
-		t.Fatalf("Failed to declare queue: %v", err)
-	}
+	// Declare queue with unique name
+	queueName := tc.UniqueQueueName("qos-per-consumer")
+	tc.DeclareQueue(queueName)
 
 	// Set QoS with prefetch=3, global=false (per-consumer)
-	err = ch.Qos(
-		3,     // prefetchCount
-		0,     // prefetchSize (ignored)
-		false, // global (per-consumer)
-	)
-	if err != nil {
-		t.Fatalf("Failed to set QoS: %v", err)
-	}
+	tc.SetQoS(3, false)
 
 	// Publish 10 messages
-	for i := 0; i < 10; i++ {
-		err = ch.PublishWithContext(
-			context.Background(),
-			"",                        // exchange
-			testQueue+"-per-consumer", // routing key
-			false,                     // mandatory
-			false,                     // immediate
-			amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        []byte(fmt.Sprintf("Message %d", i)),
-			},
-		)
-		if err != nil {
-			t.Fatalf("Failed to publish message %d: %v", i, err)
-		}
-	}
+	tc.PublishMessages(queueName, 10)
 
 	// Start consuming without auto-ack
-	msgs, err := ch.Consume(
-		testQueue+"-per-consumer",
-		"test-consumer",
-		false, // autoAck = false (manual ack)
-		false, // exclusive
-		false, // noLocal
-		false, // noWait
-		nil,   // args
-	)
-	if err != nil {
-		t.Fatalf("Failed to start consuming: %v", err)
-	}
+	consumerTag := tc.UniqueConsumerTag("test-consumer")
+	msgs := tc.StartConsumer(queueName, consumerTag, false)
 
 	// Receive messages but don't ack them immediately
 	var receivedCount int32
@@ -115,8 +65,7 @@ done:
 
 	// Ack first message, should receive 4th message
 	if len(receivedMsgs) > 0 {
-		err = receivedMsgs[0].Ack(false)
-		if err != nil {
+		if err := receivedMsgs[0].Ack(false); err != nil {
 			t.Errorf("Failed to ack message: %v", err)
 		}
 

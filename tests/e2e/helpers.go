@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -167,4 +168,21 @@ func (tc *TestConnection) AckAll(msgs []amqp.Delivery) {
 			tc.t.Errorf("Failed to ack message: %v", err)
 		}
 	}
+}
+
+// UniqueQueueName generates a unique queue name based on the test name
+func (tc *TestConnection) UniqueQueueName(prefix string) string {
+	testName := tc.t.Name()
+	// Replace slashes and other problematic chars with hyphens
+	safeName := strings.ReplaceAll(testName, "/", "-")
+	safeName = strings.ReplaceAll(safeName, " ", "-")
+	return fmt.Sprintf("%s-%s", prefix, safeName)
+}
+
+// UniqueConsumerTag generates a unique consumer tag based on the test name
+func (tc *TestConnection) UniqueConsumerTag(prefix string) string {
+	testName := tc.t.Name()
+	safeName := strings.ReplaceAll(testName, "/", "-")
+	safeName = strings.ReplaceAll(safeName, " ", "-")
+	return fmt.Sprintf("%s-%s", prefix, safeName)
 }

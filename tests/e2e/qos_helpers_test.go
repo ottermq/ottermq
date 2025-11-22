@@ -22,7 +22,8 @@ func TestQoS_WithHelpers_Example(t *testing.T) {
 	tc.PublishMessages(queueName, 10)
 
 	// Start consumer
-	msgs := tc.StartConsumer(queueName, "test-consumer", false)
+	consumerTag := tc.UniqueConsumerTag("test-consumer")
+	msgs := tc.StartConsumer(queueName, consumerTag, false)
 
 	// Wait for exactly 3 messages (prefetch limit)
 	received := tc.WaitForMessages(msgs, 3, 2*time.Second)

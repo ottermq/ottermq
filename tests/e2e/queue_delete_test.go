@@ -16,7 +16,8 @@ func TestQueueDelete_IfUnused_WithActiveConsumer_ClosesChannel(t *testing.T) {
 	q := tc.DeclareQueue("e2e.qdel.ifunused")
 
 	// Start a consumer so queue is in-use
-	msgs := tc.StartConsumer(q.Name, "ctag-qdel", true)
+	consumerTag := tc.UniqueConsumerTag("ctag-qdel")
+	msgs := tc.StartConsumer(q.Name, consumerTag, true)
 	_ = msgs
 
 	// Attempt delete with ifUnused=true

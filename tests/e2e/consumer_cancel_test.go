@@ -44,7 +44,8 @@ func TestConsumerCancel_RequeuesUnacked(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Start consumer with manual ack (noAck=false)
-	msgs := tc.StartConsumer(queue.Name, "test-consumer", false)
+	consumerTag1 := tc.UniqueConsumerTag("test-consumer")
+	msgs := tc.StartConsumer(queue.Name, consumerTag1, false)
 
 	// Receive 3 messages but DON'T ack them
 	var receivedMsgs []amqp.Delivery
@@ -56,13 +57,14 @@ func TestConsumerCancel_RequeuesUnacked(t *testing.T) {
 	}
 
 	// Cancel the consumer (should requeue the 3 unacked messages)
-	err = tc.Ch.Cancel("test-consumer", false)
+	err = tc.Ch.Cancel(consumerTag1, false)
 	require.NoError(t, err)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Start a new consumer and receive all messages
-	msgs2 := tc.StartConsumer(queue.Name, "test-consumer-2", false)
+	consumerTag2 := tc.UniqueConsumerTag("test-consumer-2")
+	msgs2 := tc.StartConsumer(queue.Name, consumerTag2, false)
 
 	// Should receive 5 messages total (3 requeued + 2 not yet consumed)
 	receivedBodies := make([]string, 0, 5)
@@ -145,8 +147,10 @@ func TestConsumerCancel_OnlyRequeuesToOriginalQueue(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Start consumers on both queues (same channel)
-	msgs1 := tc.StartConsumer(queue1.Name, "consumer-q1", false)
-	msgs2 := tc.StartConsumer(queue2.Name, "consumer-q2", false)
+	consumerTag1 := tc.UniqueConsumerTag("consumer-q1")
+	consumerTag2 := tc.UniqueConsumerTag("consumer-q2")
+	msgs1 := tc.StartConsumer(queue1.Name, consumerTag1, false)
+	msgs2 := tc.StartConsumer(queue2.Name, consumerTag2, false)
 
 	// Receive messages from both queues but don't ack
 	for i := 0; i < 2; i++ {
@@ -158,13 +162,14 @@ func TestConsumerCancel_OnlyRequeuesToOriginalQueue(t *testing.T) {
 	}
 
 	// Cancel only the first consumer
-	err = tc.Ch.Cancel("consumer-q1", false)
+	err = tc.Ch.Cancel(consumerTag1, false)
 	require.NoError(t, err)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Start new consumer on queue1
-	msgs1New := tc.StartConsumer(queue1.Name, "consumer-q1-new", false)
+	consumerTag1New := tc.UniqueConsumerTag("consumer-q1-new")
+	msgs1New := tc.StartConsumer(queue1.Name, consumerTag1New, false)
 
 	// Should receive 3 messages from queue1 (2 requeued + 1 not yet consumed)
 	q1Count := 0
@@ -221,7 +226,8 @@ func TestConsumerCancel_NoAckConsumer_NoRequeue(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Start consumer with auto-ack (noAck=true)
-	msgs := tc.StartConsumer(queue.Name, "noack-consumer", true)
+	consumerTag := tc.UniqueConsumerTag("noack-consumer")
+	msgs := tc.StartConsumer(queue.Name, consumerTag, true)
 
 	// Receive 3 messages (they're auto-acked)
 	for i := 0; i < 3; i++ {
@@ -231,13 +237,14 @@ func TestConsumerCancel_NoAckConsumer_NoRequeue(t *testing.T) {
 	}
 
 	// Cancel the consumer
-	err = tc.Ch.Cancel("noack-consumer", false)
+	err = tc.Ch.Cancel(consumerTag, false)
 	require.NoError(t, err)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Start new consumer - should only get the 2 remaining messages
-	msgs2 := tc.StartConsumer(queue.Name, "consumer-2", false)
+	consumerTag2 := tc.UniqueConsumerTag("consumer-2")
+	msgs2 := tc.StartConsumer(queue.Name, consumerTag2, false)
 
 	receivedCount := 0
 	for i := 0; i < 5; i++ {
@@ -291,7 +298,8 @@ func TestConsumerCancel_HighPrefetch(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Start consumer with manual ack
-	msgs := tc.StartConsumer(queue.Name, "high-prefetch-consumer", false)
+	consumerTag := tc.UniqueConsumerTag("high-prefetch-consumer")
+	msgs := tc.StartConsumer(queue.Name, consumerTag, false)
 
 	// Receive up to 500 messages (prefetch limit) but don't ack
 	receivedCount := 0
@@ -310,7 +318,7 @@ func TestConsumerCancel_HighPrefetch(t *testing.T) {
 
 	// Cancel consumer (this should be fast even with many unacked)
 	startTime := time.Now()
-	err = tc.Ch.Cancel("high-prefetch-consumer", false)
+	err = tc.Ch.Cancel(consumerTag, false)
 	require.NoError(t, err)
 	cancelDuration := time.Since(startTime)
 
@@ -322,7 +330,8 @@ func TestConsumerCancel_HighPrefetch(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Start new consumer - should get all messages
-	msgs2 := tc.StartConsumer(queue.Name, "consumer-2", false)
+	consumerTag2 := tc.UniqueConsumerTag("consumer-2")
+	msgs2 := tc.StartConsumer(queue.Name, consumerTag2, false)
 
 	finalCount := 0
 	redeliveredCount := 0
@@ -396,8 +405,10 @@ func TestConsumerCancel_MultipleConsumersSameChannel(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Start two consumers on same channel
-	msgs1 := tc.StartConsumer(queue1.Name, "consumer-1", false)
-	msgs2 := tc.StartConsumer(queue2.Name, "consumer-2", false)
+	consumerTag1 := tc.UniqueConsumerTag("consumer-1")
+	consumerTag2 := tc.UniqueConsumerTag("consumer-2")
+	msgs1 := tc.StartConsumer(queue1.Name, consumerTag1, false)
+	msgs2 := tc.StartConsumer(queue2.Name, consumerTag2, false)
 
 	// Receive 3 messages from each but don't ack
 	for i := 0; i < 3; i++ {
@@ -409,7 +420,7 @@ func TestConsumerCancel_MultipleConsumersSameChannel(t *testing.T) {
 	}
 
 	// Cancel only consumer-1
-	err = tc.Ch.Cancel("consumer-1", false)
+	err = tc.Ch.Cancel(consumerTag1, false)
 	require.NoError(t, err)
 
 	time.Sleep(200 * time.Millisecond)
@@ -422,7 +433,8 @@ func TestConsumerCancel_MultipleConsumersSameChannel(t *testing.T) {
 	}
 
 	// Consumer-1's unacked messages should be requeued
-	msgs1New := tc.StartConsumer(queue1.Name, "consumer-1-new", false)
+	consumerTag1New := tc.UniqueConsumerTag("consumer-1-new")
+	msgs1New := tc.StartConsumer(queue1.Name, consumerTag1New, false)
 
 	count := 0
 	for i := 0; i < 6; i++ {
@@ -470,19 +482,21 @@ func TestConsumerCancel_WithRedeliveredFlag(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// First delivery - redelivered should be false
-	msgs1 := tc.StartConsumer(queue.Name, "consumer-1", false)
+	consumerTag1 := tc.UniqueConsumerTag("consumer-1")
+	msgs1 := tc.StartConsumer(queue.Name, consumerTag1, false)
 	msg1, ok := tc.ConsumeWithTimeout(msgs1, 2*time.Second)
 	require.True(t, ok)
 	assert.False(t, msg1.Redelivered, "first delivery should have redelivered=false")
 
 	// Cancel consumer without acking
-	err = tc.Ch.Cancel("consumer-1", false)
+	err = tc.Ch.Cancel(consumerTag1, false)
 	require.NoError(t, err)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Second delivery - redelivered should be true
-	msgs2 := tc.StartConsumer(queue.Name, "consumer-2", false)
+	consumerTag2 := tc.UniqueConsumerTag("consumer-2")
+	msgs2 := tc.StartConsumer(queue.Name, consumerTag2, false)
 	msg2, ok := tc.ConsumeWithTimeout(msgs2, 2*time.Second)
 	require.True(t, ok)
 	assert.True(t, msg2.Redelivered, "redelivered message should have redelivered=true")
