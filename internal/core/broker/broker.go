@@ -321,42 +321,73 @@ func (b *Broker) ListConnectionChannels(connName string) ([]models.ChannelInfo, 
 }
 
 // ListConnectionChannels returns all channels for a specific connection.
-func (b *Broker) listChannelsByConnection(c *amqp.ConnectionInfo, conn net.Conn) []models.ChannelInfo {
+func (b *Broker) listChannelsByConnection(connInfo *amqp.ConnectionInfo, conn net.Conn) []models.ChannelInfo {
 	channels := make([]models.ChannelInfo, 0, len(b.Connections))
-	vhostName := c.VHostName
+	vhostName := connInfo.VHostName
 	vh := b.VHosts[vhostName]
-	user := c.Client.Config.Username
+	user := connInfo.Client.Config.Username
 	connID := b.connToID[conn]
-	for channelNum, ch := range c.Channels {
-		channelKey := vhost.ConnectionChannelKey{
-			ConnectionID: connID,
-			Channel:      channelNum,
-		}
-
-		deliveryState := vh.ChannelDeliveries[channelKey]
-		inTransaction := false
-		txState := vh.GetTransactionState(channelNum, connID)
-		if txState != nil {
-			txState.Lock()
-			inTransaction = txState.InTransaction
-			txState.Unlock()
-		}
-		channelStateLabel := getChannelState(deliveryState, ch)
-		channelInfo := models.ChannelInfo{
-			VHost:            vhostName,
-			Number:           channelNum,
-			ConnectionName:   string(connID),
-			User:             user,
-			State:            channelStateLabel,
-			UnconfirmedCount: 0, // Relevant only when publisher confirms mode is enabled. Not tracked yet.
-			UnackedCount:     len(deliveryState.UnackedByTag),
-			PrefetchCount:    deliveryState.NextPrefetchCount,
-			InTransaction:    inTransaction,
-			ConfirmMode:      false, // Not implemented yet
+	for channelNum, ch := range connInfo.Channels {
+		channelInfo, err := b.createChannelInfo(connID, channelNum, vh, ch, user)
+		if err != nil {
+			log.Debug().Err(err).Msg("Failed to create channel summary")
+			continue
 		}
 		channels = append(channels, channelInfo)
 	}
 	return channels
+}
+
+func (b *Broker) CreateChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost) (models.ChannelInfo, error) {
+	b.mu.Lock()
+	connInfo := b.Connections[b.connections[connID]]
+	ch := connInfo.Channels[channelNum]
+	user := connInfo.Client.Config.Username
+	b.mu.Unlock()
+	return b.createChannelInfo(connID, channelNum, vh, ch, user)
+}
+
+// createChannelInfo creates a summary of the channel state.
+func (*Broker) createChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost, ch *amqp.ChannelState, user string) (models.ChannelInfo, error) {
+	if connID == "" {
+		return models.ChannelInfo{}, fmt.Errorf("connection ID is empty")
+	}
+
+	if vh == nil {
+		return models.ChannelInfo{}, fmt.Errorf("vhost is nil")
+	}
+
+	if ch == nil {
+		return models.ChannelInfo{}, fmt.Errorf("channel state is nil")
+	}
+
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: connID,
+		Channel:      channelNum,
+	}
+
+	deliveryState := vh.ChannelDeliveries[channelKey]
+	inTransaction := false
+	txState := vh.GetTransactionState(channelNum, connID)
+	if txState != nil {
+		txState.Lock()
+		inTransaction = txState.InTransaction
+		txState.Unlock()
+	}
+	channelStateLabel := getChannelState(deliveryState, ch)
+	channelInfo := models.ChannelInfo{
+		VHost:            vh.Name,
+		Number:           channelNum,
+		ConnectionName:   string(connID),
+		User:             user,
+		State:            channelStateLabel,
+		UnconfirmedCount: 0, // Relevant only when publisher confirms mode is enabled. Not tracked yet.
+		UnackedCount:     len(deliveryState.UnackedByTag),
+		PrefetchCount:    deliveryState.NextPrefetchCount,
+		InTransaction:    inTransaction,
+		ConfirmMode:      false, // Not implemented yet
+	}
+	return channelInfo, nil
 }
 
 // getChannelState returns the state of the channel as a string ("running" or "flow").

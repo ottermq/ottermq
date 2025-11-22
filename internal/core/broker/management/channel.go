@@ -1,6 +1,7 @@
 package management
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
@@ -65,5 +66,16 @@ func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDTO {
 }
 
 func (s *Service) GetChannel(connectionName string, channelNumber uint16) (*models.ChannelDTO, error) {
-	panic("not implemented")
+	vh := s.broker.GetVHost("/")
+	if vh == nil {
+		return nil, nil
+	}
+	connInfo := vhost.ConnectionID(connectionName)
+	chInfo, err := s.broker.CreateChannelInfo(connInfo, channelNumber, vh)
+	if err != nil {
+		return nil, err
+	}
+
+	chDTO := mapChannelInfoToDTO(chInfo)
+	return &chDTO, nil
 }
