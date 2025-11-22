@@ -30,19 +30,19 @@ This document outlines a comprehensive refactoring of OtterMQ's Management API t
 
 ```sh
 ┌─────────────────────────────────────────────────────────┐
-│                   HTTP API Layer                         │
+│                   HTTP API Layer                        │
 │  (Validation, HTTP concerns, error handling)            │
-│  web/handlers/api/                                       │
+│  web/handlers/api/                                      │
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
-│              Management Service Layer                    │
+│              Management Service Layer                   │
 │  (Business logic, DTO conversion, orchestration)        │
 │  internal/core/broker/management/                       │
 └───────────────────────┬─────────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────────┐
-│                  Broker Core Layer                       │
+│                  Broker Core Layer                      │
 │  (VHost operations, queue/exchange/consumer mgmt)       │
 │  internal/core/broker/, internal/core/broker/vhost/     │
 └─────────────────────────────────────────────────────────┘
