@@ -14,6 +14,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
 	"github.com/rs/zerolog/log"
 
@@ -131,6 +132,7 @@ Y88b. .d88P Y88b. Y88b. Y8b.    888    888   "   888Y88b.Y8b88P
 
 func (b *Broker) setConfigurations() map[string]any {
 	capabilities := map[string]any{
+		// TODO: dynamically set capabilities based on enabled features
 		"basic.nack":             true,
 		"connection.blocked":     true,
 		"consumer_cancel_notify": true,
@@ -436,4 +438,69 @@ func (b *Broker) SendFrame(connID vhost.ConnectionID, channelID uint16, frame []
 	}
 
 	return b.framer.SendFrame(conn, frame)
+}
+
+func (b *Broker) FetchOverviewConfiguration() models.BrokerConfigOverview {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	enabledFeatures := []string{}
+	ctx := make([]models.HttpContext, 0)
+	if b.config.EnableDLX {
+		enabledFeatures = append(enabledFeatures, "DLX")
+	}
+	if b.config.EnableTTL {
+		enabledFeatures = append(enabledFeatures, "TTL")
+	}
+	if b.config.EnableQLL {
+		enabledFeatures = append(enabledFeatures, "QLL")
+	}
+	if b.config.EnableWebAPI {
+		enabledFeatures = append(enabledFeatures, "WebAPI")
+		ctx = append(ctx, models.HttpContext{
+			Name: "management",
+			Port: b.config.WebPort,
+			Path: b.config.WebAPIPath,
+		})
+	}
+	if b.config.EnableSwagger {
+		enabledFeatures = append(enabledFeatures, "Swagger")
+		ctx = append(ctx, models.HttpContext{
+			Name: "swagger",
+			Port: b.config.WebPort,
+			Path: b.config.SwaggerPath,
+		})
+	}
+	if b.config.EnableUI {
+		enabledFeatures = append(enabledFeatures, "WebUI")
+		ctx = append(ctx, models.HttpContext{
+			Name: "webui",
+			Port: b.config.WebPort,
+			Path: "/",
+		})
+	}
+
+	// get persistence backend
+	// if b.persist instance of json.JsonPersistence -> "json"
+	persistence := "unknown"
+	switch b.persist.(type) {
+	case *json.JsonPersistence:
+		persistence = "json"
+	case *dummy.DummyPersistence:
+		persistence = "dummy"
+		// case *memento.MementoPersistence:
+		// 	persistence = "memento"
+	}
+
+	return models.BrokerConfigOverview{
+		AMQPPort:           b.config.BrokerPort,
+		SSL:                b.config.Ssl, // this one refers to AMQP SSL/TLS
+		HTTPPort:           b.config.WebPort,
+		EnabledFeatures:    enabledFeatures,
+		ChannelMax:         int(b.config.ChannelMax),
+		FrameMax:           int(b.config.FrameMax),
+		QueueBufferSize:    b.config.QueueBufferSize,
+		PersistenceBackend: persistence, // Currently only JSON is supported, `memento` will be added in the future
+		HTTPContexts:       ctx,
+	}
 }
