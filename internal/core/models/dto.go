@@ -160,6 +160,13 @@ type BindingDTO struct {
 }
 
 type OverviewDTO struct {
+	BrokerDetails   OverviewBrokerDetails   `json:"broker"`
+	NodeDetails     OverviewNodeDetails     `json:"node"`
+	ObjectTotals    OverviewObjectTotals    `json:"object_totals"`
+	MessageStats    OverviewMessageStats    `json:"message_stats"`
+	ConnectionStats OverviewConnectionStats `json:"connection_stats"`
+	FeatureUsage    OverviewFeatureUsage    `json:"feature_usage"`
+	Configuration   BrokerConfigOverview    `json:"configuration"`
 }
 
 type MessageDTO struct {
