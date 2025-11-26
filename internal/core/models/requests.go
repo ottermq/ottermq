@@ -7,6 +7,7 @@ type CreateQueueRequest struct {
 	VHost     string `json:"vhost"` // Optional; defaults to "/"
 
 	// Properties/flags
+	Passive    bool           `json:"passive"`
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Exclusive  bool           `json:"exclusive"`
