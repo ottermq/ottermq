@@ -54,7 +54,8 @@ type ManagementService interface {
 	GetChannel(connectionName string, channelNumber uint16) (*models.ChannelDTO, error)
 
 	// Messages
-	PublishMessage(req models.PublishMessageRequest) error
+
+	PublishMessage(vhost, exchange string, req models.PublishMessageRequest) error
 	GetMessages(vhost, queue string, count int, ackMode models.AckType) ([]models.MessageDTO, error)
 
 	// VHosts

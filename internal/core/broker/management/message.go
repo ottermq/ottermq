@@ -10,14 +10,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (s *Service) PublishMessage(req models.PublishMessageRequest) error {
-	vh := s.broker.GetVHost(req.VHost)
+func (s *Service) PublishMessage(vhostName, exchangeName string, req models.PublishMessageRequest) error {
+	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
-		return fmt.Errorf("vhost '%s' not found", req.VHost)
+		return fmt.Errorf("vhost '%s' not found", vhostName)
 	}
-	exchange := vh.GetExchange(req.ExchangeName)
+	exchange := vh.GetExchange(exchangeName)
 	routingKey := req.RoutingKey
-	mandatory := req.Mandatory
 
 	payload := []byte(req.Payload)
 	props := getPropsFromRequest(req)
@@ -27,10 +26,6 @@ func (s *Service) PublishMessage(req models.PublishMessageRequest) error {
 		return err
 	}
 	if !hasRouting {
-		if mandatory {
-			log.Debug().Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
-			return fmt.Errorf("message returned: no route for exchange '%s' with routing key '%s'", exchange.Name, routingKey)
-		}
 		log.Debug().Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("No route for message, message dropped")
 		return nil
 	}

@@ -63,10 +63,6 @@ type PublishMessageRequest struct {
 	UserId          string         `json:"user_id"`
 	AppId           string         `json:"app_id"`
 	Headers         map[string]any `json:"headers,omitempty"`
-
-	// Routing flags
-	Mandatory bool `json:"mandatory"`
-	Immediate bool `json:"immediate"` // Deprecated in AMQP 0-9-1 (included for compatibility)
 }
 
 type GetMessageRequest struct {
