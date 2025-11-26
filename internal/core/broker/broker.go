@@ -299,6 +299,18 @@ func (b *Broker) ListConnections() []amqp.ConnectionInfo {
 	return connections
 }
 
+// listConnectionsPerVhosts returns a map of vhost names to their respective connections.
+func (b *Broker) listConnectionsPerVhosts() map[string][]amqp.ConnectionInfo {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vhostConnections := make(map[string][]amqp.ConnectionInfo)
+	for _, c := range b.Connections {
+		vhostName := c.VHostName
+		vhostConnections[vhostName] = append(vhostConnections[vhostName], *c)
+	}
+	return vhostConnections
+}
+
 func (b *Broker) GetConnectionByName(name string) (*amqp.ConnectionInfo, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -609,4 +621,40 @@ func (b *Broker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
 		StartTime:  b.startedAt.Format(time.RFC3339),
 		DataDir:    b.config.DataDir,
 	}
+}
+
+func (b *Broker) GetObjectTotalsOverview() models.OverviewObjectTotals {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// Count objects across all vhosts
+	var totals models.OverviewObjectTotals
+	vhostConnections := b.listConnectionsPerVhosts()
+	for _, vh := range b.VHosts {
+		totals.Connections += len(vhostConnections[vh.Name])
+		totals.Channels += b.getChannelCountByVHost(vh)
+		totals.Exchanges += b.getExchangeCountByVHost(vh)
+		totals.Queues += b.getQueueCountByVHost(vh)
+		totals.Consumers += b.getConsumersByVHost(vh)
+	}
+	return totals
+}
+
+func (b *Broker) getChannelCountByVHost(vh *vhost.VHost) int {
+	channels, err := b.ListConnectionChannels(vh.Name)
+	if err != nil {
+		log.Debug().Err(err).Msg("Failed to list channels for vhost")
+	}
+	return len(channels)
+}
+
+func (b *Broker) getExchangeCountByVHost(vh *vhost.VHost) int {
+	return len(vh.GetAllExchanges())
+}
+
+func (b *Broker) getQueueCountByVHost(vh *vhost.VHost) int {
+	return len(vh.GetAllQueues())
+}
+
+func (b *Broker) getConsumersByVHost(vh *vhost.VHost) int {
+	return len(vh.GetAllConsumers())
 }
