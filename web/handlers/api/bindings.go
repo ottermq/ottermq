@@ -24,7 +24,7 @@ import (
 // @Router /api/bindings [post]
 // @Security BearerAuth
 func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
-	var request models.BindQueueRequest
+	var request models.CreateBindingRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -32,9 +32,9 @@ func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 	}
 
 	err := ch.QueueBind(
-		request.QueueName,
+		request.Destination,
 		request.RoutingKey,
-		request.ExchangeName,
+		request.Source,
 		false, // noWait
 		nil,   // arguments
 	)
