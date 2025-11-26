@@ -156,6 +156,30 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	return count
 }
 
+// GetConsumerCountsAllQueues returns a map of queue names to the number of active consumers.
+func (vh *VHost) GetConsumerCountsAllQueues() map[string]int {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	counts := make(map[string]int)
+	for queueName, consumers := range vh.ConsumersByQueue {
+		counts[queueName] = len(consumers)
+	}
+	return counts
+}
+
+// GetAllQueues returns a copy of all queues in this vhost.
+func (vh *VHost) GetAllQueues() []*Queue {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	queues := make([]*Queue, 0, len(vh.Queues))
+	for _, queue := range vh.Queues {
+		queues = append(queues, queue)
+	}
+	return queues
+}
+
 func (vh *VHost) loadPersistedState() {
 	if vh.persist == nil {
 		return

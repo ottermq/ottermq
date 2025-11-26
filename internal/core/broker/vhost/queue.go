@@ -56,6 +56,13 @@ func NewQueue(name string, bufferSize int, vh *VHost) *Queue {
 	}
 }
 
+func (q *Queue) IsPersistenceEnabled() bool {
+	return q.Props != nil &&
+		q.Props.Durable &&
+		q.vh != nil &&
+		q.vh.persist != nil
+}
+
 func (q *Queue) startDeliveryLoop(vh *VHost) {
 	q.deliveryMu.Lock()
 	if q.delivering {
