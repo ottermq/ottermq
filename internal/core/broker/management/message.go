@@ -47,13 +47,13 @@ func (s *Service) PublishMessage(req models.PublishMessageRequest) error {
 	return err
 }
 
-func (s *Service) GetMessages(vhostName, queue string, count int, ackMode string) ([]models.MessageDTO, error) {
+func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models.AckType) ([]models.MessageDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 
-	noAck := ackMode == "noack"
+	noAck := ackMode == models.NoAck
 
 	msgCount, err := vh.GetMessageCount(queue)
 	if err != nil {

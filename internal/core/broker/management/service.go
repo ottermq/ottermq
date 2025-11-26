@@ -44,7 +44,7 @@ type ManagementService interface {
 
 	// Messages
 	PublishMessage(req models.PublishMessageRequest) error
-	GetMessages(vhost, queue string, count int, ackMode string) ([]models.MessageDTO, error)
+	GetMessages(vhost, queue string, count int, ackMode models.AckType) ([]models.MessageDTO, error)
 
 	// VHosts
 	ListVHosts() ([]models.VHostDTO, error)
