@@ -6,11 +6,9 @@ type CreateQueueRequest struct {
 	QueueName string `json:"name"` // if empty, a random name will be generated
 
 	// Properties/flags
-	Passive    bool           `json:"passive"`
-	Durable    bool           `json:"durable"`
-	AutoDelete bool           `json:"auto_delete"`
-	Exclusive  bool           `json:"exclusive"`
-	NoWait     bool           `json:"no_wait"` // not needed for management API. Included for completeness
+	Passive    bool           `json:"passive" default:"false"`
+	Durable    bool           `json:"durable" default:"false"`
+	AutoDelete bool           `json:"auto_delete" default:"false"`
 	Arguments  map[string]any `json:"arguments,omitempty"`
 
 	// Convenience fields (auto-mapped to arguments)
