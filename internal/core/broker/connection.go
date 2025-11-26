@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
@@ -88,8 +89,15 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			}
 		}
 		if _, err := b.processRequest(conn, newState); err != nil {
-			log.Error().Err(err).Msg("Failed to process request")
+			// if the error reaches here, it means that the error is at connection level and unexpected
+			// Expected errors should be handled at method level and send channel.close instead
+			if _, isChannelError := err.(*errors.ChannelError); isChannelError {
+				log.Error().Err(err).Msg("Unexpected channel error at connection level")
+			} else if _, isMethodError := err.(*errors.ConnectionError); isMethodError {
+				log.Error().Err(err).Msg("Failed to process request")
+			}
 			request := newState.MethodFrame
+
 			b.sendConnectionClosing(conn,
 				request.Channel,
 				uint16(amqp.INTERNAL_ERROR),
@@ -97,6 +105,7 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 				uint16(request.MethodID),
 				err.Error(),
 			)
+			b.setConnectionClosingState(conn)
 		}
 	}
 }
