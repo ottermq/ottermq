@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/url"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -24,6 +26,44 @@ func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 	return c.Status(fiber.StatusOK).JSON(models.QueueListResponse{
 		Queues: queues,
 	})
+}
+
+// GetQueue godoc
+// @Summary Get a queue
+// @Description Get a queue by name
+// @Tags queues
+// @Accept json
+// @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param queue path string true "Queue name"
+// @Success 200 {object} models.QueueDTO
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to list queues"
+// @Router /queues/{vhost}/{queue} [get]
+// @Security BearerAuth
+func GetQueue(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+	queueName := c.Params("queue")
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "queue name is required",
+		})
+	}
+	queue, err := b.Management.GetQueue(vhost, queueName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Failed to get queue: " + err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(*queue)
 }
 
 // CreateQueue godoc
