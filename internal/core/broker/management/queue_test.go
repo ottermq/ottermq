@@ -87,8 +87,7 @@ func TestListQueues_ShowsUnackedCount(t *testing.T) {
 	addUnackedMessages(vh, "test-queue", 5)
 
 	// List queues
-	dtos, err := service.ListQueues("/")
-	require.NoError(t, err)
+	dtos := service.ListQueues()
 	require.Len(t, dtos, 1)
 
 	assert.Equal(t, 5, dtos[0].MessagesUnacked)
