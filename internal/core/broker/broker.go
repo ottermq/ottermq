@@ -254,8 +254,26 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.TX):
 		return b.txHandler(request, vh, conn)
 	default:
-		return nil, fmt.Errorf("unsupported command")
+		log.Debug().Uint16("class_id", request.ClassID).Msg("Unsupported class ID")
+		b.sendConnectionClosing(conn,
+			request.Channel,
+			uint16(amqp.COMMAND_INVALID),
+			uint16(request.ClassID),
+			uint16(request.MethodID),
+			fmt.Sprintf("unsupported class ID %d", request.ClassID),
+		)
+		b.setConnectionClosingState(conn)
+		return nil, nil
 	}
+}
+
+// isConnectionClosing checks if the connection is in the process of closing.
+// Shall be called after sending a connection closing frame.
+// Must be called with b.mu unlocked.
+func (b *Broker) setConnectionClosingState(conn net.Conn) {
+	b.mu.Lock()
+	b.Connections[conn].ClosingConnection = true
+	b.mu.Unlock()
 }
 
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
