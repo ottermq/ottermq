@@ -115,7 +115,7 @@ func TestListExchanges(t *testing.T) {
 	service := NewService(broker)
 
 	// Should have default exchanges initially
-	initialList, err := service.ListExchanges("/")
+	initialList, err := service.ListExchanges()
 	require.NoError(t, err)
 	initialCount := len(initialList)
 
@@ -128,7 +128,7 @@ func TestListExchanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// List again
-	newList, err := service.ListExchanges("/")
+	newList, err := service.ListExchanges()
 	require.NoError(t, err)
 	assert.Equal(t, initialCount+1, len(newList))
 
