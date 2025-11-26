@@ -57,11 +57,6 @@ func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (
 	// Not necessary to check for existing queue here;
 	// CreateQueue handles that, verifying properties if passive.
 
-	if req.Exclusive {
-		// Exclusive queues cannot be created via the management API
-		return nil, fmt.Errorf("cannot create exclusive queue via management API")
-	}
-
 	props := createQueueProperties(req)
 
 	// CreateQueue (nil connection = not exclusive via API)
@@ -101,10 +96,10 @@ func createQueueProperties(req models.CreateQueueRequest) vhost.QueueProperties 
 	}
 
 	props := vhost.QueueProperties{
-		Passive:    false,
+		Passive:    req.Passive,
 		Durable:    req.Durable,
 		AutoDelete: req.AutoDelete,
-		Exclusive:  req.Exclusive,
+		Exclusive:  false,
 		Arguments:  args,
 	}
 	return props

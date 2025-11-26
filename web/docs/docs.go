@@ -1386,13 +1386,12 @@ const docTemplate = `{
                     "additionalProperties": {}
                 },
                 "auto_delete": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "default": false
                 },
                 "durable": {
-                    "type": "boolean"
-                },
-                "exclusive": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "default": false
                 },
                 "max_length": {
                     "description": "Convenience fields (auto-mapped to arguments)",
@@ -1402,11 +1401,8 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "if empty, a random name will be generated",
                     "type": "string"
-                },
-                "no_wait": {
-                    "description": "not needed for management API. Included for completeness",
-                    "type": "boolean"
                 },
                 "passive": {
                     "description": "Properties/flags",
