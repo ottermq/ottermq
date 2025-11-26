@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -47,6 +48,7 @@ type Broker struct {
 	connections   map[vhost.ConnectionID]net.Conn
 	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
 	connectionsMu sync.RWMutex
+	startedAt     time.Time
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -71,6 +73,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		rootCancel:  rootCancel,
 		persist:     persist,
 		Ready:       make(chan struct{}),
+		startedAt:   time.Now(),
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
