@@ -1,7 +1,6 @@
 package api
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rabbitmq/amqp091-go"
@@ -28,7 +27,7 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 		})
 	}
 	exchange := request.ExchangeName
-	if exchange == broker.DEFAULT_EXCHANGE_ALIAS {
+	if exchange == "(AMQP default)" {
 		exchange = ""
 	}
 

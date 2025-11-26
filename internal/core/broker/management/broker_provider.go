@@ -1,6 +1,7 @@
 package management
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 )
 
@@ -8,4 +9,5 @@ import (
 type BrokerProvider interface {
 	GetVHost(vhostName string) *vhost.VHost
 	ListVHosts() []*vhost.VHost
+	ListConnections() []amqp.ConnectionInfo
 }

@@ -1,9 +1,18 @@
 package management
 
-import "github.com/andrelcunha/ottermq/internal/core/models"
+import (
+	"fmt"
+
+	"github.com/andrelcunha/ottermq/internal/core/models"
+)
 
 func (s *Service) ListConnections() ([]models.ConnectionInfoDTO, error) {
-	panic("not implemented")
+	if s.broker == nil {
+		return nil, fmt.Errorf("broker not initialized")
+	}
+	amqpConns := s.broker.ListConnections()
+	dtos := models.MapListConnectionsDTO(amqpConns)
+	return dtos, nil
 }
 
 func (s *Service) GetConnection(name string) (*models.ConnectionInfoDTO, error) {
