@@ -56,11 +56,7 @@ func GetExchange(c *fiber.Ctx, b *broker.Broker) error {
 		}
 	}
 	exchangeName := c.Params("exchange")
-	if exchangeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "Exchange name is required",
-		})
-	} else {
+	if exchangeName != "" {
 		decoded, err := url.PathUnescape(exchangeName)
 		if err == nil {
 			exchangeName = decoded
@@ -81,12 +77,14 @@ func GetExchange(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags exchanges
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param exchange path string true "Exchange name"
 // @Param exchange body models.CreateExchangeRequest true "Exchange to create"
 // @Success 200 {object} models.SuccessResponse "Exchange created successfully"
 // @Failure 400 {object} models.ErrorResponse "Invalid or malformed request body"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /exchanges [post]
+// @Router /exchanges/{vhost}/{exchange} [post]
 // @Security BearerAuth
 func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
@@ -132,14 +130,24 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags exchanges
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
 // @Param exchange path string true "Exchange name"
 // @Success 204 {object} nil
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /exchanges/{exchange} [delete]
+// @Router /exchanges/{vhost}/{exchange} [delete]
 // @Security BearerAuth
 func DeleteExchange(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
 	exchangeName := c.Params("exchange")
 	if exchangeName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -147,7 +155,7 @@ func DeleteExchange(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 
-	err := b.Management.DeleteExchange("/", exchangeName, false)
+	err := b.Management.DeleteExchange(vhost, exchangeName, false)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),

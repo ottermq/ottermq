@@ -101,7 +101,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Delete("/queues/:vhost/:queue/content", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.PurgeQueue(c, ws.Broker)
 	})
-	apiGrp.Post("/queues/:queue/get", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Post("/queues/:vhost/:queue/get", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetMessage(c, ws.Broker)
 	})
 
@@ -120,7 +120,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})
-	apiGrp.Delete("/exchanges/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Delete("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.DeleteExchange(c, ws.Broker)
 	})
 	apiGrp.Get("/exchanges/:vhost/:exchange/bindings/source", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {

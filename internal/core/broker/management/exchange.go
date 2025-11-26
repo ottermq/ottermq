@@ -51,7 +51,7 @@ func (s *Service) CreateExchange(vhostName, exchangeName string, req models.Crea
 		Passive:    req.Passive,
 		Durable:    req.Durable,
 		AutoDelete: req.AutoDelete,
-		Internal:   req.Internal,
+		Internal:   false,
 		Arguments:  req.Arguments,
 	}
 	err := vh.CreateExchange(exchangeName, exchangeType, &props)
