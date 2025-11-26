@@ -30,6 +30,8 @@ type Config struct {
 	WebServerPort string
 	EnableUI      bool
 	EnableSwagger bool
+	SwaggerPrefix string
+	ApiPrefix     string
 }
 
 func NewWebServer(config *Config, broker *broker.Broker) (*WebServer, error) {
