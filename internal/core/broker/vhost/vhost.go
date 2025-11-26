@@ -168,6 +168,14 @@ func (vh *VHost) GetConsumerCountsAllQueues() map[string]int {
 	return counts
 }
 
+// GetConsumersByQueue returns a slice of consumers for the specified queue.
+func (vh *VHost) GetConsumersByQueue(queueName string) []*Consumer {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	return vh.ConsumersByQueue[queueName]
+}
+
 // GetAllQueues returns a copy of all queues in this vhost.
 func (vh *VHost) GetAllQueues() []*Queue {
 	vh.mu.Lock()
@@ -178,6 +186,13 @@ func (vh *VHost) GetAllQueues() []*Queue {
 		queues = append(queues, queue)
 	}
 	return queues
+}
+
+// GetQueue retrieves a queue by name.
+func (vh *VHost) GetQueue(queueName string) *Queue {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.Queues[queueName]
 }
 
 func (vh *VHost) loadPersistedState() {
