@@ -452,6 +452,17 @@ func (vh *VHost) GetActiveConsumersForQueue(queueName string) []*Consumer {
 	return activeConsumers
 }
 
+// GetAllConsumers returns a slice of all consumers in the vhost.
+func (vh *VHost) GetAllConsumers() []*Consumer {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	result := make([]*Consumer, 0, len(vh.Consumers))
+	for _, consumer := range vh.Consumers {
+		result = append(result, consumer)
+	}
+	return result
+}
+
 func generatePseudoRandomString(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
