@@ -63,6 +63,10 @@ func (fb *fakeBroker) GetOverviewNodeDetails() models.OverviewNodeDetails {
 	return models.OverviewNodeDetails{}
 }
 
+func (fb *fakeBroker) GetObjectTotalsOverview() models.OverviewObjectTotals {
+	return models.OverviewObjectTotals{}
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()
