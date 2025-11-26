@@ -11,7 +11,7 @@ type ManagementService interface {
 	// Queues
 	ListQueues() []models.QueueDTO
 	GetQueue(vhost, name string) (*models.QueueDTO, error)
-	CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error)
+	CreateQueue(vhost string, req models.CreateQueueRequest) (*models.QueueDTO, error)
 	DeleteQueue(vhost, name string, ifUnused, ifEmpty bool) error
 	PurgeQueue(vhost, name string) (int, error)
 

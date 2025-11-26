@@ -22,7 +22,6 @@ func TestCreateQueue_WithAllProperties(t *testing.T) {
 
 	req := models.CreateQueueRequest{
 		QueueName:          "",
-		VHost:              "/",
 		Durable:            true,
 		AutoDelete:         false,
 		MaxLength:          &maxLen,
@@ -30,7 +29,7 @@ func TestCreateQueue_WithAllProperties(t *testing.T) {
 		DeadLetterExchange: &dlx,
 	}
 
-	dto, err := service.CreateQueue(req)
+	dto, err := service.CreateQueue("/", req)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, dto.Name) // Auto-generated name
@@ -48,9 +47,8 @@ func TestDeleteQueue_IfUnused(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	service.CreateQueue(models.CreateQueueRequest{
+	service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "test-queue",
-		VHost:     "/",
 	})
 
 	// Add consumer (simulate)
@@ -77,9 +75,8 @@ func TestListQueues_ShowsUnackedCount(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	service.CreateQueue(models.CreateQueueRequest{
+	service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "test-queue",
-		VHost:     "/",
 	})
 
 	// Simulate unacked messages
@@ -98,9 +95,8 @@ func TestGetQueue(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue(models.CreateQueueRequest{
+	_, err := service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "get-queue",
-		VHost:     "/",
 		Durable:   true,
 	})
 	require.NoError(t, err)
@@ -117,9 +113,8 @@ func TestPurgeQueue(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue(models.CreateQueueRequest{
+	_, err := service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "purge-queue",
-		VHost:     "/",
 	})
 	require.NoError(t, err)
 
@@ -155,25 +150,22 @@ func TestCreateQueue_Idempotency(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue(models.CreateQueueRequest{
+	_, err := service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "idempotent-queue",
-		VHost:     "/",
 		Durable:   true,
 	})
 	require.NoError(t, err)
 
 	// Create again with same props
-	_, err = service.CreateQueue(models.CreateQueueRequest{
+	_, err = service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "idempotent-queue",
-		VHost:     "/",
 		Durable:   true,
 	})
 	require.NoError(t, err)
 
 	// Create again with different props (should fail)
-	_, err = service.CreateQueue(models.CreateQueueRequest{
+	_, err = service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: "idempotent-queue",
-		VHost:     "/",
 		Durable:   false, // Different
 	})
 	assert.Error(t, err)
