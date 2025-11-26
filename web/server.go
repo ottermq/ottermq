@@ -52,8 +52,8 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 		app.Static("/", "./ui")
 	}
 	if ws.config.EnableSwagger {
-		log.Info().Str("path", "/docs/index.html").Msg("Swagger docs enabled")
-		app.Get("/docs/*", swagger.HandlerDefault)
+		log.Info().Str("path", ws.config.SwaggerPrefix+"/index.html").Msg("Swagger docs enabled")
+		app.Get(ws.config.SwaggerPrefix+"/*", swagger.HandlerDefault)
 	}
 
 	ws.AddApi(app)
@@ -65,10 +65,10 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// Public API routes
-	app.Post("/api/login", api_admin.Login)
+	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login)
 
 	// Protected API routes
-	apiGrp := app.Group("/api")
+	apiGrp := app.Group(ws.config.ApiPrefix)
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})
@@ -111,7 +111,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 
 func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	// Admin API routes
-	apiAdminGrp := app.Group("/api/admin")
+	apiAdminGrp := app.Group(ws.config.ApiPrefix + "/admin")
 	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
@@ -122,7 +122,7 @@ func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 	config := fiber.Config{
 
 		Prefork:               false,
-		AppName:               "ottermq-webadmin",
+		AppName:               "ottermq-management-ui",
 		ViewsLayout:           "layout",
 		DisableStartupMessage: true,
 	}
