@@ -17,7 +17,6 @@ type CreateQueueRequest struct {
 }
 
 type CreateExchangeRequest struct {
-	ExchangeName string `json:"name" validate:"required"`
 	ExchangeType string `json:"type" validate:"required,oneof=direct fanout topic headers"`
 	VHost        string `json:"vhost"` // Optional; defaults to "/"
 

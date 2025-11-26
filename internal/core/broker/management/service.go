@@ -9,18 +9,22 @@ import (
 
 type ManagementService interface {
 	// Queues
+	// ListQueues lists all queues across all vhosts.
 	ListQueues() []models.QueueDTO
-	GetQueue(vhost, name string) (*models.QueueDTO, error)
+	// GetQueue retrieves the details of a specific queue within a vhost.
+	GetQueue(vhost, queue string) (*models.QueueDTO, error)
 	// CreateQueue creates a new queue in the specified vhost.
 	CreateQueue(vhost, queue string, req models.CreateQueueRequest) (*models.QueueDTO, error)
-	DeleteQueue(vhost, name string, ifUnused, ifEmpty bool) error
-	PurgeQueue(vhost, name string) (int, error)
-
+	DeleteQueue(vhost, queue string, ifUnused, ifEmpty bool) error
+	PurgeQueue(vhost, queue string) (int, error)
 	// Exchanges
+	// ListExchanges lists all exchanges across all vhosts.
 	ListExchanges() ([]models.ExchangeDTO, error)
-	GetExchange(vhost, name string) (*models.ExchangeDTO, error)
-	CreateExchange(req models.CreateExchangeRequest) (*models.ExchangeDTO, error)
-	DeleteExchange(vhost, name string, ifUnused bool) error
+	// GetExchange retrieves the details of a specific exchange within a vhost.
+	GetExchange(vhost, exchange string) (*models.ExchangeDTO, error)
+	// CreateExchange creates a new exchange in the specified vhost.
+	CreateExchange(vhost, exchange string, req models.CreateExchangeRequest) (*models.ExchangeDTO, error)
+	DeleteExchange(vhost, exchange string, ifUnused bool) error
 
 	// Bindings
 	ListBindings(vhost string) ([]models.BindingDTO, error)

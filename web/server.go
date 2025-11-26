@@ -77,6 +77,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/overview", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetOverview(c, ws.Broker)
 	})
+
+	// Queue routes
+
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})
@@ -98,9 +101,12 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Post("/queues/:queue/get", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetMessage(c, ws.Broker)
 	})
+
 	apiGrp.Post("/messages", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.PublishMessage(c, ws.Broker)
 	})
+
+	// Exchange routes
 
 	apiGrp.Get("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListExchanges(c, ws.Broker)
@@ -111,11 +117,18 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})
-
 	apiGrp.Delete("/exchanges/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.DeleteExchange(c, ws.Broker)
 	})
-	apiGrp.Get("/bindings/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Get("/exchanges/:vhost/:exchange/bindings/source", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetBindingsExchangeSource(c, ws.Broker)
+	})
+
+	// Binding routes
+	apiGrp.Get("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListBindings(c, ws.Broker)
+	})
+	apiGrp.Get("/bindings/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListBindings(c, ws.Broker)
 	})
 	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {

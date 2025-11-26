@@ -89,23 +89,33 @@ func GetExchange(c *fiber.Ctx, b *broker.Broker) error {
 // @Router /exchanges [post]
 // @Security BearerAuth
 func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+	exchangeName := c.Params("exchange")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Exchange name is required",
+		})
+	} else {
+		decoded, err := url.PathUnescape(exchangeName)
+		if err == nil {
+			exchangeName = decoded
+		}
+	}
 	var request models.CreateExchangeRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "Invalid or malformed request body: " + err.Error(),
 		})
 	}
-	exchangeDto := models.CreateExchangeRequest{
-		VHost:        "/", // Assuming a default vhost for simplicity
-		ExchangeName: request.ExchangeName,
-		ExchangeType: request.ExchangeType,
-		Durable:      request.Durable,
-		AutoDelete:   request.AutoDelete,
-		Internal:     request.Internal,
-		Arguments:    request.Arguments,
-	}
-
-	_, err := b.Management.CreateExchange(exchangeDto)
+	_, err := b.Management.CreateExchange(vhost, exchangeName, request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -145,4 +155,49 @@ func DeleteExchange(c *fiber.Ctx, b *broker.Broker) error {
 	}
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
+}
+
+// GetBindingsExchangeSource godoc
+// @Summary Get bindings where the exchange is the source
+// @Description Get all bindings where the specified exchange is the source
+// @Tags exchanges
+// @Accept json
+// @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param exchange path string true "Exchange name"
+// @Success 200 {object} models.BindingListResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to get bindings"
+// @Router /exchanges/{vhost}/{exchange}/bindings/source [get]
+// @Security BearerAuth
+func GetBindingsExchangeSource(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+	exchangeName := c.Params("exchange")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Exchange name is required",
+		})
+	} else {
+		decoded, err := url.PathUnescape(exchangeName)
+		if err == nil {
+			exchangeName = decoded
+		}
+	}
+	bindings, err := b.Management.ListExchangeBindings(vhost, exchangeName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(models.BindingListResponse{
+		Bindings: bindings,
+	})
 }

@@ -20,18 +20,18 @@ func TestCreateExchange_AllTypes(t *testing.T) {
 	// Let's stick to supported types.
 
 	for _, typ := range types {
+		exName := "test-" + typ
 		t.Run(typ, func(t *testing.T) {
 			req := models.CreateExchangeRequest{
-				ExchangeName: "test-" + typ,
 				ExchangeType: typ,
 				VHost:        "/",
 				Durable:      true,
 				AutoDelete:   false,
 				Internal:     false,
 			}
-			dto, err := service.CreateExchange(req)
+			dto, err := service.CreateExchange(req.VHost, exName, req)
 			require.NoError(t, err)
-			assert.Equal(t, req.ExchangeName, dto.Name)
+			assert.Equal(t, exName, dto.Name)
 			assert.Equal(t, typ, dto.Type)
 			assert.True(t, dto.Durable)
 		})
@@ -44,18 +44,14 @@ func TestDeleteExchange_IfUnused(t *testing.T) {
 
 	// Create exchange
 	exName := "test-exchange"
-	_, err := service.CreateExchange(models.CreateExchangeRequest{
-		ExchangeName: exName,
+	_, err := service.CreateExchange("/", exName, models.CreateExchangeRequest{
 		ExchangeType: "direct",
-		VHost:        "/",
 	})
 	require.NoError(t, err)
 
 	// Create queue
 	qName := "test-queue"
-	_, err = service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: qName,
-	})
+	_, err = service.CreateQueue("/", qName, models.CreateQueueRequest{})
 	require.NoError(t, err)
 
 	// Bind queue to exchange to make it "used"
@@ -93,19 +89,19 @@ func TestGetExchange(t *testing.T) {
 	broker := setupTestBroker(t)
 	service := NewService(broker)
 
+	exName := "my-exchange"
 	req := models.CreateExchangeRequest{
-		ExchangeName: "my-exchange",
 		ExchangeType: "topic",
 		VHost:        "/",
 		Durable:      true,
 		Arguments:    map[string]any{"x-custom": "value"},
 	}
-	_, err := service.CreateExchange(req)
+	_, err := service.CreateExchange("/", exName, req)
 	require.NoError(t, err)
 
-	dto, err := service.GetExchange("/", "my-exchange")
+	dto, err := service.GetExchange("/", exName)
 	require.NoError(t, err)
-	assert.Equal(t, "my-exchange", dto.Name)
+	assert.Equal(t, exName, dto.Name)
 	assert.Equal(t, "topic", dto.Type)
 	assert.Equal(t, "value", dto.Arguments["x-custom"])
 }
@@ -120,10 +116,9 @@ func TestListExchanges(t *testing.T) {
 	initialCount := len(initialList)
 
 	// Create a new one
-	_, err = service.CreateExchange(models.CreateExchangeRequest{
-		ExchangeName: "list-test-exchange",
+	exName := "list-test-exchange"
+	_, err = service.CreateExchange("/", exName, models.CreateExchangeRequest{
 		ExchangeType: "direct",
-		VHost:        "/",
 	})
 	require.NoError(t, err)
 
@@ -134,7 +129,7 @@ func TestListExchanges(t *testing.T) {
 
 	found := false
 	for _, ex := range newList {
-		if ex.Name == "list-test-exchange" {
+		if ex.Name == exName {
 			found = true
 			break
 		}
@@ -147,28 +142,23 @@ func TestCreateExchange_Idempotency(t *testing.T) {
 	service := NewService(broker)
 
 	// Create exchange
-	_, err := service.CreateExchange(models.CreateExchangeRequest{
-		ExchangeName: "idempotent-exchange",
+	exName := "idempotent-exchange"
+	_, err := service.CreateExchange("/", exName, models.CreateExchangeRequest{
 		ExchangeType: "direct",
-		VHost:        "/",
 		Durable:      true,
 	})
 	require.NoError(t, err)
 
 	// Create again with same props
-	_, err = service.CreateExchange(models.CreateExchangeRequest{
-		ExchangeName: "idempotent-exchange",
+	_, err = service.CreateExchange("/", exName, models.CreateExchangeRequest{
 		ExchangeType: "direct",
-		VHost:        "/",
 		Durable:      true,
 	})
 	require.NoError(t, err)
 
 	// Create again with different props (should fail)
-	_, err = service.CreateExchange(models.CreateExchangeRequest{
-		ExchangeName: "idempotent-exchange",
+	_, err = service.CreateExchange("/", exName, models.CreateExchangeRequest{
 		ExchangeType: "fanout", // Different type
-		VHost:        "/",
 		Durable:      true,
 	})
 	assert.Error(t, err)
