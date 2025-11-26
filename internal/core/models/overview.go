@@ -1,5 +1,27 @@
 package models
 
+type OverviewBrokerDetails struct {
+	Product    string `json:"product"`
+	Version    string `json:"version"`
+	BuildInfo  string `json:"build_info"` // e.g., commit hash
+	Platform   string `json:"platform"`
+	GoVersion  string `json:"go_version"`
+	UptimeSecs int    `json:"uptime_secs"`
+	StartTime  string `json:"start_time"`
+	DataDir    string `json:"data_dir"`
+}
+
+type OverviewNodeDetails struct {
+	Name        string `json:"name"`
+	MemoryUsage int    `json:"memory_usage"` // in bytes
+	MemoryLimit int    `json:"memory_limit"` // in bytes
+	FDUsed      int    `json:"fd_used"`
+	FDTotal     int    `json:"fd_total"`
+	DiskFree    int    `json:"disk_free"` // in bytes
+	ProcUsed    int    `json:"proc_used"`
+	SocketsUsed int    `json:"sockets_used"`
+}
+
 type OverviewObjectTotals struct {
 	Connections int `json:"connections"`
 	Channels    int `json:"channels"`
@@ -45,8 +67,20 @@ type OverviewFeatureUsage struct {
 	ChannelsWithQoS       int `json:"channels_with_qos"`
 }
 
-type OverviewLimits struct {
-	MaxConnections     int    `json:"max_connections"`
-	QueueBufferSize    int    `json:"queue_buffer_size"`
-	PersistenceBackend string `json:"persistence_backend"` // "json", "memento" (future)
+type BrokerConfigOverview struct {
+	AMQPPort           string        `json:"amqp_port"`
+	HTTPPort           string        `json:"http_port"`
+	EnabledFeatures    []string      `json:"enabled_features"` // e.g., ["DLX", "TTL", "QLL"]
+	ChannelMax         int           `json:"channel_max"`
+	FrameMax           int           `json:"frame_max"`
+	QueueBufferSize    int           `json:"queue_buffer_size"`
+	PersistenceBackend string        `json:"persistence_backend"` // "json", "memento" (future)
+	SSL                bool          `json:"ssl"`
+	HTTPContexts       []HttpContext `json:"http_contexts"` // e.g., Context:path ["management:/", "swagger:/", "prometheus:/"]
+}
+
+type HttpContext struct {
+	Name string `json:"name"`
+	Port string `json:"port"`
+	Path string `json:"path"`
 }
