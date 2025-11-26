@@ -99,7 +99,10 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 	// Architecture decision: always honor flow change requested by client
 	// Further improvements may include broker policies to override client requests
 	flowInitiatedByBroker := false
-	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
 	err := vh.HandleChannelFlow(connID, channel, flowActive, flowInitiatedByBroker)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to handle channel flow in vhost")

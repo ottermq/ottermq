@@ -32,7 +32,10 @@ func (b *Broker) txHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, 
 func (b *Broker) txSelectHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
 
-	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
 	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
@@ -54,7 +57,10 @@ func (b *Broker) txSelectHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
 
-	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
 	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
@@ -172,7 +178,10 @@ func (*Broker) clearBufferedTransactionDataUnlocked(txState *vhost.ChannelTransa
 
 func (b *Broker) txRollbackHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
-	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
 	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
