@@ -78,9 +78,10 @@ func setupBroker() error {
 		QueueBufferSize: 100000,
 		JwtSecret:       "test-secret",
 		WebPort:         "3001", // Different port to avoid conflicts
-		EnableDLX:       true,   // Enable DLX for tests
-		EnableTTL:       true,   // Enable TTL for tests
-		EnableQLL:       true,   // Enable Queue Length Limiter (QLL) for tests
+		DataDir:         testDataDir,
+		EnableDLX:       true, // Enable DLX for tests
+		EnableTTL:       true, // Enable TTL for tests
+		EnableQLL:       true, // Enable Queue Length Limiter (QLL) for tests
 	}
 
 	logger.Init(cfg.LogLevel)
