@@ -165,7 +165,6 @@ type OverviewDTO struct {
 	ObjectTotals    OverviewObjectTotals    `json:"object_totals"`
 	MessageStats    OverviewMessageStats    `json:"message_stats"`
 	ConnectionStats OverviewConnectionStats `json:"connection_stats"`
-	FeatureUsage    OverviewFeatureUsage    `json:"feature_usage"`
 	Configuration   BrokerConfigOverview    `json:"configuration"`
 }
 
