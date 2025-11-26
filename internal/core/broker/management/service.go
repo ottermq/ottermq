@@ -13,20 +13,20 @@ type ManagementService interface {
 	GetQueue(vhost, name string) (*models.QueueDTO, error)
 	CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error)
 	DeleteQueue(vhost, name string, ifUnused, ifEmpty bool) error
-	PurgeQueues(vhost, name string) (int, error)
+	PurgeQueue(vhost, name string) (int, error)
 
 	// Exchanges
 	ListExchanges(vhost string) ([]models.ExchangeDTO, error)
 	GetExchange(vhost, name string) (*models.ExchangeDTO, error)
-	CreateExchange(vhost string, req models.CreateExchangeRequest) (*models.ExchangeDTO, error)
+	CreateExchange(req models.CreateExchangeRequest) (*models.ExchangeDTO, error)
 	DeleteExchange(vhost, name string, ifUnused bool) error
 
 	// Bindings
 	ListBindings(vhost string) ([]models.BindingDTO, error)
 	ListQueuesBindings(vhost, queue string) ([]models.BindingDTO, error)
 	ListExchangeBindings(vhost, exchange string) ([]models.BindingDTO, error)
-	CreateBinding(vhost string, req models.CreateBindingRequest) (*models.BindingDTO, error)
-	DeleteBinding(vhost, exchangeName, queueName, routingKey string) error
+	CreateBinding(req models.CreateBindingRequest) (*models.BindingDTO, error)
+	DeleteBinding(req models.DeleteBindingRequest) error
 
 	// Consumers
 	ListConsumers(vhost string) ([]models.ConsumerDTO, error)
@@ -44,7 +44,7 @@ type ManagementService interface {
 
 	// Messages
 	PublishMessage(vhost string, req models.PublishMessageRequest) error
-	GetMessages(vhost, queue string, count int, requeue, ackMode string) ([]string, error)
+	GetMessages(vhost, queue string, count int, requeue, ackMode string) ([]models.MessageDTO, error)
 
 	// VHosts
 	ListVHosts() ([]models.VHostDTO, error)
