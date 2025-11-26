@@ -7,22 +7,46 @@ import (
 	"github.com/andrelcunha/ottermq/internal/testutil"
 )
 
+// mockFrameSender implements FrameSender for testing
+type mockFrameSender struct {
+	sentFrames []sentFrame
+	sendError  error
+}
+
+type sentFrame struct {
+	connID  ConnectionID
+	channel uint16
+	frame   []byte
+}
+
+func (m *mockFrameSender) SendFrame(connID ConnectionID, channel uint16, frame []byte) error {
+	if m.sendError != nil {
+		return m.sendError
+	}
+	m.sentFrames = append(m.sentFrames, sentFrame{
+		connID:  connID,
+		channel: channel,
+		frame:   frame,
+	})
+	return nil
+}
+
 func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	var options = VHostOptions{
 		QueueBufferSize: 1000,
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil, conn)
+	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Setup channel delivery state with unacked messages
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -62,7 +86,7 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Call recover with requeue=true
-	if err := vh.HandleBasicRecover(conn, 1, true); err != nil {
+	if err := vh.HandleBasicRecover(connID, 1, true); err != nil {
 		t.Fatalf("HandleBasicRecover failed: %v", err)
 	}
 
@@ -94,32 +118,36 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Create queue
-	if _, err := vh.CreateQueue("q1", nil, conn); err != nil {
+	if _, err := vh.CreateQueue("q1", nil, connID); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Register consumer
 	consumer := &Consumer{
-		Tag:        "ctag1",
-		Channel:    1,
-		QueueName:  "q1",
-		Connection: conn,
-		Active:     true,
-		Props:      &ConsumerProperties{NoAck: false},
+		Tag:          "ctag1",
+		Channel:      1,
+		QueueName:    "q1",
+		ConnectionID: connID,
+		Active:       true,
+		Props:        &ConsumerProperties{NoAck: false},
 	}
 
 	consumerKey := ConsumerKey{Channel: 1, Tag: "ctag1"}
 	vh.mu.Lock()
 	vh.Consumers[consumerKey] = consumer
-	channelKey := ConnectionChannelKey{conn, 1}
+	channelKey := ConnectionChannelKey{connID, 1}
 	vh.ConsumersByChannel[channelKey] = []*Consumer{consumer}
 	vh.mu.Unlock()
 
 	// Setup mock framer that always succeeds
 	vh.framer = &testutil.MockFramer{}
+
+	// Setup mock frame sender
+	mockSender := &mockFrameSender{}
+	vh.SetFrameSender(mockSender)
 
 	// Setup channel delivery state with unacked message
 	ch := &ChannelDeliveryState{
@@ -146,7 +174,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
-	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+	if err := vh.HandleBasicRecover(connID, 1, false); err != nil {
 		t.Fatalf("HandleBasicRecover failed: %v", err)
 	}
 
@@ -178,16 +206,16 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil, conn)
+	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Setup channel delivery state with unacked message, but NO consumer
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -211,7 +239,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
-	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+	if err := vh.HandleBasicRecover(connID, 1, false); err != nil {
 		t.Fatalf("HandleBasicRecover failed: %v", err)
 	}
 
@@ -240,33 +268,37 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil, conn)
+	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Register consumer
 	consumer := &Consumer{
-		Tag:        "ctag1",
-		Channel:    1,
-		QueueName:  "q1",
-		Connection: conn,
-		Active:     true,
-		Props:      &ConsumerProperties{NoAck: false},
+		Tag:          "ctag1",
+		Channel:      1,
+		QueueName:    "q1",
+		ConnectionID: connID,
+		Active:       true,
+		Props:        &ConsumerProperties{NoAck: false},
 	}
 
 	consumerKey := ConsumerKey{Channel: 1, Tag: "ctag1"}
 	vh.mu.Lock()
 	vh.Consumers[consumerKey] = consumer
-	channelKey := ConnectionChannelKey{conn, 1}
+	channelKey := ConnectionChannelKey{connID, 1}
 	vh.ConsumersByChannel[channelKey] = []*Consumer{consumer}
 	vh.mu.Unlock()
 
 	// Setup mock framer that FAILS
 	vh.framer = &testutil.MockFramer{SendError: &net.OpError{Op: "write", Err: net.ErrClosed}}
+
+	// Setup mock frame sender that FAILS
+	mockSender := &mockFrameSender{sendError: &net.OpError{Op: "write", Err: net.ErrClosed}}
+	vh.SetFrameSender(mockSender)
 
 	// Setup channel delivery state with unacked message
 	ch := &ChannelDeliveryState{
@@ -293,7 +325,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Call recover with requeue=false
-	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+	if err := vh.HandleBasicRecover(connID, 1, false); err != nil {
 		t.Fatalf("HandleBasicRecover failed: %v", err)
 	}
 
@@ -322,10 +354,10 @@ func TestHandleBasicRecover_NoChannelState(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Call recover without setting up channel state
-	err := vh.HandleBasicRecover(conn, 1, true)
+	err := vh.HandleBasicRecover(connID, 1, true)
 	if err == nil {
 		t.Error("expected error when channel state missing, got nil")
 	}
@@ -364,16 +396,16 @@ func TestHandleBasicRecover_RequeueFalse_BasicGetSentinel(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Create queue
-	q, err := vh.CreateQueue("q1", nil, conn)
+	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Setup channel delivery state with Basic.Get unacked message (using sentinel)
-	key := ConnectionChannelKey{conn, 1}
+	key := ConnectionChannelKey{connID, 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -399,7 +431,7 @@ func TestHandleBasicRecover_RequeueFalse_BasicGetSentinel(t *testing.T) {
 
 	// Call recover with requeue=false
 	// Since BASIC_GET_SENTINEL has no consumer, it should requeue the message
-	if err := vh.HandleBasicRecover(conn, 1, false); err != nil {
+	if err := vh.HandleBasicRecover(connID, 1, false); err != nil {
 		t.Fatalf("HandleBasicRecover failed: %v", err)
 	}
 

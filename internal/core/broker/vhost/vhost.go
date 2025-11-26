@@ -2,7 +2,6 @@ package vhost
 
 import (
 	"context"
-	"net"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -55,6 +54,13 @@ type VHost struct {
 	QueueLengthLimiter QueueLengthLimiter
 
 	ActiveExtensions map[string]bool
+
+	// injected by the broker to allow consumers to send frames
+	frameSender FrameSender
+}
+
+type FrameSender interface {
+	SendFrame(connID ConnectionID, channel uint16, frame []byte) error
 }
 
 type VHostOptions struct {
@@ -92,6 +98,12 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	vh.setupExtensions(options)
 
 	return vh
+}
+
+func (vh *VHost) SetFrameSender(sender FrameSender) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	vh.frameSender = sender
 }
 
 func (vh *VHost) setupExtensions(options VHostOptions) {
@@ -140,11 +152,11 @@ func (vh *VHost) GetUnackedMessageCountsAllQueues() map[string]int {
 }
 
 // GetUnackedMessageCountByChannel returns the count of unacknowledged messages for a specific connection and channel.
-func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) int {
+func (vh *VHost) GetUnackedMessageCountByChannel(connID ConnectionID, channel uint16) int {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	key := ConnectionChannelKey{conn, channel}
+	key := ConnectionChannelKey{connID, channel}
 	channelState := vh.ChannelDeliveries[key]
 	if channelState == nil {
 		return 0
@@ -287,7 +299,7 @@ func (vh *VHost) loadPersistedState() {
 			if skippedQueues[bindingData.QueueName] {
 				continue
 			}
-			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments, nil)
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments, INTERNAL_CONN_ID)
 			if err != nil {
 				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
 			}

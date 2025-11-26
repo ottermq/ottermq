@@ -3,12 +3,19 @@ package vhost
 import (
 	"fmt"
 	"math/rand"
-	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
+
+const (
+	// MANAGEMENT_CONNECTION_ID is used to identify management API operations
+	// that interact with queues/exchanges without a real consumer/connection.
+	MANAGEMENT_CONNECTION_ID = "__management__"
+)
+
+type ConnectionID string
 
 type ConsumerKey struct {
 	Channel uint16
@@ -17,18 +24,20 @@ type ConsumerKey struct {
 
 // ConnectionChannelKey uniquely identifies a channel within a connection
 type ConnectionChannelKey struct {
-	Connection net.Conn
-	Channel    uint16
+	ConnectionID ConnectionID
+	Channel      uint16
 }
 
 type Consumer struct {
 	Tag           string
 	Channel       uint16
 	QueueName     string
-	Connection    net.Conn
+	ConnectionID  ConnectionID
 	Active        bool
 	PrefetchCount uint16 // 0 means unlimited
 	Props         *ConsumerProperties
+
+	frameSender FrameSender
 }
 
 type ConsumerProperties struct {
@@ -37,13 +46,13 @@ type ConsumerProperties struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
-func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, props *ConsumerProperties) *Consumer {
+func NewConsumer(connID ConnectionID, channel uint16, queueName, consumerTag string, props *ConsumerProperties) *Consumer {
 	return &Consumer{
-		Tag:        consumerTag,
-		Channel:    channel,
-		QueueName:  queueName,
-		Connection: conn,
-		Props:      props,
+		Tag:          consumerTag,
+		Channel:      channel,
+		QueueName:    queueName,
+		ConnectionID: connID,
+		Props:        props,
 	}
 }
 
@@ -51,7 +60,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 	vh.mu.Lock()
 
 	// Apply consumer prefetch if it was set via QoS(global = false)
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	channelKey := ConnectionChannelKey{consumer.ConnectionID, consumer.Channel}
 	if state, exists := vh.ChannelDeliveries[channelKey]; exists {
 		if !state.PrefetchGlobal && state.NextPrefetchCount > 0 {
 			consumer.PrefetchCount = state.NextPrefetchCount
@@ -189,7 +198,7 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	delete(vh.Consumers, key)
 
 	// Requeue unacked messages for this consumer
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	channelKey := ConnectionChannelKey{consumer.ConnectionID, consumer.Channel}
 	if state := vh.ChannelDeliveries[channelKey]; state != nil {
 		vh.requeueUnackedForConsumer(state, consumer.Tag, consumer.QueueName)
 	}
@@ -219,7 +228,7 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	}
 
 	// Remove from ConsumersByChannel (connection-scoped)
-	channelKey = ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	channelKey = ConnectionChannelKey{consumer.ConnectionID, consumer.Channel}
 	consumersForChannel := vh.ConsumersByChannel[channelKey]
 	for i, c := range consumersForChannel {
 		if c.Tag == tag {
@@ -306,11 +315,11 @@ func (vh *VHost) checkAutoDeleteQueueUnlocked(name string) (bool, error) {
 	return true, nil
 }
 
-func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
+func (vh *VHost) CleanupChannel(connID ConnectionID, channel uint16) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	channelKey := ConnectionChannelKey{connection, channel}
+	channelKey := ConnectionChannelKey{connID, channel}
 	// Get copy of consumers to avoid modification during iteration
 	_ = cancelAllConsumers(vh, channelKey)
 
@@ -383,14 +392,14 @@ func cancelAllConsumers(vh *VHost, channelKey ConnectionChannelKey) bool {
 	return false
 }
 
-func (vh *VHost) CleanupConnection(connection net.Conn) {
+func (vh *VHost) CleanupConnection(connID ConnectionID) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
 	// Find all consumers for this connection
 	var consumersToRemove []*Consumer
 	for _, consumer := range vh.Consumers {
-		if consumer.Connection == connection {
+		if consumer.ConnectionID == connID {
 			consumersToRemove = append(consumersToRemove, consumer)
 		}
 	}
@@ -411,11 +420,11 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 	// during consumer cancellation above
 	var queuesToDelete []string
 	for queueName, queue := range vh.Queues {
-		if queue.OwnerConn == connection {
+		if queue.OwnerConn == connID {
 			if queue.Props.Exclusive {
 				queuesToDelete = append(queuesToDelete, queueName)
 			} else {
-				queue.OwnerConn = nil
+				queue.OwnerConn = ""
 			}
 		}
 	}

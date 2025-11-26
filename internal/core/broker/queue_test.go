@@ -31,8 +31,9 @@ func TestQueuePurgeHandler_Success(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connID := newTestConsumerConnID()
 	// Create queue and seed messages
-	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, connID)
 	vh.Queues["purge-q"].Push(vhost.Message{ID: "1", Body: []byte("a")})
 	vh.Queues["purge-q"].Push(vhost.Message{ID: "2", Body: []byte("b")})
 
@@ -148,11 +149,12 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connID := newTestConsumerConnID()
 
 	// Create exchange and queue
 	vh.CreateExchange("test-exchange", vhost.DIRECT, &vhost.ExchangeProperties{Durable: false})
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
-	vh.BindQueue("test-exchange", "test-queue", "test.key", nil, nil)
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, connID)
+	vh.BindQueue("test-exchange", "test-queue", "test.key", nil, connID)
 
 	// Create unbind request
 	request := &amqp.RequestMethodMessage{
@@ -201,9 +203,10 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
-	// Create only queue, no exchange
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
+	connID := newTestConsumerConnID()
 
+	// Create only queue, no exchange
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, connID)
 	conn := &mockConn{}
 
 	// Register connection and channel in broker

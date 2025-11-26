@@ -2,7 +2,6 @@ package vhost
 
 import (
 	"fmt"
-	"net"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -42,8 +41,8 @@ type FlowState struct {
 }
 
 // HandleChannelFlow processes a CHANNEL.FLOW request for the given channel
-func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive bool, flowInitiatedByBroker bool) error {
-	channelKey := ConnectionChannelKey{conn, channel}
+func (vh *VHost) HandleChannelFlow(connID ConnectionID, channel uint16, flowActive bool, flowInitiatedByBroker bool) error {
+	channelKey := ConnectionChannelKey{connID, channel}
 	channelState := vh.GetOrCreateChannelDelivery(channelKey)
 
 	channelState.mu.Lock()
@@ -58,8 +57,8 @@ func (vh *VHost) HandleChannelFlow(conn net.Conn, channel uint16, flowActive boo
 	return nil
 }
 
-func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) FlowState {
-	channelState := vh.getChannelDeliveryState(conn, channel)
+func (vh *VHost) GetChannelFlowState(connID ConnectionID, channel uint16) FlowState {
+	channelState := vh.getChannelDeliveryState(connID, channel)
 	if channelState == nil {
 		return FlowState{
 			FlowActive:            true,
@@ -77,6 +76,9 @@ func (vh *VHost) GetChannelFlowState(conn net.Conn, channel uint16) FlowState {
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered bool) error {
+	if vh.frameSender == nil {
+		return fmt.Errorf("frame sender not set in vhost")
+	}
 	// If caller didn't force redelivered, consult the mark set during requeue/recover.
 	if !redelivered {
 		redelivered = vh.ShouldRedeliver(msg.ID)
@@ -84,7 +86,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	channelKey := ConnectionChannelKey{consumer.ConnectionID, consumer.Channel}
 	ch := vh.GetOrCreateChannelDelivery(channelKey)
 
 	ch.mu.Lock()
@@ -131,7 +133,8 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 			vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), amqpMsg),
 			vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)...)...)
 
-	if err := vh.framer.SendFrame(consumer.Connection, frames); err != nil {
+	// if err := vh.framer.SendFrame(consumer.Connection, frames); err != nil {
+	if err := vh.frameSender.SendFrame(consumer.ConnectionID, consumer.Channel, frames); err != nil {
 		log.Error().Err(err).Msg("Failed to send frames")
 		if track {
 			ch.mu.Lock()
@@ -236,11 +239,11 @@ func (vh *VHost) getUnackedCountConsumer(channelState *ChannelDeliveryState, con
 	return uint16(len(consumerMap))
 }
 
-func (vh *VHost) getChannelDeliveryState(connection net.Conn, channel uint16) *ChannelDeliveryState {
+func (vh *VHost) getChannelDeliveryState(connectionID ConnectionID, channel uint16) *ChannelDeliveryState {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	key := ConnectionChannelKey{connection, channel}
+	key := ConnectionChannelKey{connectionID, channel}
 	return vh.ChannelDeliveries[key]
 }
 

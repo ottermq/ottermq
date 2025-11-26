@@ -141,8 +141,8 @@ func TestBasicConsumeHandler_ValidConsumer(t *testing.T) {
 	}
 
 	channelKey := vhost.ConnectionChannelKey{
-		Connection: conn,
-		Channel:    1,
+		ConnectionID: vhost.ConnectionID(GenerateConnectionID(conn)),
+		Channel:      1,
 	}
 	channelConsumers := vh.ConsumersByChannel[channelKey]
 	if len(channelConsumers) != 1 {
@@ -239,9 +239,9 @@ func TestBasicConsumeHandler_NonExistentQueue(t *testing.T) {
 func TestBasicConsumeHandler_DuplicateConsumer(t *testing.T) {
 	broker, _, conn := createTestBroker()
 	vh := broker.VHosts["test-vhost"]
-
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
 	// Register first consumer
-	consumer1 := vhost.NewConsumer(conn, 1, "test-queue", "duplicate-tag", &vhost.ConsumerProperties{
+	consumer1 := vhost.NewConsumer(connID, 1, "test-queue", "duplicate-tag", &vhost.ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,

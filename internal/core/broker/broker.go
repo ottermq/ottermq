@@ -38,6 +38,9 @@ type Broker struct {
 	persist      persistence.Persistence
 	Ready        chan struct{} // Signals when the broker is ready to accept connections
 	Management   management.ManagementService
+
+	connections   map[vhost.ConnectionID]net.Conn
+	connectionsMu sync.RWMutex
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -68,9 +71,15 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-	b.VHosts["/"] = vhost.NewVhost("/", options)
+
+	defaultVHost := vhost.NewVhost("/", options)
+	b.VHosts["/"] = defaultVHost
+
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
+
+	defaultVHost.SetFrameSender(b)
+
 	b.Management = management.NewService(b)
 	return b
 }
@@ -296,7 +305,7 @@ func (b *Broker) ListChannels() ([]ChannelInformation, error) {
 			channelInfo := ChannelInformation{
 				VHost:          vhost,
 				Number:         ck.Channel,
-				ConnectionName: consumer.Connection.RemoteAddr().String(),
+				ConnectionName: string(consumer.ConnectionID),
 				User:           user,
 				State:          "running",
 				// UnconfirmedCount:   ch.UnconfirmedCount,
@@ -322,4 +331,22 @@ type ChannelInformation struct {
 	UnconfirmedCount int    `json:"unconfirmed_count"`
 	PrefetchCount    uint16 `json:"prefetch_count"`
 	UnackedCount     int    `json:"unacked_count"`
+}
+
+func GenerateConnectionID(conn net.Conn) string {
+	// connID := fmt.Sprintf("%s:%s", conn.RemoteAddr().String(), uuid.New().String()[:8])
+	connID := fmt.Sprintf("%s", conn.RemoteAddr().String())
+	return connID
+}
+
+func (b *Broker) SendFrame(connID vhost.ConnectionID, channelID uint16, frame []byte) error {
+	b.connectionsMu.RLock()
+	conn := b.connections[connID]
+	b.connectionsMu.RUnlock()
+
+	if conn == nil {
+		return fmt.Errorf("connection %s not found", connID)
+	}
+
+	return b.framer.SendFrame(conn, frame)
 }
