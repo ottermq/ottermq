@@ -16,7 +16,18 @@ func (s *Service) ListConnections() ([]models.ConnectionInfoDTO, error) {
 }
 
 func (s *Service) GetConnection(name string) (*models.ConnectionInfoDTO, error) {
-	panic("not implemented")
+	if s.broker == nil {
+		return nil, fmt.Errorf("broker not initialized")
+	}
+	amqpConn, err := s.broker.GetConnectionByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if amqpConn == nil {
+		return nil, fmt.Errorf("connection '%s' not found", name)
+	}
+	dto := models.MapConnectionInfoDTO(*amqpConn)
+	return &dto, nil
 }
 
 func (s *Service) CloseConnection(name string, reason string) error {

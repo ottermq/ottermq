@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -127,9 +126,4 @@ func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing
 	if err != nil {
 		t.Fatalf("owner connection should be able to purge: %v", err)
 	}
-}
-
-// mockConn for testing
-type mockConn struct {
-	net.Conn
 }
