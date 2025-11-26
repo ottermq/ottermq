@@ -48,6 +48,8 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 	return &dto, nil
 }
 
+// CreateQueue creates a new queue in the specified vhost.
+// TODO: handle idempotent creation (passive + same properties) -- it seems that it is created twice
 func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (*models.QueueDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
