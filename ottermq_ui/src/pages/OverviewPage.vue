@@ -3,7 +3,7 @@
     <!-- Header Bar (RabbitMQ style) -->
     <div class="row items-center q-mb-lg">
       <div class="text-h4 text-weight-medium">
-        {{ store.brokerVersion || 'OtterMQ' }}
+       Overview
       </div>
       <q-space />
       <div class="text-subtitle1 text-grey-7">

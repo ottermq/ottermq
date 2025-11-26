@@ -683,11 +683,6 @@ const docTemplate = `{
         },
         "/overview/broker": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Retrieve basic information about the message broker",
                 "consumes": [
                     "application/json"
@@ -1175,20 +1170,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CommitInfo": {
-            "type": "object",
-            "properties": {
-                "commit_hash": {
-                    "type": "string"
-                },
-                "commit_num": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
         "models.ConnectionInfoDTO": {
             "type": "object",
             "properties": {
@@ -1541,8 +1522,11 @@ const docTemplate = `{
         "models.OverviewBrokerDetails": {
             "type": "object",
             "properties": {
-                "commit_info": {
-                    "$ref": "#/definitions/models.CommitInfo"
+                "commit_hash": {
+                    "type": "string"
+                },
+                "commit_number": {
+                    "type": "string"
                 },
                 "data_dir": {
                     "type": "string"

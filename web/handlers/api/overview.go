@@ -14,7 +14,6 @@ import (
 // @Success 200 {object} models.OverviewBrokerDetails
 // @Failure 500 {object} models.ErrorResponse "Failed to get broker information"
 // @Router /overview/broker [get]
-// @Security BearerAuth
 func GetBasicBrokerInfo(c *fiber.Ctx, b *broker.Broker) error {
 	info := b.Management.GetBrokerInfo()
 	return c.Status(fiber.StatusOK).JSON(info)
