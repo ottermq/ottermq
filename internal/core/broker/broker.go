@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	platform = "golang"
-	product  = "OtterMQ"
+	PLATFORM         = "golang"
+	PRODUCT          = "OtterMQ"
+	DEFAULT_PROTOCOL = "AMQP 0-9-1"
 )
 
 type Broker struct {
@@ -141,9 +142,9 @@ func (b *Broker) setConfigurations() map[string]any {
 
 	serverProperties := map[string]any{
 		"capabilities": capabilities,
-		"product":      product,
+		"product":      PRODUCT,
 		"version":      b.config.Version,
-		"platform":     platform,
+		"platform":     PLATFORM,
 	}
 
 	configurations := map[string]any{
@@ -154,7 +155,7 @@ func (b *Broker) setConfigurations() map[string]any {
 		"frameMax":          b.config.FrameMax,
 		"channelMax":        b.config.ChannelMax,
 		"ssl":               b.config.Ssl,
-		"protocol":          "AMQP 0-9-1",
+		"protocol":          DEFAULT_PROTOCOL,
 	}
 	return configurations
 }
