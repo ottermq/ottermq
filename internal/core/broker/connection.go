@@ -89,6 +89,14 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 		}
 		if _, err := b.processRequest(conn, newState); err != nil {
 			log.Error().Err(err).Msg("Failed to process request")
+			request := newState.MethodFrame
+			b.sendConnectionClosing(conn,
+				request.Channel,
+				uint16(amqp.INTERNAL_ERROR),
+				uint16(request.ClassID),
+				uint16(request.MethodID),
+				err.Error(),
+			)
 		}
 	}
 }
