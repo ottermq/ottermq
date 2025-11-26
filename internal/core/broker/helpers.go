@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/andrelcunha/ottermq/internal/core/models"
@@ -22,21 +23,14 @@ func getHostname() string {
 func getCommitInfo(verInfo string) models.CommitInfo {
 	var commit models.CommitInfo
 	// split verInfo into version, commit, buildNum (assuming format "version-buildNum-commit")
-	if verInfo != "" {
-		var version, commitNum, commitHash string
-		n, _ := fmt.Sscanf(verInfo, "%s-%s-%s", &version, &commitNum, &commitHash)
-		if n == 3 {
-			commit = models.CommitInfo{
-				Version:    version,
-				CommitNum:  commitNum,
-				CommitHash: commitHash,
-			}
-		} else {
-			commit = models.CommitInfo{
-				Version: verInfo,
-			}
-		}
+	parts := strings.Split(verInfo, "-")
+	if len(parts) >= 3 {
+		commit.Version = parts[0]    // "v0.14.0"
+		commit.CommitNum = parts[1]  // "92"
+		commit.CommitHash = parts[2] // "g3bb9ca6"
+		return commit
 	}
+	commit.Version = verInfo
 	return commit
 }
 

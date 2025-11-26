@@ -300,9 +300,7 @@ func (b *Broker) ListConnections() []amqp.ConnectionInfo {
 }
 
 // listConnectionsPerVhosts returns a map of vhost names to their respective connections.
-func (b *Broker) listConnectionsPerVhosts() map[string][]amqp.ConnectionInfo {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (b *Broker) listConnectionsPerVhostsUnlocked() map[string][]amqp.ConnectionInfo {
 	vhostConnections := make(map[string][]amqp.ConnectionInfo)
 	for _, c := range b.Connections {
 		vhostName := c.VHostName
@@ -501,7 +499,7 @@ func (b *Broker) getContexts() []models.HttpContext {
 		ctx = append(ctx, models.HttpContext{
 			Name: "management",
 			Port: b.config.WebPort,
-			Path: b.config.WebAPIPath,
+			Path: "/",
 		})
 	}
 	// Prometheus context in the future
@@ -612,49 +610,40 @@ func (b *Broker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
 	defer b.mu.Unlock()
 	build := getCommitInfo(b.config.Version)
 	return models.OverviewBrokerDetails{
-		Product:    PRODUCT,
-		Version:    build.Version,
-		CommitInfo: build,
-		Platform:   PLATFORM,
-		GoVersion:  runtime.Version(),
-		UptimeSecs: int(time.Since(b.startedAt).Seconds()),
-		StartTime:  b.startedAt.Format(time.RFC3339),
-		DataDir:    b.config.DataDir,
+		Product:      PRODUCT,
+		Version:      build.Version,
+		CommitNumber: build.CommitNum,
+		CommitHash:   build.CommitHash,
+		Platform:     PLATFORM,
+		GoVersion:    runtime.Version(),
+		UptimeSecs:   int(time.Since(b.startedAt).Seconds()),
+		StartTime:    b.startedAt.Format(time.RFC3339),
+		DataDir:      b.config.DataDir,
 	}
 }
 
 func (b *Broker) GetObjectTotalsOverview() models.OverviewObjectTotals {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	// Count objects across all vhosts
 	var totals models.OverviewObjectTotals
-	vhostConnections := b.listConnectionsPerVhosts()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vhostConnections := b.listConnectionsPerVhostsUnlocked()
 	for _, vh := range b.VHosts {
 		totals.Connections += len(vhostConnections[vh.Name])
-		totals.Channels += b.getChannelCountByVHost(vh)
-		totals.Exchanges += b.getExchangeCountByVHost(vh)
-		totals.Queues += b.getQueueCountByVHost(vh)
-		totals.Consumers += b.getConsumersByVHost(vh)
+		totals.Channels += b.getChannelCountByVHostUnlocked(vh)
+		totals.Exchanges += len(vh.GetAllExchanges())
+		totals.Queues += len(vh.GetAllQueues())
+		totals.Consumers += len(vh.GetAllConsumers())
 	}
 	return totals
 }
 
-func (b *Broker) getChannelCountByVHost(vh *vhost.VHost) int {
-	channels, err := b.ListConnectionChannels(vh.Name)
-	if err != nil {
-		log.Debug().Err(err).Msg("Failed to list channels for vhost")
+func (b *Broker) getChannelCountByVHostUnlocked(vh *vhost.VHost) int {
+	count := 0
+	for _, connInfo := range b.Connections {
+		if connInfo.VHostName == vh.Name {
+			count += len(connInfo.Channels)
+		}
 	}
-	return len(channels)
-}
-
-func (b *Broker) getExchangeCountByVHost(vh *vhost.VHost) int {
-	return len(vh.GetAllExchanges())
-}
-
-func (b *Broker) getQueueCountByVHost(vh *vhost.VHost) int {
-	return len(vh.GetAllQueues())
-}
-
-func (b *Broker) getConsumersByVHost(vh *vhost.VHost) int {
-	return len(vh.GetAllConsumers())
+	return count
 }
