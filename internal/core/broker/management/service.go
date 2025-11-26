@@ -9,7 +9,7 @@ import (
 
 type ManagementService interface {
 	// Queues
-	ListQueues(vhost string) ([]models.QueueDTO, error)
+	ListQueues() []models.QueueDTO
 	GetQueue(vhost, name string) (*models.QueueDTO, error)
 	CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error)
 	DeleteQueue(vhost, name string, ifUnused, ifEmpty bool) error
