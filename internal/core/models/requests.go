@@ -76,5 +76,3 @@ type PublishMessageRequest struct {
 	Mandatory bool `json:"mandatory"`
 	Immediate bool `json:"immediate"` // Deprecated in AMQP 0-9-1 (included for compatibility)
 }
-
-type Li
