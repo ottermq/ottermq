@@ -163,3 +163,44 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
 }
+
+// PurgeQueue godoc
+// @Summary Purge a queue
+// @Description Remove all messages from a queue with the specified name
+// @Tags queues
+// @Accept json
+// @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param queue path string true "Queue name"
+// @Success 204 {object} string "Number of messages purged"
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues/{vhost}/{queue}/content [delete]
+// @Security BearerAuth
+func PurgeQueue(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+	queueName := c.Params("queue")
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "queue name is required",
+		})
+	}
+
+	count, err := b.Management.PurgeQueue(vhost, queueName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusNoContent).Send([]byte(fmt.Sprintf("Number of messages purged: %d", count)))
+}
