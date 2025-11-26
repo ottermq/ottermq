@@ -20,16 +20,8 @@ import (
 // @Router /queues [get]
 // @Security BearerAuth
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	vhost := c.Params("vhost")
-	if vhost == "" {
-		vhost = "/" // default vhost
-	}
-	queues, err := b.Management.ListQueues(vhost)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "Failed to list queues: " + err.Error(),
-		})
-	}
+	queues := b.Management.ListQueues()
+
 	return c.Status(fiber.StatusOK).JSON(models.QueueListResponse{
 		Queues: queues,
 	})
