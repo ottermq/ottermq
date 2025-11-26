@@ -98,9 +98,10 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 	b.Connections[conn] = connInfo
 	b.mu.Unlock()
 
-	// Register connection ID in bidirectional map
+	// Register connection ID in bidirectional maps
 	connID := vhost.ConnectionID(GenerateConnectionID(conn))
 	b.connectionsMu.Lock()
+	b.connections[connID] = conn
 	b.connToID[conn] = connID
 	b.connectionsMu.Unlock()
 }
@@ -116,8 +117,10 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	delete(b.Connections, conn)
 	b.mu.Unlock()
 
-	// Remove from bidirectional map
+	// Remove from bidirectional maps
 	b.connectionsMu.Lock()
+	connID := b.connToID[conn]
+	delete(b.connections, connID)
 	delete(b.connToID, conn)
 	b.connectionsMu.Unlock()
 
