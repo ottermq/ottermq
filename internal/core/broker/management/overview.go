@@ -32,6 +32,7 @@ func (s *Service) GetMessageStats() models.OverviewMessageStats {
 			})
 		}
 	}
+	mStats.QueueStats = qStats
 	return mStats
 }
 
