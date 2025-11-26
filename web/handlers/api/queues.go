@@ -13,13 +13,18 @@ import (
 // @Tags queues
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
 // @Success 200 {object} models.QueueListResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse "Failed to list queues"
 // @Router /queues [get]
 // @Security BearerAuth
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues, err := b.Management.ListQueues("/") // Use default vhost for now TODO: allow specifying vhost in the request
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	}
+	queues, err := b.Management.ListQueues(vhost)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to list queues: " + err.Error(),
@@ -36,6 +41,7 @@ func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags queues
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
 // @Param queue body models.CreateQueueRequest true "Queue to create"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
@@ -44,6 +50,10 @@ func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 // @Router /queues [post]
 // @Security BearerAuth
 func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	}
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -74,6 +84,7 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags queues
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
 // @Param queue path string true "Queue name"
 // @Success 204 {object} nil
 // @Failure 400 {object} models.ErrorResponse
@@ -82,16 +93,20 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Router /queues/{queue} [delete]
 // @Security BearerAuth
 func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	}
 	queueName := c.Params("queue")
 	if queueName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "queue name is required",
 		})
 	}
+	ifUnused := c.Query("ifUnused") == "true"
+	ifEmpty := c.Query("ifEmpty") == "true"
 
-	// Use default vhost TODO: allow specifying vhost in the request
-	// TODO: support ifUnused and ifEmpty query parameters
-	err := b.Management.DeleteQueue("/", queueName, false, false)
+	err := b.Management.DeleteQueue(vhost, queueName, ifUnused, ifEmpty)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -99,60 +114,4 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 	}
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
-}
-
-// GetMessage godoc
-// @Summary Consume a message from a queue
-// @Description Consume a message from the specified queue
-// @Tags queues
-// @Accept json
-// @Produce json
-// @Param queue path string true "Queue name"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 400 {object} models.ErrorResponse "Queue name is required"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
-// @Failure 404 {object} models.ErrorResponse "No messages in queue"
-// @Failure 500 {object} models.ErrorResponse
-// @Router /queues/{queue}/consume [post]
-// @Security BearerAuth
-func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
-	vhost := c.Params("vhost")
-	if vhost == "" {
-		vhost = "/" // default vhost
-	}
-	var request models.GetMessageRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "invalid request body: " + err.Error(),
-		})
-	}
-	queueName := c.Params("queue")
-	if queueName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "Queue name is required",
-		})
-	}
-	ackMode := models.AckType(request.AckMode)
-	if ackMode == "" {
-		ackMode = models.Ack
-	}
-	messageCount := request.MessageCount
-	if messageCount <= 0 {
-		messageCount = 1
-	}
-	msgs, err := b.Management.GetMessages(vhost, queueName, messageCount, ackMode)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: err.Error(),
-		})
-	}
-	if len(msgs) == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
-			Error: "No messages in queue",
-		})
-	}
-	msg := msgs[0]
-	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: string(msg.Payload),
-	})
 }
