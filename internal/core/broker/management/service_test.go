@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
@@ -20,6 +21,11 @@ func (fb *fakeBroker) ListVHosts() []*vhost.VHost {
 		out = append(out, vh)
 	}
 	return out
+}
+
+func (fb *fakeBroker) ListConnections() []amqp.ConnectionInfo {
+	// For testing purposes, return an empty list.
+	return []amqp.ConnectionInfo{}
 }
 
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
