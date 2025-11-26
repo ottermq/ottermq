@@ -3,7 +3,7 @@ package management
 import "github.com/andrelcunha/ottermq/internal/core/models"
 
 func (s *Service) ListChannels() ([]models.ChannelDTO, error) {
-	panic("not implemented")
+	panic("not implement")
 }
 
 func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDTO, error) {
