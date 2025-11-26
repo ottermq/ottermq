@@ -114,14 +114,14 @@ type MessageStats struct {
 }
 
 type ConsumerDTO struct {
-	ConsumerTag    string         `json:"consumer_tag"`
-	QueueName      string         `json:"queue_name"`
-	ChannelDetails ChannelDetails `json:"channel_details"`
-	AckRequired    bool           `json:"ack_required"` // !NoAck
-	Exclusive      bool           `json:"exclusive"`
-	PrefetchCount  int            `json:"prefetch_count"`
-	Active         bool           `json:"active"`
-	Arguments      map[string]any `json:"arguments_count"`
+	ConsumerTag    string            `json:"consumer_tag"`
+	QueueName      string            `json:"queue_name"`
+	ChannelDetails ChannelDetailsDTO `json:"channel_details"`
+	AckRequired    bool              `json:"ack_required"` // !NoAck
+	Exclusive      bool              `json:"exclusive"`
+	PrefetchCount  int               `json:"prefetch_count"`
+	Active         bool              `json:"active"`
+	Arguments      map[string]any    `json:"arguments,omitempty"`
 }
 
 type ChannelDetails struct {

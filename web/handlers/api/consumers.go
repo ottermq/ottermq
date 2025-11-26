@@ -18,12 +18,36 @@ import (
 // @Router /connections [get]
 // @Security BearerAuth
 func ListConsumers(c *fiber.Ctx, b *broker.Broker) error {
-	// get query parameters
-	vhost := c.Query("vhost", "/")
-	consumers, err := b.Management.ListConsumers(vhost)
+	consumers, err := b.Management.ListConsumers()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to list consumers: " + err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(models.ConsumerListResponse{
+		Consumers: consumers,
+	})
+}
+
+// ListQueueConsumers godoc
+// @Summary List consumers for a specific queue
+// @Description Get a list of consumers for a specific queue
+// @Tags consumers
+// @Accept json
+// @Produce json
+// @Param vhost query string false "VHost name" default(/)
+// @Success 200 {object} models.ConsumerListResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to list consumers for queue"
+// @Router /queues/{queueName}/consumers [get]
+// @Security BearerAuth
+func ListVhostConsumers(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Query("vhost", "/")
+
+	consumers, err := b.Management.ListVhostConsumers(vhost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Failed to list consumers for queue: " + err.Error(),
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.ConsumerListResponse{
