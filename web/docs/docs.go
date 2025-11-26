@@ -728,15 +728,6 @@ const docTemplate = `{
                     "queues"
                 ],
                 "summary": "List all queues",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "/",
-                        "description": "VHost name",
-                        "name": "vhost",
-                        "in": "path"
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -990,6 +981,62 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queue}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a queue by name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Get a queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.QueueDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list queues",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }

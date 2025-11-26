@@ -80,6 +80,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})
+	apiGrp.Get("/queues/:vhost/:queue", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetQueue(c, ws.Broker)
+	})
 	apiGrp.Post("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateQueue(c, ws.Broker)
 	})
