@@ -230,30 +230,54 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	// Passive declaration: error if queue doesn't exist
-	existing, err := vh.retrievePassiveQueue(props, name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Queue already exists: validate compatibility
-	// Idempotent if properties match
-	if existing != nil {
-		if existing.Props == nil || props == nil {
-			return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
-		}
-		if existing.Props.Durable != props.Durable ||
-			existing.Props.AutoDelete != props.AutoDelete ||
-			existing.Props.Exclusive != props.Exclusive ||
-			!equalArgs(existing.Props.Arguments, props.Arguments) {
-			return nil, fmt.Errorf("queue %s already exists with different properties", name)
-		}
-		log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
-		return existing, nil
-	}
-
 	if name == "" {
-		name = generateRandomQueueName()
+		maxRetries := 5
+		ok := false
+		for range maxRetries {
+			name = generateRandomQueueName()
+			if _, exists := vh.Queues[name]; !exists {
+				log.Debug().Str("queue", name).Msg("Generated random queue name")
+				ok = true
+				break
+			} else {
+				log.Debug().Str("queue", name).Msg("Generated already existing queue name, retrying")
+			}
+		}
+		if !ok {
+			serverErr := errors.NewChannelError(
+				fmt.Sprintf("fail to generate queue name on '%s'", vh.Name),
+				uint16(amqp.INTERNAL_ERROR),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DECLARE),
+			)
+			return nil, serverErr
+		}
+		log.Debug().Str("queue", name).Msg("Using generated queue name")
+	} else {
+		// Passive declaration: error if queue doesn't exist
+		existing, err := vh.retrievePassiveQueue(props, name)
+		if err != nil {
+			return nil, err
+		}
+		if existing == nil && props != nil && !props.Passive {
+			existing = vh.Queues[name]
+		}
+
+		// Queue already exists: validate compatibility
+		// Idempotent if properties match
+		if existing != nil {
+			if existing.Props == nil || props == nil {
+				return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
+			}
+			if existing.Props.Durable != props.Durable ||
+				existing.Props.AutoDelete != props.AutoDelete ||
+				existing.Props.Exclusive != props.Exclusive ||
+				!equalArgs(existing.Props.Arguments, props.Arguments) {
+				return nil, fmt.Errorf("queue %s already exists with different properties", name)
+			}
+			log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
+			return existing, nil
+		}
 	}
 
 	// Create new queue

@@ -101,7 +101,7 @@ func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, 
 		return nil, err
 	}
 
-	err = vh.BindToDefaultExchange(req.QueueName)
+	err = vh.BindToDefaultExchange(queue.Name)
 	if err != nil {
 		return nil, err
 	}
