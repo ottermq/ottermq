@@ -29,6 +29,25 @@ func (s *Service) ListQueues(vhostName string) ([]models.QueueDTO, error) {
 
 }
 
+func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error) {
+	vh := s.broker.GetVHost(vhostName)
+	if vh == nil {
+		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
+	}
+
+	queue := vh.GetQueue(queueName)
+	if queue == nil {
+		return nil, fmt.Errorf("queue '%s' not found in vhost '%s'", queueName, vhostName)
+	}
+
+	// Get statistics from vhost (these methods handle locking internally)
+	unackedCounts := vh.GetUnackedMessageCountsAllQueues()
+	consumerCounts := vh.GetConsumersByQueue(queueName)
+
+	dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], len(consumerCounts))
+	return &dto, nil
+}
+
 func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (*models.QueueDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
@@ -88,7 +107,7 @@ func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty boo
 	}
 
 	if ifEmpty {
-		queue := vh.Queues[queueName]
+		queue := vh.GetQueue(queueName)
 		if queue != nil && queue.Len() > 0 {
 			return fmt.Errorf("queue '%s' has %d messages, cannot delete (if-empty)", queueName, queue.Len())
 		}
@@ -96,6 +115,16 @@ func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty boo
 
 	return vh.DeleteQueuebyName(queueName)
 
+}
+
+func (s *Service) PurgeQueues(vhostName, queueName string) (int, error) {
+	vh := s.broker.GetVHost(vhostName)
+	if vh == nil {
+		return 0, fmt.Errorf("vhost '%s' not found", vhostName)
+	}
+
+	count, err := vh.PurgeQueue(queueName, nil)
+	return int(count), err
 }
 
 func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, consumerCount int) models.QueueDTO {
