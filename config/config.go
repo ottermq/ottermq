@@ -32,6 +32,9 @@ type Config struct {
 	EnableUI      bool
 	EnableSwagger bool
 
+	WebAPIPath  string
+	SwaggerPath string
+
 	// Web Admin
 	WebPort   string
 	Username  string
@@ -66,6 +69,8 @@ func LoadConfig(version string) *Config {
 		EnableWebAPI:  getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
 		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
 		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
+		WebAPIPath:    getEnv("OTTERMQ_WEB_API_PATH", "/api"),
+		SwaggerPath:   getEnv("OTTERMQ_SWAGGER_PATH", "/docs"),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
 		Username:  getEnv("OTTERMQ_USERNAME", "guest"),
