@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
@@ -100,7 +101,7 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 
-	_, err := b.Management.CreateQueue(vhost, request)
+	q, err := b.Management.CreateQueue(vhost, request)
 	if err != nil {
 		// if error is amqp error, verify if it's a 404 (not found) and contains 'no queue' in the text
 		if err.(errors.AMQPError).ReplyCode() == 404 {
@@ -114,7 +115,7 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: "Queue created successfully",
+		Message: fmt.Sprintf("Queue %s created successfully", q.Name),
 	})
 }
 
@@ -126,16 +127,23 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Produce json
 // @Param vhost path string false "VHost name" default(/)
 // @Param queue path string true "Queue name"
+// @Param ifUnused query string false "If true, the server will only delete the queue if it has no consumers"
+// @Param ifEmpty query string false "If true, the server will only delete the queue if it is empty"
 // @Success 204 {object} nil
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /queues/{queue} [delete]
+// @Router /queues/{vhost}/{queue} [delete]
 // @Security BearerAuth
 func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
 	}
 	queueName := c.Params("queue")
 	if queueName == "" {
