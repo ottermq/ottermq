@@ -1,14 +1,15 @@
 package models
 
 type OverviewBrokerDetails struct {
-	Product    string     `json:"product"`
-	Version    string     `json:"version"`
-	CommitInfo CommitInfo `json:"commit_info"`
-	Platform   string     `json:"platform"`
-	GoVersion  string     `json:"go_version"`
-	UptimeSecs int        `json:"uptime_secs"`
-	StartTime  string     `json:"start_time"`
-	DataDir    string     `json:"data_dir"`
+	Product      string `json:"product"`
+	Version      string `json:"version"`
+	CommitNumber string `json:"commit_number"`
+	CommitHash   string `json:"commit_hash"`
+	Platform     string `json:"platform"`
+	GoVersion    string `json:"go_version"`
+	UptimeSecs   int    `json:"uptime_secs"`
+	StartTime    string `json:"start_time"`
+	DataDir      string `json:"data_dir"`
 }
 
 type CommitInfo struct {
