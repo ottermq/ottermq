@@ -24,12 +24,11 @@ func TestCreateExchange_AllTypes(t *testing.T) {
 		t.Run(typ, func(t *testing.T) {
 			req := models.CreateExchangeRequest{
 				ExchangeType: typ,
-				VHost:        "/",
 				Durable:      true,
 				AutoDelete:   false,
-				Internal:     false,
+				Arguments:    nil,
 			}
-			dto, err := service.CreateExchange(req.VHost, exName, req)
+			dto, err := service.CreateExchange("/", exName, req)
 			require.NoError(t, err)
 			assert.Equal(t, exName, dto.Name)
 			assert.Equal(t, typ, dto.Type)
@@ -92,7 +91,6 @@ func TestGetExchange(t *testing.T) {
 	exName := "my-exchange"
 	req := models.CreateExchangeRequest{
 		ExchangeType: "topic",
-		VHost:        "/",
 		Durable:      true,
 		Arguments:    map[string]any{"x-custom": "value"},
 	}
