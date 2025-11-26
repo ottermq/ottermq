@@ -38,6 +38,11 @@ func (fb *fakeBroker) ListConnectionChannels(connectionName string) ([]models.Ch
 	return []models.ChannelInfo{}, nil
 }
 
+func (fb *fakeBroker) CreateChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost) (models.ChannelInfo, error) {
+	// For testing purposes, return a default ChannelInfo.
+	return models.ChannelInfo{}, nil
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()
