@@ -3,8 +3,6 @@ package models
 import "time"
 
 type CreateQueueRequest struct {
-	QueueName string `json:"name"` // if empty, a random name will be generated
-
 	// Properties/flags
 	Passive    bool           `json:"passive" default:"false"`
 	Durable    bool           `json:"durable" default:"false"`

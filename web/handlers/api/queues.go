@@ -75,7 +75,8 @@ func GetQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param vhost path string false "VHost name" default(/)
-// @Param queue body models.CreateQueueRequest true "Queue to create"
+// @Param queue path string true "Queue name -- if empty, a random name will be generated"
+// @Param request body models.CreateQueueRequest true "Queue to create"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
@@ -94,6 +95,13 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 			vhost = decoded
 		}
 	}
+	queue := c.Params("queue")
+	if queue != "" {
+		decoded, err := url.PathUnescape(queue)
+		if err == nil {
+			queue = decoded
+		}
+	}
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -101,7 +109,7 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 
-	q, err := b.Management.CreateQueue(vhost, request)
+	q, err := b.Management.CreateQueue(vhost, queue, request)
 	if err != nil {
 		// if error is amqp error, verify if it's a 404 (not found) and contains 'no queue' in the text
 		if err.(errors.AMQPError).ReplyCode() == 404 {

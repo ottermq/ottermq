@@ -50,7 +50,7 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 
 // CreateQueue creates a new queue in the specified vhost.
 // TODO: handle idempotent creation (passive + same properties) -- it seems that it is created twice
-func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (*models.QueueDTO, error) {
+func (s *Service) CreateQueue(vhostName, queueName string, req models.CreateQueueRequest) (*models.QueueDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
@@ -62,7 +62,7 @@ func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (
 	props := createQueueProperties(req)
 
 	// CreateQueue (nil connection = not exclusive via API)
-	queue, err := vh.CreateQueue(req.QueueName, &props, vhost.MANAGEMENT_CONNECTION_ID)
+	queue, err := vh.CreateQueue(queueName, &props, vhost.MANAGEMENT_CONNECTION_ID)
 	if err != nil {
 		return nil, err
 	}
