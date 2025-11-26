@@ -153,3 +153,6 @@ type BindingDTO struct {
 
 type OverviewDTO struct {
 }
+
+type MessageDTO struct {
+}
