@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/url"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
@@ -12,12 +14,14 @@ import (
 // @Tags messages
 // @Accept json
 // @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param exchange path string true "Exchange name"
 // @Param message body models.PublishMessageRequest true "Message details"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /messages [post]
+// @Router /exchanges/{vhost}/{exchange}/publish [post]
 // @Security BearerAuth
 func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
@@ -30,12 +34,15 @@ func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 			Error: err.Error(),
 		})
 	}
-	exchange := request.ExchangeName
-	if exchange == "(AMQP default)" {
-		exchange = ""
+	exchange := c.Params("exchange")
+	if exchange != "" {
+		decoded, err := url.PathUnescape(exchange)
+		if err == nil {
+			exchange = decoded
+		}
 	}
 
-	err := b.Management.PublishMessage(request)
+	err := b.Management.PublishMessage(vhost, exchange, request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
@@ -53,28 +60,29 @@ func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param queue path string true "Queue name"
+// @Param vhost path string false "VHost name" default(/)
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse "Queue name is required"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 404 {object} models.ErrorResponse "No messages in queue"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /queues/{queue}/consume [post]
+// @Router /queues/{vhost}/{queue}/get [post]
 // @Security BearerAuth
 func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
 	}
-	var request models.GetMessageRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "invalid request body: " + err.Error(),
-		})
-	}
 	queueName := c.Params("queue")
 	if queueName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "Queue name is required",
+		})
+	}
+	var request models.GetMessageRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "invalid request body: " + err.Error(),
 		})
 	}
 	ackMode := models.AckType(request.AckMode)
