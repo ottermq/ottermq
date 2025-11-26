@@ -186,36 +186,46 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 
 	// Extract Max Length
 	if val, ok := queue.Props.Arguments["x-max-length"]; ok {
-		switch v := val.(type) {
-		case int32:
-			dto.MaxLength = &v
-		case int:
-			val := int32(v)
-			dto.MaxLength = &val
-		case int64:
-			val := int32(v)
-			dto.MaxLength = &val
-		case float64:
-			val := int32(v)
-			dto.MaxLength = &val
-		}
+		dto.MaxLength = toInt32Pointer(val)
 	}
 
 	// Extract TTL
 	if val, ok := queue.Props.Arguments["x-message-ttl"]; ok {
-		switch v := val.(type) {
-		case int64:
-			dto.MessageTTL = &v
-		case int32:
-			val := int64(v)
-			dto.MessageTTL = &val
-		case int:
-			val := int64(v)
-			dto.MessageTTL = &val
-		case float64:
-			val := int64(v)
-			dto.MessageTTL = &val
-		}
+		dto.MessageTTL = toInt64Pointer(val)
 	}
 	return dto
+}
+
+func toInt32Pointer(val any) *int32 {
+	switch v := val.(type) {
+	case int32:
+		return &v
+	case int:
+		val := int32(v)
+		return &val
+	case int64:
+		val := int32(v)
+		return &val
+	case float64:
+		val := int32(v)
+		return &val
+	}
+	return nil
+}
+
+func toInt64Pointer(val any) *int64 {
+	switch v := val.(type) {
+	case int64:
+		return &v
+	case int32:
+		val := int64(v)
+		return &val
+	case int:
+		val := int64(v)
+		return &val
+	case float64:
+		val := int64(v)
+		return &val
+	}
+	return nil
 }
