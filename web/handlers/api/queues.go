@@ -116,13 +116,31 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Router /queues/{queue}/consume [post]
 // @Security BearerAuth
 func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	}
+	var request models.GetMessageRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "invalid request body: " + err.Error(),
+		})
+	}
 	queueName := c.Params("queue")
 	if queueName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "Queue name is required",
 		})
 	}
-	msgs, err := b.Management.GetMessages("/", queueName, 1, "ack")
+	ackMode := models.AckType(request.AckMode)
+	if ackMode == "" {
+		ackMode = models.Ack
+	}
+	messageCount := request.MessageCount
+	if messageCount <= 0 {
+		messageCount = 1
+	}
+	msgs, err := b.Management.GetMessages(vhost, queueName, messageCount, ackMode)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
