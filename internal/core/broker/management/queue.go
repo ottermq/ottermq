@@ -48,7 +48,8 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 	return &dto, nil
 }
 
-func (s *Service) CreateQueue(vhostName string, req models.CreateQueueRequest) (*models.QueueDTO, error) {
+func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error) {
+	vhostName := req.VHost
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
