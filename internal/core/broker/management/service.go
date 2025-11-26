@@ -23,7 +23,7 @@ type ManagementService interface {
 
 	// Bindings
 	ListBindings(vhost string) ([]models.BindingDTO, error)
-	ListQueuesBindings(vhost, queue string) ([]models.BindingDTO, error)
+	ListQueueBindings(vhost, queue string) ([]models.BindingDTO, error)
 	ListExchangeBindings(vhost, exchange string) ([]models.BindingDTO, error)
 	CreateBinding(req models.CreateBindingRequest) (*models.BindingDTO, error)
 	DeleteBinding(req models.DeleteBindingRequest) error
