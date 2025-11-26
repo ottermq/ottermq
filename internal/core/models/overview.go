@@ -1,25 +1,40 @@
 package models
 
 type OverviewBrokerDetails struct {
-	Product    string `json:"product"`
+	Product    string     `json:"product"`
+	Version    string     `json:"version"`
+	CommitInfo CommitInfo `json:"commit_info"`
+	Platform   string     `json:"platform"`
+	GoVersion  string     `json:"go_version"`
+	UptimeSecs int        `json:"uptime_secs"`
+	StartTime  string     `json:"start_time"`
+	DataDir    string     `json:"data_dir"`
+}
+
+type CommitInfo struct {
 	Version    string `json:"version"`
-	BuildInfo  string `json:"build_info"` // e.g., commit hash
-	Platform   string `json:"platform"`
-	GoVersion  string `json:"go_version"`
-	UptimeSecs int    `json:"uptime_secs"`
-	StartTime  string `json:"start_time"`
-	DataDir    string `json:"data_dir"`
+	CommitNum  string `json:"commit_num"`
+	CommitHash string `json:"commit_hash"`
 }
 
 type OverviewNodeDetails struct {
-	Name        string `json:"name"`
-	MemoryUsage int    `json:"memory_usage"` // in bytes
-	MemoryLimit int    `json:"memory_limit"` // in bytes
-	FDUsed      int    `json:"fd_used"`
-	FDTotal     int    `json:"fd_total"`
-	DiskFree    int    `json:"disk_free"` // in bytes
-	ProcUsed    int    `json:"proc_used"`
-	SocketsUsed int    `json:"sockets_used"`
+	Name            string   `json:"name"`
+	FDUsed          int      `json:"fd_used"`
+	FDLimit         int      `json:"fd_limit"`
+	Goroutines      int      `json:"goroutines"`
+	GoroutinesLimit int      `json:"goroutines_limit"`
+	MemoryUsage     int      `json:"memory_usage"`   // in bytes
+	MemoryLimit     int      `json:"memory_limit"`   // in bytes
+	DiskAvailable   int      `json:"disk_available"` // in bytes
+	DiskTotal       int      `json:"disk_total"`     // in bytes
+	UptimeSecs      int      `json:"uptime_secs"`
+	Cores           int      `json:"cores"`
+	Info            NodeInfo `json:"info"`
+}
+
+type NodeInfo struct {
+	MessageRates   string   `json:"message_rates"` // message rates strategy
+	EnabledPlugins []string `json:"enabled_plugins"`
 }
 
 type OverviewObjectTotals struct {
@@ -49,7 +64,7 @@ type QueueMessageBreakdown struct {
 
 type OverviewConnectionStats struct {
 	Total             int `json:"total"`
-	ClientConnections int `json:"client_connections"`
+	ClientConnections int `json:"client_connections"` // Excludes management connections
 
 	// By state
 	Running int `json:"running"`
@@ -57,14 +72,6 @@ type OverviewConnectionStats struct {
 
 	// Protocol breakdown
 	AMQP091 int `json:"amqp091"`
-}
-
-type OverviewFeatureUsage struct {
-	QueuesWithDLX         int `json:"queues_with_dlx"`
-	QueuesWithTTL         int `json:"queues_with_ttl"`
-	QueuesWithQLL         int `json:"queues_with_qll"`
-	TransactionalChannels int `json:"transactional_channels"`
-	ChannelsWithQoS       int `json:"channels_with_qos"`
 }
 
 type BrokerConfigOverview struct {
@@ -80,7 +87,9 @@ type BrokerConfigOverview struct {
 }
 
 type HttpContext struct {
-	Name string `json:"name"`
-	Port string `json:"port"`
-	Path string `json:"path"`
+	Name    string `json:"name"`
+	BoundTo string `json:"bound_to"`
+	Port    string `json:"port"`
+	SSL     bool   `json:"ssl"`
+	Path    string `json:"path"`
 }
