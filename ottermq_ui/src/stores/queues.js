@@ -24,7 +24,15 @@ lastMessage: null,
       }
     },
     async addQueue (name) {
-        await api.post('/queues', {queue_name: name})
+        await api.post('/queues', {
+          name: name,
+          vhost: "/",
+          Durable: false,
+          AutoDelete: false,
+          Exclusive: false,
+          NoWait: false,
+          Arguments: {}
+        })
         await this.fetch()
     },
     async deleteQueue (name) {
