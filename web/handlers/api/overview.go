@@ -29,6 +29,7 @@ func GetBasicBrokerInfo(c *fiber.Ctx, b *broker.Broker) error {
 // @Success 200 {object} models.OverviewDTO
 // @Failure 500 {object} models.ErrorResponse "Failed to get broker information"
 // @Router /overview [get]
+// @Security BearerAuth
 func GetOverview(c *fiber.Ctx, b *broker.Broker) error {
 	overview, err := b.Management.GetOverview()
 	if err != nil {

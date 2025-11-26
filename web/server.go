@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/andrelcunha/ottermq/web/docs"
 	_ "github.com/andrelcunha/ottermq/web/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
@@ -52,6 +53,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 		app.Static("/", "./ui")
 	}
 	if ws.config.EnableSwagger {
+		docs.SwaggerInfo.Host = "localhost:" + ws.config.WebServerPort
 		log.Info().Str("path", ws.config.SwaggerPrefix+"/index.html").Msg("Swagger docs enabled")
 		app.Get(ws.config.SwaggerPrefix+"/*", swagger.HandlerDefault)
 	}
@@ -69,6 +71,12 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 
 	// Protected API routes
 	apiGrp := app.Group(ws.config.ApiPrefix)
+	apiGrp.Get("/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetBasicBrokerInfo(c, ws.Broker)
+	})
+	apiGrp.Get("/overview", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetOverview(c, ws.Broker)
+	})
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})

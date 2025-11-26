@@ -15,7 +15,7 @@ import (
 // @Tags bindings
 // @Accept json
 // @Produce json
-// @Param binding body models.BindQueueRequest true "Binding details"
+// @Param binding body models.CreateBindingRequest true "Binding to create"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
