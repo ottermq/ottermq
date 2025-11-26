@@ -135,7 +135,7 @@ type ChannelDTO struct {
 	ConnectionName string `json:"connection_name"`
 	VHost          string `json:"vhost"`
 	User           string `json:"user"`
-	State          string `json:"state"` // "running", "flow"
+	State          string `json:"state"` // "running", "flow", "closing"
 	// Details
 	UnconfirmedCount int    `json:"unconfirmed_count"`
 	PrefetchCount    uint16 `json:"prefetch_count"`

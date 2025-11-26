@@ -27,8 +27,14 @@ type ManagementService interface {
 	DeleteExchange(vhost, exchange string, ifUnused bool) error
 
 	// Bindings
-	ListBindings(vhost string) ([]models.BindingDTO, error)
+	// ListBindings lists all bindings across all vhosts.
+	ListBindings() ([]models.BindingDTO, error)
+	ListVhostBindings(vhost string) ([]models.BindingDTO, error)
+
+	// ListQueueBindings lists all bindings where the specified queue is the destination.
 	ListQueueBindings(vhost, queue string) ([]models.BindingDTO, error)
+
+	// ListExchangeBindings lists all bindings where the specified exchange is the source.
 	ListExchangeBindings(vhost, exchange string) ([]models.BindingDTO, error)
 	CreateBinding(req models.CreateBindingRequest) (*models.BindingDTO, error)
 	DeleteBinding(req models.DeleteBindingRequest) error
