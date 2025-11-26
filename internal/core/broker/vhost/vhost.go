@@ -193,7 +193,7 @@ func (vh *VHost) GetExchangeUniqueNames() map[string]bool {
 	return exchangeNames
 }
 
-// GetAllExchanges returns a slice of all exchanges in this vhost.
+// GetAllExchanges returns a slice of all (deduplicated) exchanges in this vhost.
 func (vh *VHost) GetAllExchanges() []*Exchange {
 	exchangeNames := vh.GetExchangeUniqueNames()
 	vh.mu.Lock()
@@ -209,7 +209,12 @@ func (vh *VHost) GetAllExchanges() []*Exchange {
 func (vh *VHost) GetExchange(exchangeName string) *Exchange {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	return vh.Exchanges[exchangeName]
+	// get actual exchange name in case an alias was used
+	actualName := exchangeName
+	if exchangeName == DEFAULT_EXCHANGE_ALIAS || exchangeName == EMPTY_EXCHANGE {
+		actualName = DEFAULT_EXCHANGE
+	}
+	return vh.Exchanges[actualName]
 }
 
 // GetAllQueues returns a copy of all queues in this vhost.

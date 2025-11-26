@@ -11,6 +11,7 @@ import (
 )
 
 type Binding struct {
+	// TODO: Add support for exchange-to-exchange bindings
 	Queue      *Queue
 	RoutingKey string
 	Args       map[string]any

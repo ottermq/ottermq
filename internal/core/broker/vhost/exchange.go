@@ -99,6 +99,18 @@ func (e *Exchange) BindingCount() int {
 	return count
 }
 
+func (e *Exchange) GetBindings() map[string][]Binding {
+	bindings := make(map[string][]Binding)
+	for routingKey, bs := range e.Bindings {
+		var bindingList []Binding
+		for _, binding := range bs {
+			bindingList = append(bindingList, *binding)
+		}
+		bindings[routingKey] = bindingList
+	}
+	return bindings
+}
+
 // Candidate to be on an ExchangeManager interface
 func ParseExchangeType(s string) (ExchangeType, error) {
 	switch s {
