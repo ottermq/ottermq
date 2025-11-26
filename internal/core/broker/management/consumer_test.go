@@ -59,7 +59,7 @@ func TestListConsumers_MultipleQueues(t *testing.T) {
 		},
 	}
 
-	consumers, err := service.ListConsumers("/")
+	consumers, err := service.ListConsumers()
 	require.NoError(t, err)
 	assert.Len(t, consumers, 3)
 }

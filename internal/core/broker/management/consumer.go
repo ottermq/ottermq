@@ -7,15 +7,29 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-// ListConsumers lists all consumers in the specified vhost.
-func (s *Service) ListConsumers(vhostName string) ([]models.ConsumerDTO, error) {
+// ListConsumers lists all consumers.
+func (s *Service) ListConsumers() ([]models.ConsumerDTO, error) {
+	vhosts := s.broker.ListVHosts()
+	var dtos []models.ConsumerDTO
+	for _, vh := range vhosts {
+		consumers, err := s.newFunction(vh, []models.ConsumerDTO{})
+		if err != nil {
+			return nil, err
+		}
+		dtos = append(dtos, consumers...)
+	}
+	return dtos, nil
+}
+
+func (s *Service) ListVhostConsumers(vhostName string) ([]models.ConsumerDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
+	return s.newFunction(vh, []models.ConsumerDTO{})
+}
 
-	var consumers []models.ConsumerDTO
-
+func (s *Service) newFunction(vh *vhost.VHost, consumers []models.ConsumerDTO) ([]models.ConsumerDTO, error) {
 	err := vh.ListConsumers(func(queueName string, consumer vhost.Consumer, dtos []models.ConsumerDTO) {
 		dto := s.consumerToDTO(vh, queueName, &consumer)
 		consumers = append(consumers, dto)
@@ -46,7 +60,7 @@ func (s *Service) ListQueueConsumers(vhostName, queueName string) ([]models.Cons
 
 func (s *Service) consumerToDTO(vh *vhost.VHost, queueName string, consumer *vhost.Consumer) models.ConsumerDTO {
 	// Get channel details from connection
-	var channelDetails models.ChannelDetails
+	var channelDetails models.ChannelDetailsDTO
 
 	// Find connection for this consumer
 	connections := s.broker.ListConnections()
@@ -54,7 +68,7 @@ func (s *Service) consumerToDTO(vh *vhost.VHost, queueName string, consumer *vho
 		if conn.VHostName == vh.Name {
 			// Match consumer's channel to connection
 			// This requires adding channel tracking to ConnectionInfo
-			channelDetails = models.ChannelDetails{
+			channelDetails = models.ChannelDetailsDTO{
 				Number:         consumer.Channel,
 				ConnectionName: conn.Client.Conn.RemoteAddr().String(),
 				User:           conn.Client.Config.Username,
