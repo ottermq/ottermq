@@ -204,3 +204,52 @@ func PurgeQueue(c *fiber.Ctx, b *broker.Broker) error {
 
 	return c.Status(fiber.StatusNoContent).Send([]byte(fmt.Sprintf("Number of messages purged: %d", count)))
 }
+
+// ListQueueBindings godoc
+// @Summary List all bindings for a queue
+// @Description Get a list of all bindings for the specified queue
+// @Tags queues
+// @Accept json
+// @Produce json
+// @Param queue path string true "Queue name"
+// @Param vhost path string false "VHost name" default(/)
+// @Success 200 {object} models.BindingListResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues/{vhost}/{queue}/bindings [get]
+// @Security BearerAuth
+func ListQueueBindings(c *fiber.Ctx, b *broker.Broker) error {
+	encodedQueueName := c.Params("queue")
+	queueName, err := url.PathUnescape(encodedQueueName)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Invalid queue name",
+		})
+	}
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Queue name is required",
+		})
+	}
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+
+	bindings, err := b.Management.ListQueueBindings(vhost, queueName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "failed to list bindings: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(models.BindingListResponse{
+		Bindings: bindings,
+	})
+}
