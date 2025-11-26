@@ -794,11 +794,11 @@ GET    /api/overview                        # Global statistics and info
    - Property mapping (content-type, delivery-mode, TTL, headers, etc.)
    - Message DTO conversion
 
-3. ⬜ Create `web/handlers/api/channels.go`
+3. ✅ Create `web/handlers/api/channels.go`
    - Channel listing endpoints
    - Channel details with statistics
 
-4. ⬜ Enhance `web/handlers/api/messages.go`
+4. ✅ Enhance `web/handlers/api/messages.go`
    - Support TTL, priority, headers in publish
    - Support delivery-mode, correlation-id, reply-to
    - Message properties validation
@@ -819,7 +819,7 @@ GET    /api/overview                        # Global statistics and info
    - Queue/Exchange/Connection aggregation
    - Message statistics
 
-2. ⬜ Implement `management/connection.go`
+2. ✅ Implement `management/connection.go`
    - ListConnections (with enhanced details)
    - GetConnection (specific connection info)
    - CloseConnection (graceful shutdown)
