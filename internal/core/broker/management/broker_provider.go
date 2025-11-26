@@ -15,4 +15,8 @@ type BrokerProvider interface {
 	ListConnectionChannels(connectionName string) ([]models.ChannelInfo, error)
 	CreateChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost) (models.ChannelInfo, error)
 	GetConnectionByName(name string) (*amqp.ConnectionInfo, error)
+	GetOverviewConnStats() models.OverviewConnectionStats
+	GetBrokerOverviewConfig() models.BrokerConfigOverview
+	GetBrokerOverviewDetails() models.OverviewBrokerDetails
+	GetOverviewNodeDetails() models.OverviewNodeDetails
 }

@@ -47,6 +47,21 @@ func (fb *fakeBroker) GetConnectionByName(name string) (*amqp.ConnectionInfo, er
 	// For testing purposes, return nil.
 	return nil, nil
 }
+func (fb *fakeBroker) GetOverviewConnStats() models.OverviewConnectionStats {
+	return models.OverviewConnectionStats{}
+}
+
+func (fb *fakeBroker) GetBrokerOverviewConfig() models.BrokerConfigOverview {
+	return models.BrokerConfigOverview{}
+}
+
+func (fb *fakeBroker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
+	return models.OverviewBrokerDetails{}
+}
+
+func (fb *fakeBroker) GetOverviewNodeDetails() models.OverviewNodeDetails {
+	return models.OverviewNodeDetails{}
+}
 
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
