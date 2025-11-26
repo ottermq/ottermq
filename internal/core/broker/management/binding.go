@@ -7,19 +7,34 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-func (s *Service) ListBindings(vhostName string) ([]models.BindingDTO, error) {
+// ListBindings lists all bindings across all vhosts.
+func (s *Service) ListBindings() ([]models.BindingDTO, error) {
+	bindingDtos := make([]models.BindingDTO, 0)
+	for _, vh := range s.broker.ListVHosts() {
+		bindingDtos = collectExchangeBindings(vh, bindingDtos)
+	}
+	return bindingDtos, nil
+}
+
+// ListVhostBindings lists all bindings in the specified vhost.
+func (s *Service) ListVhostBindings(vhostName string) ([]models.BindingDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 
-	exchanges := vh.GetAllExchanges()
-	bindingDtos := make([]models.BindingDTO, 0)
-	for _, exchange := range exchanges {
-		bindingDtos = listExchangeBindings(exchange, vhostName, bindingDtos)
-	}
+	bindingDtos := collectExchangeBindings(vh, make([]models.BindingDTO, 0))
 
 	return bindingDtos, nil
+}
+
+// collectExchangeBindings collects all bindings from all exchanges in the given vhost.
+func collectExchangeBindings(vh *vhost.VHost, bindingDtos []models.BindingDTO) []models.BindingDTO {
+	exchanges := vh.GetAllExchanges()
+	for _, exchange := range exchanges {
+		bindingDtos = listExchangeBindings(exchange, vh.Name, bindingDtos)
+	}
+	return bindingDtos
 }
 
 func (s *Service) ListExchangeBindings(vhostName string, exchangeName string) ([]models.BindingDTO, error) {

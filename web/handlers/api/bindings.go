@@ -1,8 +1,6 @@
 package api
 
 import (
-	"net/url"
-
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -51,29 +49,14 @@ func BindQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags bindings
 // @Accept json
 // @Produce json
-// @Param exchange path string true "Exchange name"
 // @Success 200 {object} models.BindingListResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /bindings/{exchange} [get]
+// @Router /bindings [get]
 // @Security BearerAuth
 func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
-
-	encodedExchangeName := c.Params("exchange")
-	exchangeName, err := url.PathUnescape(encodedExchangeName)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "Invalid exchange name",
-		})
-	}
-	if exchangeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "Exchange name is required",
-		})
-	}
-
-	bindings, err := b.Management.ListExchangeBindings("/", exchangeName)
+	bindings, err := b.Management.ListBindings()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "failed to list bindings: " + err.Error(),

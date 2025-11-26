@@ -114,6 +114,50 @@ const docTemplate = `{
             }
         },
         "/bindings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all bindings for the specified exchange",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "List all bindings for an exchange",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -200,61 +244,6 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/bindings/{exchange}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a list of all bindings for the specified exchange",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "bindings"
-                ],
-                "summary": "List all bindings for an exchange",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Exchange name",
-                        "name": "exchange",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.BindingListResponse"
-                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -600,6 +589,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/exchanges/{vhost}/{exchange}/bindings/source": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all bindings where the specified exchange is the source",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "Get bindings where the exchange is the source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get bindings",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "description": "Login",
@@ -831,8 +876,15 @@ const docTemplate = `{
                         "in": "path"
                     },
                     {
-                        "description": "Queue to create",
+                        "type": "string",
+                        "description": "Queue name -- if empty, a random name will be generated",
                         "name": "queue",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Queue to create",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1370,7 +1422,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "state": {
-                    "description": "\"running\", \"flow\"",
+                    "description": "\"running\", \"flow\", \"closing\"",
                     "type": "string"
                 },
                 "unacked_count": {
@@ -1531,7 +1583,6 @@ const docTemplate = `{
         "models.CreateExchangeRequest": {
             "type": "object",
             "required": [
-                "name",
                 "type"
             ],
             "properties": {
@@ -1547,9 +1598,6 @@ const docTemplate = `{
                 },
                 "internal": {
                     "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
                 },
                 "no_wait": {
                     "description": "not needed for management API. Included for completeness",
@@ -1595,10 +1643,6 @@ const docTemplate = `{
                 },
                 "message_ttl": {
                     "type": "integer"
-                },
-                "name": {
-                    "description": "if empty, a random name will be generated",
-                    "type": "string"
                 },
                 "passive": {
                     "description": "Properties/flags",
