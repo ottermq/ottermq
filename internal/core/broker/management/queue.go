@@ -49,6 +49,7 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 }
 
 func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, error) {
+
 	vhostName := req.VHost
 	if vhostName == "" {
 		vhostName = "/"
@@ -67,6 +68,24 @@ func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, 
 		return nil, fmt.Errorf("cannot create exclusive queue via management API")
 	}
 
+	props := createQueueProperties(req)
+
+	// CreateQueue (nil connection = not exclusive via API)
+	queue, err := vh.CreateQueue(req.QueueName, &props, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = vh.BindToDefaultExchange(queue.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	dto := s.queueToDTO(vh, queue, 0, 0)
+	return &dto, nil
+}
+
+func createQueueProperties(req models.CreateQueueRequest) vhost.QueueProperties {
 	// Build arguments from convenience fields
 	args := req.Arguments
 	if args == nil {
@@ -94,20 +113,7 @@ func (s *Service) CreateQueue(req models.CreateQueueRequest) (*models.QueueDTO, 
 		Exclusive:  req.Exclusive,
 		Arguments:  args,
 	}
-
-	// CreateQueue (nil connection = not exclusive via API)
-	queue, err := vh.CreateQueue(req.QueueName, &props, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	err = vh.BindToDefaultExchange(queue.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	dto := s.queueToDTO(vh, queue, 0, 0)
-	return &dto, nil
+	return props
 }
 
 func (s *Service) DeleteQueue(vhostName, queueName string, ifUnused, ifEmpty bool) error {

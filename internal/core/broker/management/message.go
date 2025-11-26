@@ -29,7 +29,7 @@ func (s *Service) PublishMessage(req models.PublishMessageRequest) error {
 	if !hasRouting {
 		if mandatory {
 			log.Debug().Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
-			return fmt.Errorf("message returned: no route for exchange '%s' with routing key '%s'", exchange, routingKey)
+			return fmt.Errorf("message returned: no route for exchange '%s' with routing key '%s'", exchange.Name, routingKey)
 		}
 		log.Debug().Str("exchange", exchange.Name).Str("routing_key", routingKey).Msg("No route for message, message dropped")
 		return nil
@@ -50,7 +50,7 @@ func (s *Service) PublishMessage(req models.PublishMessageRequest) error {
 func (s *Service) GetMessages(vhostName, queue string, count int, ackMode string) ([]models.MessageDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
-		return nil, fmt.Errorf("vhost '%s' not found")
+		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 
 	noAck := ackMode == "noack"
