@@ -140,10 +140,13 @@ type ChannelDTO struct {
 }
 
 type BindingDTO struct {
-	VHostName string              `json:"vhost"`
-	VHostId   string              `json:"vhost_id"`
-	Exchange  string              `json:"exchange"`
-	Bindings  map[string][]string `json:"bindings"`
+	Source          string         `json:"source"` // Exchange name
+	VHost           string         `json:"vhost"`
+	Destination     string         `json:"destination"`
+	DestinationType string         `json:"destination_type"` // "queue" or "exchange"
+	RoutingKey      string         `json:"routing_key"`
+	Arguments       map[string]any `json:"arguments_count"`
+	PropertiesKey   string         `json:"properties_key"` // Hash for idempotency
 }
 
 type OverviewDTO struct {
