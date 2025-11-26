@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/memento"
 	"github.com/rs/zerolog/log"
 
 	_ "github.com/andrelcunha/ottermq/internal/persistdb"
@@ -51,7 +53,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	// Create persistence layer based on config
 	persistConfig := &persistence.Config{
 		Type:    "json", // from config or env var
-		DataDir: "data",
+		DataDir: config.DataDir,
 		Options: make(map[string]string),
 	}
 	persist, err := json.NewJsonPersistence(persistConfig)
@@ -441,57 +443,14 @@ func (b *Broker) SendFrame(connID vhost.ConnectionID, channelID uint16, frame []
 	return b.framer.SendFrame(conn, frame)
 }
 
-func (b *Broker) FetchOverviewConfiguration() models.BrokerConfigOverview {
+func (b *Broker) GetBrokerOverviewConfig() models.BrokerConfigOverview {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	enabledFeatures := []string{}
-	ctx := make([]models.HttpContext, 0)
-	if b.config.EnableDLX {
-		enabledFeatures = append(enabledFeatures, "DLX")
-	}
-	if b.config.EnableTTL {
-		enabledFeatures = append(enabledFeatures, "TTL")
-	}
-	if b.config.EnableQLL {
-		enabledFeatures = append(enabledFeatures, "QLL")
-	}
-	if b.config.EnableWebAPI {
-		enabledFeatures = append(enabledFeatures, "WebAPI")
-		ctx = append(ctx, models.HttpContext{
-			Name: "management",
-			Port: b.config.WebPort,
-			Path: b.config.WebAPIPath,
-		})
-	}
-	if b.config.EnableSwagger {
-		enabledFeatures = append(enabledFeatures, "Swagger")
-		ctx = append(ctx, models.HttpContext{
-			Name: "swagger",
-			Port: b.config.WebPort,
-			Path: b.config.SwaggerPath,
-		})
-	}
-	if b.config.EnableUI {
-		enabledFeatures = append(enabledFeatures, "WebUI")
-		ctx = append(ctx, models.HttpContext{
-			Name: "webui",
-			Port: b.config.WebPort,
-			Path: "/",
-		})
-	}
+	enabledFeatures := b.getEnabledFeatures()
+	ctx := b.getContexts()
 
-	// get persistence backend
-	// if b.persist instance of json.JsonPersistence -> "json"
-	persistence := "unknown"
-	switch b.persist.(type) {
-	case *json.JsonPersistence:
-		persistence = "json"
-	case *dummy.DummyPersistence:
-		persistence = "dummy"
-		// case *memento.MementoPersistence:
-		// 	persistence = "memento"
-	}
+	persistence := b.getPersistenceBackend()
 
 	return models.BrokerConfigOverview{
 		AMQPPort:           b.config.BrokerPort,
@@ -501,7 +460,132 @@ func (b *Broker) FetchOverviewConfiguration() models.BrokerConfigOverview {
 		ChannelMax:         int(b.config.ChannelMax),
 		FrameMax:           int(b.config.FrameMax),
 		QueueBufferSize:    b.config.QueueBufferSize,
-		PersistenceBackend: persistence, // Currently only JSON is supported, `memento` will be added in the future
+		PersistenceBackend: persistence,
 		HTTPContexts:       ctx,
 	}
+}
+
+func (b *Broker) getPersistenceBackend() string {
+	persistence := "unknown"
+	switch b.persist.(type) {
+	case *json.JsonPersistence:
+		persistence = "json"
+	case *dummy.DummyPersistence:
+		persistence = "dummy"
+	case *memento.MementoPersistence:
+		persistence = "memento"
+	}
+	return persistence
+}
+
+func (b *Broker) getContexts() []models.HttpContext {
+	ctx := make([]models.HttpContext, 0)
+	if b.config.EnableWebAPI && b.config.EnableUI {
+		ctx = append(ctx, models.HttpContext{
+			Name: "management",
+			Port: b.config.WebPort,
+			Path: b.config.WebAPIPath,
+		})
+	}
+	return ctx
+}
+
+func (b *Broker) getEnabledPlugins() []string {
+	enabledPlugins := []string{}
+	if b.config.EnableWebAPI {
+		enabledPlugins = append(enabledPlugins, "WebAPI")
+
+	}
+	if b.config.EnableSwagger {
+		enabledPlugins = append(enabledPlugins, "Swagger")
+
+	}
+	if b.config.EnableUI {
+		enabledPlugins = append(enabledPlugins, "WebUI")
+
+	}
+	return enabledPlugins
+}
+
+func (b *Broker) getEnabledFeatures() []string {
+	enabledFeatures := []string{}
+	if b.config.EnableDLX {
+		enabledFeatures = append(enabledFeatures, "DLX")
+	}
+	if b.config.EnableTTL {
+		enabledFeatures = append(enabledFeatures, "TTL")
+	}
+	if b.config.EnableQLL {
+		enabledFeatures = append(enabledFeatures, "QLL")
+	}
+	return enabledFeatures
+}
+
+func (b *Broker) GetOverviewConnStats() models.OverviewConnectionStats {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	var stats models.OverviewConnectionStats
+	for _, connInfo := range b.Connections {
+		stats.Total++
+		if connInfo.ClosingConnection {
+			stats.Closing++
+		} else {
+			stats.Running++
+		}
+		if connInfo.Client.Config.Protocol == DEFAULT_PROTOCOL {
+			stats.AMQP091++
+		}
+	}
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+		Channel:      0,
+	}
+	for _, vh := range b.VHosts {
+		ch := vh.GetChannelDelivery(channelKey)
+		if ch != nil {
+			stats.Total++   // each management connection has one channel (0) on each vhost
+			stats.Running++ // management channels are always running
+		}
+	}
+
+	stats.ClientConnections = stats.Total // In the future, exclude management connections
+
+	return stats
+}
+
+func (b *Broker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	build := b.getCommitInfo()
+	return models.OverviewBrokerDetails{
+		Product:    PRODUCT,
+		Version:    build.Version,
+		CommitInfo: build,
+		Platform:   PLATFORM,
+		GoVersion:  runtime.Version(),
+		DataDir:    b.config.DataDir,
+	}
+}
+
+func (b *Broker) getCommitInfo() models.CommitInfo {
+	var commit models.CommitInfo
+	verInfo := b.config.Version
+	// split verInfo into version, commit, buildNum (assuming format "version-buildNum-commit")
+	if verInfo != "" {
+		var version, commitNum, commitHash string
+		n, _ := fmt.Sscanf(verInfo, "%s-%s-%s", &version, &commitNum, &commitHash)
+		if n == 3 {
+			commit = models.CommitInfo{
+				Version:    version,
+				CommitNum:  commitNum,
+				CommitHash: commitHash,
+			}
+		} else {
+			commit = models.CommitInfo{
+				Version: verInfo,
+			}
+		}
+	}
+	return commit
 }

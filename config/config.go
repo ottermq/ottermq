@@ -13,6 +13,7 @@ type Config struct {
 	ShowLogo   bool
 	BrokerPort string
 	BrokerHost string
+	DataDir    string
 
 	// AMQP Settings
 	HeartbeatIntervalMax uint16
@@ -55,6 +56,7 @@ func LoadConfig(version string) *Config {
 		ShowLogo:   getEnvAsBool("OTTERMQ_SHOW_LOGO", false),
 		BrokerPort: getEnv("OTTERMQ_BROKER_PORT", "5672"),
 		BrokerHost: getEnv("OTTERMQ_BROKER_HOST", ""),
+		DataDir:    getEnv("OTTERMQ_DATA_DIR", "data"),
 
 		HeartbeatIntervalMax: getEnvAsUint16("OTTERMQ_HEARTBEAT_INTERVAL", 60),
 		ChannelMax:           getEnvAsUint16("OTTERMQ_CHANNEL_MAX", 2048),
