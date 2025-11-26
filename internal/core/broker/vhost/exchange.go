@@ -91,6 +91,14 @@ func NewExchange(name string, typ ExchangeType, props *ExchangeProperties) *Exch
 	}
 }
 
+func (e *Exchange) BindingCount() int {
+	count := 0
+	for _, bindings := range e.Bindings {
+		count += len(bindings)
+	}
+	return count
+}
+
 // Candidate to be on an ExchangeManager interface
 func ParseExchangeType(s string) (ExchangeType, error) {
 	switch s {
