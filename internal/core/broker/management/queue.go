@@ -7,26 +7,24 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-func (s *Service) ListQueues(vhostName string) ([]models.QueueDTO, error) {
-	vh := s.broker.GetVHost(vhostName)
-	if vh == nil {
-		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
-	}
-	dtos := s.getQueueDTOs(vh)
+// ListQueues returns a list of all queues across all vhosts.
+func (s *Service) ListQueues() []models.QueueDTO {
+	// get queues from all vhosts
+	var dtos []models.QueueDTO
+	vhosts := s.broker.ListVHosts()
+	queues := []*vhost.Queue{}
+	unackedCounts := map[string]int{}
+	consumerCounts := map[string]int{}
+	for _, vh := range vhosts {
+		unackedCounts = vh.GetUnackedMessageCountsAllQueues()
+		consumerCounts = vh.GetConsumerCountsAllQueues()
+		queues = append(queues, vh.GetAllQueues()...)
 
-	return dtos, nil
-}
-
-func (s *Service) getQueueDTOs(vh *vhost.VHost) []models.QueueDTO {
-	unackedCounts := vh.GetUnackedMessageCountsAllQueues()
-	consumerCounts := vh.GetConsumerCountsAllQueues()
-	queues := vh.GetAllQueues()
-
-	// Map to DTOs
-	dtos := make([]models.QueueDTO, 0, len(queues))
-	for _, queue := range queues {
-		dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], consumerCounts[queue.Name])
-		dtos = append(dtos, dto)
+		// Map to DTOs
+		for _, queue := range queues {
+			dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], consumerCounts[queue.Name])
+			dtos = append(dtos, dto)
+		}
 	}
 	return dtos
 }
