@@ -109,6 +109,8 @@ func main() {
 			WebServerPort: cfg.WebPort,
 			EnableUI:      cfg.EnableUI,
 			EnableSwagger: cfg.EnableSwagger,
+			SwaggerPrefix: cfg.SwaggerPath,
+			ApiPrefix:     cfg.WebAPIPath,
 		}
 
 		webServer, err = web.NewWebServer(webConfig, b)
