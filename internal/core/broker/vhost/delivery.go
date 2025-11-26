@@ -175,6 +175,13 @@ func (vh *VHost) GetOrCreateChannelDelivery(channelKey ConnectionChannelKey) *Ch
 	return ch
 }
 
+func (vh *VHost) GetChannelDelivery(channelKey ConnectionChannelKey) *ChannelDeliveryState {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	ch := vh.ChannelDeliveries[channelKey]
+	return ch
+}
+
 func (vh *VHost) ShouldRedeliver(msgID string) bool {
 	vh.redeliveredMu.Lock()
 	_, exists := vh.redeliveredMessages[msgID]
