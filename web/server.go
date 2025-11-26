@@ -76,10 +76,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Delete("/queues/:queue", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.DeleteQueue(c, ws.Broker)
 	})
-	apiGrp.Post("/queues/:queue/consume", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Post("/queues/:queue/get", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetMessage(c, ws.Broker)
 	})
-	apiGrp.Post("/messages/:id/ack", middleware.JwtMiddleware(ws.config.JwtKey), api.AckMessage)
 	apiGrp.Post("/messages", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.PublishMessage(c, ws.Broker)
 	})

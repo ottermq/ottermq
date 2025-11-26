@@ -96,7 +96,7 @@ async function del(name) {
 
 async function consume() {
   if (!selectedName.value) return
-  await store.consume(selectedName.value)
+  await store.get(selectedName.value)
 }
 
 onMounted(store.fetch)

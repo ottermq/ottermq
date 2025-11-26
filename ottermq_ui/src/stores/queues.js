@@ -39,8 +39,12 @@ lastMessage: null,
         await api.delete(`/queues/${encodeURIComponent(name)}`)
         await this.fetch()
     },
-    async consume(queue) {
-        const {data} = await api.post(`/queues/${encodeURIComponent(queue)}/consume`)
+    async get(queue) {
+        const {data} = await api.post(`/queues/${encodeURIComponent(queue)}/get`, {
+          queue: queue,
+          vhost: "/",
+          ackMode: "ack", // "ack" | "noack" | "reject" | "reject_requeue"
+        })
         this.lastMessage = data?.message ?? null
         await this.fetch()
         return this.lastMessage
