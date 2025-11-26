@@ -46,10 +46,10 @@ func (s *Service) GetExchange(vhost, name string) (*models.ExchangeDTO, error) {
 }
 
 // CreateExchange creates a new exchange in the specified vhost.
-func (s *Service) CreateExchange(vhostName string, req models.CreateExchangeRequest) (*models.ExchangeDTO, error) {
-	vh := s.broker.GetVHost(vhostName)
+func (s *Service) CreateExchange(req models.CreateExchangeRequest) (*models.ExchangeDTO, error) {
+	vh := s.broker.GetVHost(req.VHost)
 	if vh == nil {
-		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
+		return nil, fmt.Errorf("vhost '%s' not found", req.VHost)
 	}
 	exchangeType := vhost.ExchangeType(req.ExchangeType)
 	props := vhost.ExchangeProperties{
