@@ -1380,9 +1380,6 @@ const docTemplate = `{
         },
         "models.CreateQueueRequest": {
             "type": "object",
-            "required": [
-                "name"
-            ],
             "properties": {
                 "arguments": {
                     "type": "object",
@@ -1413,11 +1410,8 @@ const docTemplate = `{
                 },
                 "passive": {
                     "description": "Properties/flags",
-                    "type": "boolean"
-                },
-                "vhost": {
-                    "description": "Optional; defaults to \"/\"",
-                    "type": "string"
+                    "type": "boolean",
+                    "default": false
                 },
                 "x-dead-letter-exchange": {
                     "type": "string"

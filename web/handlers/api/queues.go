@@ -84,6 +84,11 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
 	}
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -91,13 +96,8 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 			Error: "invalid request body: " + err.Error(),
 		})
 	}
-	if request.QueueName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "queue name is required",
-		})
-	}
 
-	_, err := b.Management.CreateQueue(request)
+	_, err := b.Management.CreateQueue(vhost, request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),

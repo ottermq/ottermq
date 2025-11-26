@@ -53,9 +53,8 @@ func TestDeleteExchange_IfUnused(t *testing.T) {
 
 	// Create queue
 	qName := "test-queue"
-	_, err = service.CreateQueue(models.CreateQueueRequest{
+	_, err = service.CreateQueue("/", models.CreateQueueRequest{
 		QueueName: qName,
-		VHost:     "/",
 	})
 	require.NoError(t, err)
 
