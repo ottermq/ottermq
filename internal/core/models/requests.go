@@ -1,32 +1,72 @@
 package models
 
-type CreateExchangeRequest struct {
-	ExchangeName string `json:"exchange_name"`
-	ExchangeType string `json:"exchange_type"`
-	// VhostId      string `json:"vhost_id"`
-}
+import "time"
 
 type CreateQueueRequest struct {
-	QueueName string `json:"queue_name"`
+	QueueName string `json:"name" validate:"required"`
+	VHost     string `json:"vhost"` // Optional; defaults to "/"
+
+	// Properties/flags
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Exclusive  bool           `json:"exclusive"`
+	Arguments  map[string]any `json:"arguments,omitempty"`
+
+	// Convenience fields (auto-mapped to arguments)
+	MaxLength            *int32 `json:"max_length,omitempty"`
+	MessageTTL           *int64 `json:"message_ttl,omitempty"`
+	DeadLetterExchange   string `json:"x-dead-letter-exchange,omitempty"`
+	DeadLetterRoutingKey string `json:"x-dead-letter-routing-key,omitempty"`
+}
+
+type CreateExchangeRequest struct {
+	ExchangeName string `json:"name" validate:"required"`
+	ExchangeType string `json:"type" validate:"required,oneof=direct fanout topic headers"`
+	VHost        string `json:"vhost"` // Optional; defaults to "/"
+
+	// Properties
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Exclusive  bool           `json:"exclusive"`
+	Arguments  map[string]any `json:"arguments,omitempty"`
 }
 
 type CreateBindingRequest struct {
+	VHost       string         `json:"vhost"`                           // Optional; defaults to "/"
+	Source      string         `json:"source" validate:"required"`      // Exchange
+	Destination string         `json:"destination" validate:"required"` // Queue (?or Exchange too??)
+	RoutingKey  string         `json:"routing_key"`
+	Arguments   map[string]any `json:"arguments,omitempty"`
 }
 
-type BindQueueRequest struct {
-	ExchangeName string `json:"exchange_name"`
-	QueueName    string `json:"queue_name"`
+type PublishMessageRequest struct {
+	VHost        string `json:"vhost"` // Optional; defaults to "/"
+	ExchangeName string `json:"exchange" validate:"required"`
 	RoutingKey   string `json:"routing_key"`
+	Payload      string `json:"payload" validate:"required"`
+
+	// Message properties (AMQP 0-9-1 spec)
+	ContentType     string         `json:"content_type"`
+	ContentEncoding string         `json:"content_encoding"`
+	DeliveryMode    uint8          `json:"delivery_mode"` // 1=transient, 2=persistent
+	Priority        uint8          `json:"priority"`
+	CorrelationId   string         `json:"correlation_id"`
+	ReplyTo         string         `json:"reply_to"`
+	Expiration      string         `json:"expiration"` // TTL in milliseconds as string
+	MessageID       string         `json:"message_id"`
+	Timestamp       *time.Time     `json:"timestamp"`
+	Type            string         `json:"type"`
+	UserId          string         `json:"user_id"`
+	AppId           string         `json:"app_id"`
+	Headers         map[string]any `json:"headers,omitempty"`
+
+	// Routing flags
+	Mandatory bool `json:"mandatory"`
+	Immediate bool `json:"immediate"` // Deprecated in AMQP 0-9-1 (included for compatibility)
 }
 
 type DeleteBindingRequest struct {
 	ExchangeName string `json:"exchange_name"`
 	QueueName    string `json:"queue_name"`
 	RoutingKey   string `json:"routing_key"`
-}
-
-type PublishMessageRequest struct {
-	ExchangeName string `json:"exchange_name"`
-	RoutingKey   string `json:"routing_key"`
-	Message      string `json:"message"`
 }
