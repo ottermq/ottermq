@@ -20,7 +20,7 @@ import (
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/bindings [post]
+// @Router /bindings [post]
 // @Security BearerAuth
 func BindQueue(c *fiber.Ctx, b *broker.Broker) error {
 	var request models.CreateBindingRequest
