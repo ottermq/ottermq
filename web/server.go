@@ -105,6 +105,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListExchanges(c, ws.Broker)
 	})
+	apiGrp.Get("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetExchange(c, ws.Broker)
+	})
 	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})

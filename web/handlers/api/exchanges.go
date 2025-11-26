@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/url"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -28,6 +30,49 @@ func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 	return c.Status(fiber.StatusOK).JSON(models.ExchangeListResponse{
 		Exchanges: exchanges,
 	})
+}
+
+// GetExchange godoc
+// @Summary Get an exchange
+// @Description Get an exchange by name
+// @Tags exchanges
+// @Accept json
+// @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param exchange path string true "Exchange name"
+// @Success 200 {object} models.ExchangeDTO
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to get exchange"
+// @Router /exchanges/{vhost}/{exchange} [get]
+// @Security BearerAuth
+func GetExchange(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+	exchangeName := c.Params("exchange")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Exchange name is required",
+		})
+	} else {
+		decoded, err := url.PathUnescape(exchangeName)
+		if err == nil {
+			exchangeName = decoded
+		}
+	}
+	exchange, err := b.Management.GetExchange(vhost, exchangeName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(exchange)
 }
 
 // CreateExchange godoc
