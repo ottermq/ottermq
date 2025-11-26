@@ -169,20 +169,28 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 
 	// Extract DLX configuration
 	if dlx, ok := queue.Props.Arguments["x-dead-letter-exchange"].(string); ok {
-		dto.DeadLetterExchange = &dlx
+		if dlx != "" {
+			dto.DeadLetterExchange = &dlx
+		}
 	}
 	if dlrk, ok := queue.Props.Arguments["x-dead-letter-routing-key"].(string); ok {
-		dto.DeadLetterRoutingKey = &dlrk
+		if dlrk != "" {
+			dto.DeadLetterRoutingKey = &dlrk
+		}
 	}
 
 	// Extract Max Length
 	if val, ok := queue.Props.Arguments["x-max-length"]; ok {
-		dto.MaxLength = toInt32Pointer(val)
+		if val != nil && val != 0 {
+			dto.MaxLength = toInt32Pointer(val)
+		}
 	}
 
 	// Extract TTL
 	if val, ok := queue.Props.Arguments["x-message-ttl"]; ok {
-		dto.MessageTTL = toInt64Pointer(val)
+		if val != nil && val != 0 {
+			dto.MessageTTL = toInt64Pointer(val)
+		}
 	}
 	return dto
 }
