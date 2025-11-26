@@ -69,7 +69,7 @@ type QueueDTO struct {
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Exclusive  bool           `json:"exclusive"`
-	Arguments  map[string]any `json:"arguments_count"`
+	Arguments  map[string]any `json:"arguments,omitempty"`
 
 	// DLX Configuration (extracted for convenience)
 	DeadLetterExchange   *string `json:"dead_letter_exchange,omitempty"`
@@ -99,7 +99,7 @@ type ExchangeDTO struct {
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Internal   bool           `json:"internal"`
-	Arguments  map[string]any `json:"arguments_count"`
+	Arguments  map[string]any `json:"arguments,omitempty"`
 
 	// Stats
 	MessageStatsIn  *MessageStats `json:"message_stats_in,omitempty"`
@@ -124,14 +124,14 @@ type ConsumerDTO struct {
 	Arguments      map[string]any    `json:"arguments,omitempty"`
 }
 
-type ChannelDetails struct {
-	Number         uint16 `json:"number"`
+type ChannelDetailsDTO struct {
+	Number         uint16 `json:"number"` // channel number
 	ConnectionName string `json:"connection_name"`
 	User           string `json:"user"`
 }
 
 type ChannelDTO struct {
-	Number         uint16 `json:"number"`
+	Number         uint16 `json:"number"` // channel number
 	ConnectionName string `json:"connection_name"`
 	VHost          string `json:"vhost"`
 	User           string `json:"user"`
@@ -178,7 +178,7 @@ type MessageDTO struct {
 
 // ChannelInfo represents information about a channel.
 type ChannelInfo struct {
-	Number           uint16 `json:"number"`
+	Number           uint16 `json:"number"` // channel number
 	ConnectionName   string `json:"connection_name"`
 	VHost            string `json:"vhost"`
 	User             string `json:"user"`
