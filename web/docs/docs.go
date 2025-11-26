@@ -849,81 +849,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new queue with the specified name",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "queues"
-                ],
-                "summary": "Create a new queue",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "/",
-                        "description": "VHost name",
-                        "name": "vhost",
-                        "in": "path"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Queue name -- if empty, a random name will be generated",
-                        "name": "queue",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Queue to create",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.CreateQueueRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Queue not found in vhost",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
             }
         },
         "/queues/{queueName}/consumers": {
@@ -1043,6 +968,76 @@ const docTemplate = `{
                 }
             }
         },
+        "/queues/{vhost}/": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new queue with a generated name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Create a new queue with generated name",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Queue to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateQueueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found in vhost",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/queues/{vhost}/{queue}": {
             "get": {
                 "security": [
@@ -1092,6 +1087,80 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to list queues",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new queue with the specified name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Create a new queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue name -- if empty, a random name will be generated",
+                        "name": "queue",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Queue to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateQueueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found in vhost",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }

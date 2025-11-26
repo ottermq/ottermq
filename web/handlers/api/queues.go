@@ -75,7 +75,7 @@ func GetQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param vhost path string false "VHost name" default(/)
-// @Param queue path string true "Queue name -- if empty, a random name will be generated"
+// @Param queue path string true "Queue name"
 // @Param request body models.CreateQueueRequest true "Queue to create"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
@@ -83,9 +83,21 @@ func GetQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 404 {object} models.ErrorResponse "VHost not found"
 // @Failure 404 {object} models.ErrorResponse "Queue not found in vhost"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /queues [post]
+// @Router /queues/{vhost}/{queue} [post]
 // @Security BearerAuth
 func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
+	queue := c.Params("queue")
+	if queue != "" {
+		decoded, err := url.PathUnescape(queue)
+		if err == nil {
+			queue = decoded
+		}
+	}
+	return createQueue(c, b, queue)
+}
+
+// helper to create queue with given name (or empty for generated name)
+func createQueue(c *fiber.Ctx, b *broker.Broker, queue string) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
@@ -93,13 +105,6 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 		decoded, err := url.PathUnescape(vhost)
 		if err == nil {
 			vhost = decoded
-		}
-	}
-	queue := c.Params("queue")
-	if queue != "" {
-		decoded, err := url.PathUnescape(queue)
-		if err == nil {
-			queue = decoded
 		}
 	}
 	var request models.CreateQueueRequest
@@ -123,8 +128,28 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: fmt.Sprintf("Queue %s created successfully", q.Name),
+		Message: fmt.Sprintf("Queue '%s' created successfully", q.Name),
 	})
+}
+
+// CreateQueue godoc
+// @Summary Create a new queue with generated name
+// @Description Create a new queue with a generated name
+// @Tags queues
+// @Accept json
+// @Produce json
+// @Param vhost path string false "VHost name" default(/)
+// @Param request body models.CreateQueueRequest true "Queue to create"
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "VHost not found"
+// @Failure 404 {object} models.ErrorResponse "Queue not found in vhost"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues/{vhost}/ [post]
+// @Security BearerAuth
+func CreateQueueEmptyName(c *fiber.Ctx, b *broker.Broker) error {
+	return createQueue(c, b, "")
 }
 
 // DeleteQueue godoc

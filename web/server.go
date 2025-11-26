@@ -89,7 +89,10 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/queues/:vhost/:queue/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueueBindings(c, ws.Broker)
 	})
-	apiGrp.Post("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Post("/queues/:vhost/", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CreateQueueEmptyName(c, ws.Broker)
+	})
+	apiGrp.Post("/queues/:vhost/:queue", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateQueue(c, ws.Broker)
 	})
 	apiGrp.Delete("/queues/:vhost/:queue", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
