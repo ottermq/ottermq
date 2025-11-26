@@ -2,7 +2,7 @@
 
 [![Go](https://github.com/ottermq/ottermq/actions/workflows/go.yml/badge.svg)](https://github.com/ottermq/ottermq/actions/workflows/go.yml)
 [![Docker Image CI](https://github.com/ottermq/ottermq/actions/workflows/docker-image.yml/badge.svg)](https://github.com/ottermq/ottermq/actions/workflows/docker-image.yml)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ottermq/ottermq)]
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ottermq/ottermq)](https://github.com/ottermq/ottermq/pulse)
 [![GitHub issues](https://img.shields.io/github/issues/ottermq/ottermq.svg)](https://github.com/ottermq/ottermq/issues)
 
 **OtterMQ** is a high-performance message broker written in Go, inspired by RabbitMQ. It aims to provide a reliable, scalable, and easy-to-use messaging solution for distributed systems. OtterMQ is being developed with the goal of full compliance with the **AMQP 0.9.1 protocol**, ensuring compatibility with existing tools and workflows. It also features a modern management UI built with **Vue + Quasar**.
