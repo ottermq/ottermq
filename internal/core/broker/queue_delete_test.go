@@ -45,6 +45,14 @@ func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	b.Connections[connOwner] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
 
+	// Initialize and register connection ID in broker's map
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[connOwner] = connOwnerID
+	b.connectionsMu.Unlock()
+
 	// Build request with IfUnused=true
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -99,6 +107,14 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 	b.Connections[conn] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
 
+	// Initialize and register connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
+
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,
 		ClassID:  uint16(amqp.QUEUE),
@@ -150,6 +166,14 @@ func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 
 	conn := &mockConn{}
 
+	// Initialize and register connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
+
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,
 		ClassID:  uint16(amqp.QUEUE),
@@ -200,9 +224,18 @@ func TestQueueDeleteHandler_ExclusiveOwnerMismatch_AccessRefused(t *testing.T) {
 
 	// Another connection attempts delete
 	foreign := &mockConn{}
+	foreignID := newTestConsumerConnID()
 	b.mu.Lock()
 	b.Connections[foreign] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
+
+	// Initialize and register foreign connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[foreign] = foreignID
+	b.connectionsMu.Unlock()
 
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,

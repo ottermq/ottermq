@@ -17,6 +17,7 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
@@ -66,6 +67,19 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 	return broker, mockFramer, conn, vh
 }
 
+// Helper to setup test broker with transaction support and register a connection
+func createTestBrokerForTxWithConnID() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VHost, vhost.ConnectionID) {
+	broker, mockFramer, conn, vh := createTestBrokerForTx()
+	connID := newTestConsumerConnID()
+
+	// Register connection ID
+	broker.connectionsMu.Lock()
+	broker.connToID[conn] = connID
+	broker.connectionsMu.Unlock()
+
+	return broker, mockFramer, conn, vh, connID
+}
+
 // =============================================================================
 // TX.SELECT Tests - Basic Transaction Mode Activation
 // =============================================================================
@@ -73,6 +87,11 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 func TestTxSelect_EntersTransactionMode(t *testing.T) {
 	broker, mockFramer, conn, vh := createTestBrokerForTx()
 	connID := newTestConsumerConnID()
+
+	// Register connection ID in broker
+	broker.connectionsMu.Lock()
+	broker.connToID[conn] = connID
+	broker.connectionsMu.Unlock()
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -117,6 +136,12 @@ func TestTxSelect_EntersTransactionMode(t *testing.T) {
 func TestTxSelect_Idempotent(t *testing.T) {
 	broker, mockFramer, conn, vh := createTestBrokerForTx()
 	connID := newTestConsumerConnID()
+
+	// Register connection ID in broker
+	broker.connectionsMu.Lock()
+	broker.connToID[conn] = connID
+	broker.connectionsMu.Unlock()
+
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
 		ClassID:  uint16(amqp.TX),
@@ -158,7 +183,12 @@ func TestTxSelect_Idempotent(t *testing.T) {
 // =============================================================================
 
 func TestTxCommit_WithoutSelect_ReturnsError(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
+
+	// Register connection ID in broker
+	broker.connectionsMu.Lock()
+	broker.connToID[conn] = connID
+	broker.connectionsMu.Unlock()
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -182,7 +212,12 @@ func TestTxCommit_WithoutSelect_ReturnsError(t *testing.T) {
 }
 
 func TestTxRollback_WithoutSelect_ReturnsError(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
+
+	// Register connection ID in broker
+	broker.connectionsMu.Lock()
+	broker.connToID[conn] = connID
+	broker.connectionsMu.Unlock()
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -209,8 +244,7 @@ func TestTxRollback_WithoutSelect_ReturnsError(t *testing.T) {
 // =============================================================================
 
 func TestPublish_InTransactionMode_BuffersNotRoutes(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -266,7 +300,7 @@ func TestPublish_InTransactionMode_BuffersNotRoutes(t *testing.T) {
 }
 
 func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
+	broker, _, conn, vh, _ := createTestBrokerForTxWithConnID()
 
 	// Do NOT enter transaction mode
 
@@ -310,8 +344,7 @@ func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
 // =============================================================================
 
 func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
@@ -378,8 +411,7 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 }
 
 func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
@@ -440,8 +472,7 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 }
 
 func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 
 	// Setup: Deliver a message to create an unacked message
 	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
@@ -503,8 +534,7 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 // =============================================================================
 
 func TestCommit_RoutesAllBufferedPublishes(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -561,8 +591,7 @@ func TestCommit_RoutesAllBufferedPublishes(t *testing.T) {
 }
 
 func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Setup: Create multiple unacked messages
 	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
@@ -634,8 +663,7 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 }
 
 func TestCommit_KeepsTransactionMode(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -689,8 +717,7 @@ func TestCommit_KeepsTransactionMode(t *testing.T) {
 // =============================================================================
 
 func TestRollback_DiscardsAllBuffers(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -750,8 +777,7 @@ func TestRollback_DiscardsAllBuffers(t *testing.T) {
 }
 
 func TestRollback_KeepsTransactionMode(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -787,8 +813,7 @@ func TestRollback_KeepsTransactionMode(t *testing.T) {
 // =============================================================================
 
 func TestChannelClose_ImplicitRollback(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode and buffer some operations
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -842,7 +867,7 @@ func TestChannelClose_ImplicitRollback(t *testing.T) {
 // =============================================================================
 
 func TestCommit_MandatoryNoRoute_ReturnsMessage(t *testing.T) {
-	broker, mockFramer, conn, vh := createTestBrokerForTx()
+	broker, mockFramer, conn, vh, _ := createTestBrokerForTxWithConnID()
 
 	// Create an exchange without bindings
 	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
@@ -888,7 +913,7 @@ func TestCommit_MandatoryNoRoute_ReturnsMessage(t *testing.T) {
 }
 
 func TestCommit_NonMandatoryNoRoute_DropsMessage(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
+	broker, _, conn, vh, _ := createTestBrokerForTxWithConnID()
 
 	// Create an exchange without bindings
 	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
@@ -929,8 +954,7 @@ func TestCommit_NonMandatoryNoRoute_DropsMessage(t *testing.T) {
 }
 
 func TestCommit_DryRunValidation(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -980,8 +1004,7 @@ func TestCommit_DryRunValidation(t *testing.T) {
 // =============================================================================
 
 func TestPublish_ExceedsBufferLimit(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -1022,8 +1045,7 @@ func TestPublish_ExceedsBufferLimit(t *testing.T) {
 }
 
 func TestAck_ExceedsBufferLimit(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -1062,8 +1084,7 @@ func TestAck_ExceedsBufferLimit(t *testing.T) {
 // =============================================================================
 
 func TestCommit_MixedOperations(t *testing.T) {
-	broker, _, conn, vh := createTestBrokerForTx()
-	connID := newTestConsumerConnID()
+	broker, _, conn, vh, connID := createTestBrokerForTxWithConnID()
 	// Setup: Create unacked messages
 	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{

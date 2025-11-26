@@ -29,6 +29,7 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
@@ -51,6 +52,9 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 		Channels:  make(map[uint16]*amqp.ChannelState),
 	}
 	broker.Connections[conn].Channels[1] = &amqp.ChannelState{}
+
+	// Register connection ID
+	broker.connToID[conn] = connID
 
 	// Test 1: Client requests flow pause (active=false)
 	request := &amqp.RequestMethodMessage{
