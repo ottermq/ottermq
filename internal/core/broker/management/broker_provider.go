@@ -19,4 +19,5 @@ type BrokerProvider interface {
 	GetBrokerOverviewConfig() models.BrokerConfigOverview
 	GetBrokerOverviewDetails() models.OverviewBrokerDetails
 	GetOverviewNodeDetails() models.OverviewNodeDetails
+	GetObjectTotalsOverview() models.OverviewObjectTotals
 }
