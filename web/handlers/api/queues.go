@@ -13,7 +13,6 @@ import (
 // @Tags queues
 // @Accept json
 // @Produce json
-// @Param vhost path string false "VHost name" default(/)
 // @Success 200 {object} models.QueueListResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse "Failed to list queues"
