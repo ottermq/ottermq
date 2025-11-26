@@ -34,3 +34,8 @@ func (s *Service) GetMessageStats() models.OverviewMessageStats {
 	}
 	return mStats
 }
+
+// BasicBrokerInfo returns basic information about the broker.
+func (s *Service) GetBrokerInfo() models.OverviewBrokerDetails {
+	return s.broker.GetBrokerOverviewDetails()
+}

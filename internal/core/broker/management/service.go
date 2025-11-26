@@ -52,6 +52,7 @@ type ManagementService interface {
 
 	// Overview/Stats
 	GetOverview() (*models.OverviewDTO, error)
+	GetBrokerInfo() models.OverviewBrokerDetails
 }
 
 type Service struct {
