@@ -176,6 +176,19 @@ func (vh *VHost) GetConsumersByQueue(queueName string) []*Consumer {
 	return vh.ConsumersByQueue[queueName]
 }
 
+func (vh *VHost) GetAllExchanges() []*Exchange {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	exchanges := make([]*Exchange, 0, len(vh.Exchanges))
+	for _, exchange := range vh.Exchanges {
+		if exchange.Name != EMPTY_EXCHANGE {
+			exchanges = append(exchanges, exchange)
+		}
+	}
+	return exchanges
+}
+
 // GetAllQueues returns a copy of all queues in this vhost.
 func (vh *VHost) GetAllQueues() []*Queue {
 	vh.mu.Lock()
