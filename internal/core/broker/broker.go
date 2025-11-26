@@ -468,6 +468,7 @@ func (b *Broker) GetBrokerOverviewConfig() models.BrokerConfigOverview {
 	}
 }
 
+// getPersistenceBackend returns the name of the persistence backend in use.
 func (b *Broker) getPersistenceBackend() string {
 	persistence := "unknown"
 	switch b.persist.(type) {
@@ -481,6 +482,7 @@ func (b *Broker) getPersistenceBackend() string {
 	return persistence
 }
 
+// getContexts returns the list of HTTP contexts (e.g., management UI, prometheus) available in the broker.
 func (b *Broker) getContexts() []models.HttpContext {
 	ctx := make([]models.HttpContext, 0)
 	if b.config.EnableWebAPI && b.config.EnableUI {
@@ -490,9 +492,11 @@ func (b *Broker) getContexts() []models.HttpContext {
 			Path: b.config.WebAPIPath,
 		})
 	}
+	// Prometheus context in the future
 	return ctx
 }
 
+// getEnabledPlugins returns the list of enabled plugins in the node.
 func (b *Broker) getEnabledPlugins() []string {
 	enabledPlugins := []string{}
 	if b.config.EnableWebAPI {
@@ -510,6 +514,7 @@ func (b *Broker) getEnabledPlugins() []string {
 	return enabledPlugins
 }
 
+// getEnabledFeatures returns the list of enabled features in the node.
 func (b *Broker) getEnabledFeatures() []string {
 	enabledFeatures := []string{}
 	if b.config.EnableDLX {
@@ -522,6 +527,38 @@ func (b *Broker) getEnabledFeatures() []string {
 		enabledFeatures = append(enabledFeatures, "QLL")
 	}
 	return enabledFeatures
+}
+
+// GetOverviewNodeDetails returns detailed information about the node.
+func (b *Broker) GetOverviewNodeDetails() models.OverviewNodeDetails {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	nodeName := fmt.Sprintf("ottermq@%s", getHostname())
+
+	node := models.OverviewNodeDetails{
+		Name:            nodeName,
+		FDUsed:          int(getFileDescriptors()),
+		FDLimit:         int(getFileDescriptorLimit()),
+		Goroutines:      runtime.NumGoroutine(),
+		GoroutinesLimit: 0, // No hard limit in Go, TBD if we should set one
+		MemoryUsage:     int(getMemoryUsage()),
+		Cores:           runtime.NumCPU(),
+		// Info: models.NodeInfo{
+	}
+	sysInfo, err := getSysInfo()
+	if err == nil {
+		node.MemoryLimit = int(sysInfo.TotalRam)
+		node.UptimeSecs = int(sysInfo.Uptime)
+		node.DiskTotal = int(sysInfo.TotalDisk)
+		node.DiskAvailable = int(sysInfo.AvailDisk)
+	}
+
+	node.Info = models.NodeInfo{
+		MessageRates:   "basic", // default strategy
+		EnabledPlugins: b.getEnabledPlugins(),
+	}
+	return node
 }
 
 func (b *Broker) GetOverviewConnStats() models.OverviewConnectionStats {
@@ -557,38 +594,19 @@ func (b *Broker) GetOverviewConnStats() models.OverviewConnectionStats {
 	return stats
 }
 
+// GetBrokerOverviewDetails returns detailed information about the broker.
 func (b *Broker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	build := b.getCommitInfo()
+	build := getCommitInfo(b.config.Version)
 	return models.OverviewBrokerDetails{
 		Product:    PRODUCT,
 		Version:    build.Version,
 		CommitInfo: build,
 		Platform:   PLATFORM,
 		GoVersion:  runtime.Version(),
+		UptimeSecs: int(time.Since(b.startedAt).Seconds()),
+		StartTime:  b.startedAt.Format(time.RFC3339),
 		DataDir:    b.config.DataDir,
 	}
-}
-
-func (b *Broker) getCommitInfo() models.CommitInfo {
-	var commit models.CommitInfo
-	verInfo := b.config.Version
-	// split verInfo into version, commit, buildNum (assuming format "version-buildNum-commit")
-	if verInfo != "" {
-		var version, commitNum, commitHash string
-		n, _ := fmt.Sscanf(verInfo, "%s-%s-%s", &version, &commitNum, &commitHash)
-		if n == 3 {
-			commit = models.CommitInfo{
-				Version:    version,
-				CommitNum:  commitNum,
-				CommitHash: commitHash,
-			}
-		} else {
-			commit = models.CommitInfo{
-				Version: verInfo,
-			}
-		}
-	}
-	return commit
 }
