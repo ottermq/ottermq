@@ -101,7 +101,7 @@ func (s *Service) CreateBinding(req models.CreateBindingRequest) (*models.Bindin
 	exchangeName := req.Source
 	queue := req.Destination
 
-	err := vh.BindQueue(exchangeName, queue, req.RoutingKey, req.Arguments, nil)
+	err := vh.BindQueue(exchangeName, queue, req.RoutingKey, req.Arguments, vhost.MANAGEMENT_CONNECTION_ID)
 	if err != nil {
 		return nil, err
 	}
@@ -128,5 +128,5 @@ func (s *Service) DeleteBinding(req models.DeleteBindingRequest) error {
 	exchange := req.Source
 	queue := req.Destination
 
-	return vh.UnbindQueue(exchange, queue, req.RoutingKey, req.Arguments, nil)
+	return vh.UnbindQueue(exchange, queue, req.RoutingKey, req.Arguments, vhost.MANAGEMENT_CONNECTION_ID)
 }

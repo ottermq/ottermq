@@ -2,14 +2,13 @@ package vhost
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/rs/zerolog/log"
 )
 
 // HandleBasicRecover processes a Basic.Recover AMQP frame, handling message requeueing if necessary.
-func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool) error {
-	key := ConnectionChannelKey{conn, channel}
+func (vh *VHost) HandleBasicRecover(connID ConnectionID, channel uint16, requeue bool) error {
+	key := ConnectionChannelKey{connID, channel}
 
 	vh.mu.Lock()
 	ch := vh.ChannelDeliveries[key]
@@ -46,7 +45,7 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 			}
 
 			vh.mu.Lock()
-			consumerKey := ConnectionChannelKey{conn, channel}
+			consumerKey := ConnectionChannelKey{connID, channel}
 			consumers := vh.ConsumersByChannel[consumerKey]
 			vh.mu.Unlock()
 			var targetConsumer *Consumer

@@ -70,8 +70,8 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode string
 
 	channelKey := vhost.ConnectionChannelKey{
 		// ConnectionName: "management",
-		Connection: nil,
-		Channel:    0,
+		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+		Channel:      0,
 	}
 	ch := vh.GetOrCreateChannelDelivery(channelKey)
 

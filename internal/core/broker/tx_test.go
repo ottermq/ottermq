@@ -72,6 +72,7 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 
 func TestTxSelect_EntersTransactionMode(t *testing.T) {
 	broker, mockFramer, conn, vh := createTestBrokerForTx()
+	connID := newTestConsumerConnID()
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -92,7 +93,7 @@ func TestTxSelect_EntersTransactionMode(t *testing.T) {
 	}
 
 	// Verify transaction state was created
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	if txState == nil {
 		t.Fatal("Transaction state was not created")
 	}
@@ -115,7 +116,7 @@ func TestTxSelect_EntersTransactionMode(t *testing.T) {
 
 func TestTxSelect_Idempotent(t *testing.T) {
 	broker, mockFramer, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
 		ClassID:  uint16(amqp.TX),
@@ -143,7 +144,7 @@ func TestTxSelect_Idempotent(t *testing.T) {
 	}
 
 	// Transaction state should still be active
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -209,7 +210,7 @@ func TestTxRollback_WithoutSelect_ReturnsError(t *testing.T) {
 
 func TestPublish_InTransactionMode_BuffersNotRoutes(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -247,7 +248,7 @@ func TestPublish_InTransactionMode_BuffersNotRoutes(t *testing.T) {
 	}
 
 	// Verify message is in buffer
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -310,9 +311,10 @@ func TestPublish_OutsideTransaction_RoutesImmediately(t *testing.T) {
 
 func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
+	connID := newTestConsumerConnID()
 
 	// Setup: Deliver a message to create an unacked message
-	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
+	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
@@ -358,7 +360,7 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	}
 
 	// Verify ACK is in buffer
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -377,9 +379,10 @@ func TestAck_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
+	connID := newTestConsumerConnID()
 
 	// Setup: Deliver a message to create an unacked message
-	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
+	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
@@ -419,7 +422,7 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	}
 
 	// Verify NACK is in buffer
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -438,9 +441,10 @@ func TestNack_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
+	connID := newTestConsumerConnID()
 
 	// Setup: Deliver a message to create an unacked message
-	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
+	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
@@ -481,7 +485,7 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 	}
 
 	// Verify REJECT is in buffer
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -500,7 +504,7 @@ func TestReject_InTransactionMode_BuffersNotProcesses(t *testing.T) {
 
 func TestCommit_RoutesAllBufferedPublishes(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -547,7 +551,7 @@ func TestCommit_RoutesAllBufferedPublishes(t *testing.T) {
 	}
 
 	// Verify buffer was cleared
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -558,9 +562,9 @@ func TestCommit_RoutesAllBufferedPublishes(t *testing.T) {
 
 func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Setup: Create multiple unacked messages
-	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
+	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),
@@ -620,7 +624,7 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 	}
 
 	// Verify buffer was cleared
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -631,7 +635,7 @@ func TestCommit_ProcessesAllBufferedAcks(t *testing.T) {
 
 func TestCommit_KeepsTransactionMode(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -653,7 +657,7 @@ func TestCommit_KeepsTransactionMode(t *testing.T) {
 	}
 
 	// Verify channel is still in transaction mode (per AMQP spec)
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	inTransaction := txState.InTransaction
 	txState.Unlock()
@@ -686,7 +690,7 @@ func TestCommit_KeepsTransactionMode(t *testing.T) {
 
 func TestRollback_DiscardsAllBuffers(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -707,7 +711,7 @@ func TestRollback_DiscardsAllBuffers(t *testing.T) {
 	}
 
 	// Verify buffers have data
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	bufferCountBefore := len(txState.BufferedPublishes)
 	txState.Unlock()
@@ -747,7 +751,7 @@ func TestRollback_DiscardsAllBuffers(t *testing.T) {
 
 func TestRollback_KeepsTransactionMode(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -769,7 +773,7 @@ func TestRollback_KeepsTransactionMode(t *testing.T) {
 	}
 
 	// Verify channel is still in transaction mode (per AMQP spec)
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -784,7 +788,7 @@ func TestRollback_KeepsTransactionMode(t *testing.T) {
 
 func TestChannelClose_ImplicitRollback(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode and buffer some operations
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -799,7 +803,7 @@ func TestChannelClose_ImplicitRollback(t *testing.T) {
 	broker.bufferPublishInTransaction(vh, 1, conn, "test-exchange", "test.key", msg, false)
 
 	// Verify buffer has data
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	bufferCount := len(txState.BufferedPublishes)
 	txState.Unlock()
@@ -809,10 +813,10 @@ func TestChannelClose_ImplicitRollback(t *testing.T) {
 	}
 
 	// Close channel (simulate channel close)
-	vh.CleanupChannel(conn, 1)
+	vh.CleanupChannel(connID, 1)
 
 	// Verify transaction state was cleaned up
-	txState = vh.GetTransactionState(1, conn)
+	txState = vh.GetTransactionState(1, connID)
 	if txState != nil {
 		txState.Lock()
 		defer txState.Unlock()
@@ -926,7 +930,7 @@ func TestCommit_NonMandatoryNoRoute_DropsMessage(t *testing.T) {
 
 func TestCommit_DryRunValidation(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -941,7 +945,7 @@ func TestCommit_DryRunValidation(t *testing.T) {
 	}
 
 	// Manually add to buffer (bypassing validation that would happen in publish handler)
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
 		ExchangeName: "non-existent-exchange",
@@ -977,7 +981,7 @@ func TestCommit_DryRunValidation(t *testing.T) {
 
 func TestPublish_ExceedsBufferLimit(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -986,7 +990,7 @@ func TestPublish_ExceedsBufferLimit(t *testing.T) {
 	broker.txSelectHandler(selectRequest, vh, conn)
 
 	// Fill buffer up to limit
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	for i := 0; i < MaxTransactionBufferSize; i++ {
 		txState.BufferedPublishes = append(txState.BufferedPublishes, vhost.BufferedPublish{
@@ -1019,7 +1023,7 @@ func TestPublish_ExceedsBufferLimit(t *testing.T) {
 
 func TestAck_ExceedsBufferLimit(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Enter transaction mode
 	selectRequest := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -1028,7 +1032,7 @@ func TestAck_ExceedsBufferLimit(t *testing.T) {
 	broker.txSelectHandler(selectRequest, vh, conn)
 
 	// Fill buffer up to limit
-	txState := vh.GetTransactionState(1, conn)
+	txState := vh.GetTransactionState(1, connID)
 	txState.Lock()
 	for i := 0; i < MaxTransactionBufferSize; i++ {
 		txState.BufferedAcks = append(txState.BufferedAcks, vhost.BufferedAck{
@@ -1059,9 +1063,9 @@ func TestAck_ExceedsBufferLimit(t *testing.T) {
 
 func TestCommit_MixedOperations(t *testing.T) {
 	broker, _, conn, vh := createTestBrokerForTx()
-
+	connID := newTestConsumerConnID()
 	// Setup: Create unacked messages
-	channelKey := vhost.ConnectionChannelKey{Connection: conn, Channel: 1}
+	channelKey := vhost.ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	vh.ChannelDeliveries[channelKey] = &vhost.ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*vhost.DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*vhost.DeliveryRecord),

@@ -2,7 +2,6 @@ package vhost
 
 import (
 	"fmt"
-	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
@@ -106,24 +105,23 @@ func TestExclusiveQueueDeletedOnConnectionClose(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-	// conn := &mockConn{}
-	conn := net.Conn(nil)
+	connID := newTestConsumerConnID()
 
 	// Create exclusive queue
 	queue, err := vh.CreateQueue("exclusive-q", &QueueProperties{
 		Exclusive: true,
-	}, conn)
+	}, connID)
 	if err != nil {
 		t.Fatalf("Failed to create exclusive queue: %v", err)
 	}
 
 	// Verify owner is set
-	if queue.OwnerConn != conn {
+	if queue.OwnerConn != connID {
 		t.Error("Expected OwnerConn to be set")
 	}
 
 	// Close connection
-	vh.CleanupConnection(conn)
+	vh.CleanupConnection(connID)
 
 	// Verify queue was deleted
 	if _, exists := vh.Queues["exclusive-q"]; exists {

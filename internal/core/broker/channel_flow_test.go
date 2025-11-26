@@ -43,6 +43,7 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 		localAddr:  &MockAddr{network: "tcp", address: "127.0.0.1:5672"},
 		remoteAddr: &MockAddr{network: "tcp", address: "127.0.0.1:12345"},
 	}
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
 
 	// Initialize connection
 	broker.Connections[conn] = &amqp.ConnectionInfo{
@@ -65,7 +66,7 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 	}
 
 	// Verify flow state was updated
-	flowState := vh.GetChannelFlowState(conn, 1)
+	flowState := vh.GetChannelFlowState(connID, 1)
 	if flowState.FlowActive {
 		t.Error("Expected FlowActive to be false after client pause")
 	}
@@ -89,7 +90,7 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 		t.Fatalf("handleChannelFlow failed: %v", err)
 	}
 
-	flowState = vh.GetChannelFlowState(conn, 1)
+	flowState = vh.GetChannelFlowState(connID, 1)
 	if !flowState.FlowActive {
 		t.Error("Expected FlowActive to be true after client resume")
 	}
