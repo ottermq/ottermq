@@ -1,9 +1,9 @@
 package api
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
-	"github.com/rabbitmq/amqp091-go"
 )
 
 // PublishMessage godoc
@@ -19,7 +19,7 @@ import (
 // @Failure 500 {object} models.ErrorResponse
 // @Router /messages [post]
 // @Security BearerAuth
-func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
+func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 	var request models.PublishMessageRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
@@ -31,17 +31,7 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 		exchange = ""
 	}
 
-	msg := amqp091.Publishing{
-		ContentType: "text/plain",
-		Body:        []byte(request.Payload),
-	}
-	err := ch.Publish(
-		exchange,
-		request.RoutingKey,
-		false, // mandatory
-		false, // immediate
-		msg,
-	)
+	err := b.Management.PublishMessage(request)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
