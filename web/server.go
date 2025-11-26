@@ -69,11 +69,11 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	// Public API routes
 	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login)
 
-	// Protected API routes
-	apiGrp := app.Group(ws.config.ApiPrefix)
-	apiGrp.Get("/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	app.Get(ws.config.ApiPrefix+"/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetBasicBrokerInfo(c, ws.Broker)
 	})
+	// Protected API routes
+	apiGrp := app.Group(ws.config.ApiPrefix)
 	apiGrp.Get("/overview", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetOverview(c, ws.Broker)
 	})
