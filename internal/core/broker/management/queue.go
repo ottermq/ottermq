@@ -12,8 +12,12 @@ func (s *Service) ListQueues(vhostName string) ([]models.QueueDTO, error) {
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
+	dtos := s.getQueueDTOs(vh)
 
-	// Get statistics from vhost (these methods handle locking internally)
+	return dtos, nil
+}
+
+func (s *Service) getQueueDTOs(vh *vhost.VHost) []models.QueueDTO {
 	unackedCounts := vh.GetUnackedMessageCountsAllQueues()
 	consumerCounts := vh.GetConsumerCountsAllQueues()
 	queues := vh.GetAllQueues()
@@ -24,9 +28,7 @@ func (s *Service) ListQueues(vhostName string) ([]models.QueueDTO, error) {
 		dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], consumerCounts[queue.Name])
 		dtos = append(dtos, dto)
 	}
-
-	return dtos, nil
-
+	return dtos
 }
 
 func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error) {
