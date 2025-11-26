@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added GitHub commit activity badge to README
 - **Per-consumer unacked message tracking**: Implemented dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
 - **Consumer cancel E2E tests**: Added 6 comprehensive tests for consumer cancel behavior and edge cases
 - Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)
