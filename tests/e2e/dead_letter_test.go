@@ -417,7 +417,8 @@ func TestDLX_MultipleNack(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Check DLQ has 2 messages
-	dlqInspected, err := tc.Ch.QueueInspect(dlq.Name)
+	// dlqInspected, err := tc.Ch.QueueInspect(dlq.Name)
+	dlqInspected, err := tc.Ch.QueueDeclarePassive(dlq.Name, false, true, false, false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, dlqInspected.Messages, "two messages should be in DLQ")
 
@@ -427,7 +428,16 @@ func TestDLX_MultipleNack(t *testing.T) {
 
 	// After acking msg3, the main queue should be completely empty
 	time.Sleep(50 * time.Millisecond)
-	inspected, err := tc.Ch.QueueInspect(mainQueue.Name)
+	inspected, err := tc.Ch.QueueDeclarePassive(mainQueue.Name,
+		false,
+		true,
+		false,
+		false,
+		amqp.Table{
+			"x-dead-letter-exchange":    "dlx-multi",
+			"x-dead-letter-routing-key": "dead",
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, 0, inspected.Messages, "main queue should be empty after all messages processed")
 }
