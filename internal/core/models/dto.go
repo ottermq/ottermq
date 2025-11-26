@@ -54,11 +54,43 @@ type ExchangeDTO struct {
 }
 
 type QueueDTO struct {
-	VHostName string `json:"vhost"`
-	VHostId   string `json:"vhost_id"`
-	Name      string `json:"name"`
-	Messages  int    `json:"messages"`
-	Unacked   int    `json:"unacked"`
+	// Identity
+	VHost string `json:"vhost"`
+	Name  string `json:"name"`
+
+	// Message counts (RabbitMQ compatible field names)
+	Messages           int `json:"messages"`       // Ready
+	MessagesReady      int `json:"messages_ready"` // Alias
+	MessagesUnacked    int `json:"messages_unacked"`
+	MessagesPersistent int `json:"messages_persistent"`
+	MessagesTotal      int `json:"messages_total"` // Ready + Unacked
+
+	// Consumers stats
+	Consumers       int `json:"consumers"`
+	ConsumersActive int `json:"consumers_active"`
+
+	// Properties/flags
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Exclusive  bool           `json:"exclusive"`
+	Arguments  map[string]any `json:"arguments_count"`
+
+	// DLX Configuration (extracted for convenience)
+	DeadLetterExchange   *string `json:"dead_letter_exchange,omitempty"`
+	DeadLetterRoutingKey *string `json:"dead_letter_routing_key,omitempty"`
+
+	// TTL Configuration
+	MessageTTL *int64 `json:"message_ttl,omitempty"` // in milliseconds
+
+	// Queue Length Limit (QLL AKA Max Length)
+	MaxLength *int32 `json:"max_length,omitempty"`
+
+	// State
+	State string `json:"state"` // "running", "idle", "flow"
+
+	// Metadata
+	OwnerConnection    string `json:"owner_connection"` // for exclusive queues
+	PersistenceEnabled bool   `json:"persistence_enabled"`
 }
 
 type BindingDTO struct {
