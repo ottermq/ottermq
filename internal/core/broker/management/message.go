@@ -52,6 +52,12 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhostName)
 	}
+	if queue == "" {
+		return nil, fmt.Errorf("queue name cannot be empty")
+	}
+	if count <= 0 {
+		return nil, fmt.Errorf("message count must be greater than zero")
+	}
 
 	noAck := ackMode == models.NoAck
 
@@ -59,35 +65,40 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 	if err != nil {
 		return nil, err
 	}
-	var msg *vhost.Message
-	if msgCount > 0 {
-		msg = vh.GetMessage(queue)
+	log.Debug().Str("queue", queue).Int("requested_count", count).Int("available_count", msgCount).Msg("Getting messages from queue")
+	msgs := make([]models.MessageDTO, 0, count)
+	if count > msgCount {
+		count = msgCount
 	}
 
-	if msgCount == 0 || msg == nil {
-		return []models.MessageDTO{}, nil
+	for i := 0; i < count; i++ {
+		msg := vh.GetMessage(queue)
+
+		if msgCount == 0 || msg == nil {
+			return []models.MessageDTO{}, nil
+		}
+
+		channelKey := vhost.ConnectionChannelKey{
+			ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+			Channel:      0,
+		}
+		ch := vh.GetOrCreateChannelDelivery(channelKey)
+
+		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+		redelivered := vh.ShouldRedeliver(msg.ID)
+
+		dto := models.MessageDTO{
+			ID:          msg.ID,
+			Payload:     msg.Body,
+			Properties:  propertiesToMap(msg.Properties),
+			DeliveryTag: deliveryTag,
+			Redelivered: redelivered,
+		}
+		msgs = append(msgs, dto)
 	}
 
-	channelKey := vhost.ConnectionChannelKey{
-		// ConnectionName: "management",
-		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
-		Channel:      0,
-	}
-	ch := vh.GetOrCreateChannelDelivery(channelKey)
-
-	deliveryTag := ch.TrackDelivery(noAck, msg, queue)
-
-	redelivered := vh.ShouldRedeliver(msg.ID)
-
-	dto := models.MessageDTO{
-		ID:          msg.ID,
-		Payload:     msg.Body,
-		Properties:  propertiesToMap(msg.Properties),
-		DeliveryTag: deliveryTag,
-		Redelivered: redelivered,
-	}
-
-	return []models.MessageDTO{dto}, nil
+	return msgs, nil
 }
 
 func propertiesToMap(props amqp.BasicProperties) map[string]any {

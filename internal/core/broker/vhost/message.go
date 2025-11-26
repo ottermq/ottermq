@@ -256,6 +256,7 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 	return msg
 }
 
+// GetMessageCount returns the number of messages in the specified queue.
 func (vh *VHost) GetMessageCount(queueName string) (int, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()

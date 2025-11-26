@@ -78,9 +78,8 @@ type PublishMessageRequest struct {
 }
 
 type GetMessageRequest struct {
-	QueueName string  `json:"queue" validate:"required"`
-	VHost     string  `json:"vhost"`    // Optional; defaults to "/"
-	AckMode   AckType `json:"ack_mode"` // "ack", "no_ack", "reject"
+	AckMode      AckType `json:"ack_mode"` // "ack", "no_ack", "reject"
+	MessageCount int     `json:"message_count"`
 }
 
 type AckType string
