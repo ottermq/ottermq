@@ -126,17 +126,20 @@ type ChannelDetails struct {
 }
 
 type ChannelDTO struct {
-	Number              uint16 `json:"number"`
-	ConnectionName      string `json:"connection_name"`
-	VHost               string `json:"vhost"`
-	User                string `json:"user"`
-	State               string `json:"state"` // "running", "flow"
-	UnackedCount        int    `json:"messages_unacknowledged"`
-	ConsumerCount       int    `json:"consumer_count"`
-	PrefetchCount       uint16 `json:"prefetch_count"`
-	GlobalPrefetchCount uint16 `json:"global_prefetch_count"`
-	InTransaction       bool   `json:"in_transaction"`
-	ConfirmMode         bool   `json:"confirm"`
+	Number         uint16 `json:"number"`
+	ConnectionName string `json:"connection_name"`
+	VHost          string `json:"vhost"`
+	User           string `json:"user"`
+	State          string `json:"state"` // "running", "flow"
+	// Details
+	UnconfirmedCount int    `json:"unconfirmed_count"`
+	PrefetchCount    uint16 `json:"prefetch_count"`
+	UnackedCount     int    `json:"unacked_count"`
+	// Stats
+	PublishRate float64 `json:"publish_rate"`
+	ConfirmRate float64 `json:"confirm_rate"`
+	DeliverRate float64 `json:"deliver_rate"`
+	AckRate     float64 `json:"ack_rate"`
 }
 
 type BindingDTO struct {
