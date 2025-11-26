@@ -57,7 +57,7 @@ func listExchangeBindings(exchange *vhost.Exchange, vhostName string, bindingDto
 	return bindingDtos
 }
 
-func (s *Service) ListQueuesBindings(vhost, queueName string) ([]models.BindingDTO, error) {
+func (s *Service) ListQueueBindings(vhost, queueName string) ([]models.BindingDTO, error) {
 	vh := s.broker.GetVHost(vhost)
 	if vh == nil {
 		return nil, fmt.Errorf("vhost '%s' not found", vhost)
