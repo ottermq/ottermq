@@ -719,6 +719,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/exchanges/{vhost}/{exchange}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Publish a message to the specified exchange with a routing key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Publish a message to an exchange",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Message details",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.PublishMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "description": "Login",
@@ -752,63 +823,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Invalid username or password",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/messages": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Publish a message to the specified exchange with a routing key",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "messages"
-                ],
-                "summary": "Publish a message to an exchange",
-                "parameters": [
-                    {
-                        "description": "Message details",
-                        "name": "message",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.PublishMessageRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
                         "schema": {
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
                         }
@@ -974,67 +988,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to list consumers for queue",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/queues/{queue}/consume": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Consume a message from the specified queue",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "queues"
-                ],
-                "summary": "Consume a message from a queue",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Queue name",
-                        "name": "queue",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Queue name is required",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "No messages in queue",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -1425,6 +1378,74 @@ const docTemplate = `{
                         "description": "Missing or invalid JWT token",
                         "schema": {
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queue}/get": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Consume a message from the specified queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Consume a message from a queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Queue name is required",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No messages in queue",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
@@ -2103,7 +2124,6 @@ const docTemplate = `{
         "models.PublishMessageRequest": {
             "type": "object",
             "required": [
-                "exchange",
                 "payload"
             ],
             "properties": {
@@ -2123,9 +2143,6 @@ const docTemplate = `{
                 "delivery_mode": {
                     "description": "1=transient, 2=persistent",
                     "type": "integer"
-                },
-                "exchange": {
-                    "type": "string"
                 },
                 "expiration": {
                     "description": "TTL in milliseconds as string",
@@ -2165,10 +2182,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
-                    "type": "string"
-                },
-                "vhost": {
-                    "description": "Optional; defaults to \"/\"",
                     "type": "string"
                 }
             }

@@ -44,12 +44,11 @@ type DeleteBindingRequest struct {
 }
 
 type PublishMessageRequest struct {
-	VHost        string `json:"vhost"` // Optional; defaults to "/"
-	ExchangeName string `json:"exchange" validate:"required"`
-	RoutingKey   string `json:"routing_key"`
-	Payload      string `json:"payload" validate:"required"`
+	RoutingKey string `json:"routing_key"`
+	Payload    string `json:"payload" validate:"required"`
 
 	// Message properties (AMQP 0-9-1 spec)
+
 	ContentType     string         `json:"content_type"`
 	ContentEncoding string         `json:"content_encoding"`
 	DeliveryMode    uint8          `json:"delivery_mode"` // 1=transient, 2=persistent

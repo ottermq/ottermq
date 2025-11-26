@@ -126,6 +126,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/exchanges/:vhost/:exchange/bindings/source", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetBindingsExchangeSource(c, ws.Broker)
 	})
+	apiGrp.Post("/exchanges/:vhost/:exchange/publish", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.PublishMessage(c, ws.Broker)
+	})
 
 	// Binding routes
 	apiGrp.Get("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
