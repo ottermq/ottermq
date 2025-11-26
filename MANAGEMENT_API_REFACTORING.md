@@ -75,7 +75,7 @@ This document outlines a comprehensive refactoring of OtterMQ's Management API t
 
 ### New Files to Create
 
-```
+```sh
 internal/core/broker/management/
 ├── service.go              # Main service interface and factory
 ├── queues.go              # Queue operations (List, Get, Create, Delete, Purge)
@@ -105,7 +105,7 @@ web/handlers/api/
 
 ### Files to Refactor
 
-```
+```sh
 internal/core/broker/
 ├── public.go              # DEPRECATED → Replace with management/service.go
 └── ...
@@ -167,6 +167,7 @@ type QueueDTO struct {
 ```
 
 **UI Badge Mapping**:
+
 - **D** = Durable
 - **AD** = AutoDelete
 - **E** = Exclusive
@@ -204,6 +205,7 @@ type MessageStats struct {
 ```
 
 **UI Badge Mapping**:
+
 - **D** = Durable
 - **AD** = AutoDelete
 - **I** = Internal
@@ -591,7 +593,7 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 
 ### Current Endpoints (Existing)
 
-```
+```sh
 GET    /api/queues
 POST   /api/queues
 DELETE /api/queues/:queue
@@ -615,7 +617,7 @@ POST   /api/login
 
 ### New/Enhanced Endpoints (Proposed)
 
-```
+```sh
 # Queues (Enhanced)
 GET    /api/queues                          # List all queues (with full details)
 GET    /api/queues/:vhost/:queue            # Get single queue details
@@ -681,6 +683,7 @@ GET    /api/overview                        # Global statistics and info
 5. ✅ Create `models/responses.go` for structured responses
 
 **Deliverables**:
+
 - Management service skeleton
 - Enhanced DTOs
 - Request/response models
@@ -695,7 +698,7 @@ GET    /api/overview                        # Global statistics and info
    - CreateQueue (with arguments support)
    - DeleteQueue (with conditions)
    - PurgeQueue
-   
+
 2. ✅ Implement `management/exchanges.go`
    - ListExchanges (with properties)
    - GetExchange
@@ -716,6 +719,7 @@ GET    /api/overview                        # Global statistics and info
    - Pass to handlers instead of AMQP channel
 
 **Deliverables**:
+
 - Full queue/exchange management via API
 - All properties configurable
 - Arguments support (TTL, DLX, QLL)
@@ -745,6 +749,7 @@ GET    /api/overview                        # Global statistics and info
    - Consumer details endpoint
 
 **Deliverables**:
+
 - Structured binding API
 - Consumer visibility via API
 - QoS/prefetch information exposed
@@ -771,6 +776,7 @@ GET    /api/overview                        # Global statistics and info
    - Support delivery-mode, correlation-id
 
 **Deliverables**:
+
 - Channel information via API
 - Full message property support
 - TTL configurable via publish API
@@ -789,6 +795,7 @@ GET    /api/overview                        # Global statistics and info
    - Statistics endpoints
 
 **Deliverables**:
+
 - Overview/statistics API
 - Monitoring-ready endpoints
 
@@ -802,6 +809,7 @@ GET    /api/overview                        # Global statistics and info
 4. ✅ Update documentation
 
 **Deliverables**:
+
 - Clean codebase
 - No AMQP client in web layer
 - Updated tests and docs
@@ -910,22 +918,23 @@ Once API is complete, update UI to display new information:
 
 ### Queue Table
 
-**Add badges/columns**:
-- D (Durable)
-- AD (Auto-delete)
-- E (Exclusive)
-- TTL (has message TTL)
-- DLX (has dead-letter exchange)
-- QLL (has max-length)
-- Args (has other arguments)
+- **Add badges/columns**:
+  - D (Durable)
+  - AD (Auto-delete)
+  - E (Exclusive)
+  - TTL (has message TTL)
+  - DLX (has dead-letter exchange)
+  - QLL (has max-length)
+  - Args (has other arguments)
 
-**Add consumer count column**
+- **Add consumer count column**
 
 **Fix unacked count display** (already in API response)
 
 ### Exchange Table
 
 **Add badges**:
+
 - D (Durable)
 - AD (Auto-delete)
 - I (Internal)
@@ -934,6 +943,7 @@ Once API is complete, update UI to display new information:
 ### New Consumers Tab
 
 **Show**:
+
 - Consumer tag
 - Queue name
 - Connection
