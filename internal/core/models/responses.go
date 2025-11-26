@@ -12,6 +12,10 @@ type ConnectionListResponse struct {
 	Connections []ConnectionInfoDTO `json:"connections"`
 }
 
+type ChannelListResponse struct {
+	Channels []ChannelDTO `json:"channels"`
+}
+
 type ExchangeListResponse struct {
 	Exchanges []ExchangeDTO `json:"exchanges"`
 }
