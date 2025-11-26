@@ -10,6 +10,9 @@ type CreateQueueRequest struct {
 	QueueName string `json:"queue_name"`
 }
 
+type CreateBindingRequest struct {
+}
+
 type BindQueueRequest struct {
 	ExchangeName string `json:"exchange_name"`
 	QueueName    string `json:"queue_name"`
