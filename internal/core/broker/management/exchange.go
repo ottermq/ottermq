@@ -8,23 +8,18 @@ import (
 )
 
 // ListExchanges lists all exchanges in the specified vhost.
-func (s *Service) ListExchanges(vhost string) ([]models.ExchangeDTO, error) {
-	vh := s.broker.GetVHost(vhost)
-	if vh == nil {
-		return nil, fmt.Errorf("vhost '%s' not found", vhost)
-	}
-
-	exchanges := vh.GetAllExchanges()
-	dtos := make([]models.ExchangeDTO, 0, len(exchanges))
-	for _, exchange := range exchanges {
-		dto := models.ExchangeDTO{
-			VHost: vh.Name,
-			Name:  exchange.NameOrAlias(),
-			Type:  string(exchange.Typ),
+func (s *Service) ListExchanges() ([]models.ExchangeDTO, error) {
+	dtos := make([]models.ExchangeDTO, 0, 0)
+	for _, vh := range s.broker.ListVHosts() {
+		for _, exchange := range vh.GetAllExchanges() {
+			dto := models.ExchangeDTO{
+				VHost: vh.Name,
+				Name:  exchange.NameOrAlias(),
+				Type:  string(exchange.Typ),
+			}
+			dtos = append(dtos, dto)
 		}
-		dtos = append(dtos, dto)
 	}
-
 	return dtos, nil
 }
 

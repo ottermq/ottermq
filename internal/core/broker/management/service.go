@@ -16,7 +16,7 @@ type ManagementService interface {
 	PurgeQueue(vhost, name string) (int, error)
 
 	// Exchanges
-	ListExchanges(vhost string) ([]models.ExchangeDTO, error)
+	ListExchanges() ([]models.ExchangeDTO, error)
 	GetExchange(vhost, name string) (*models.ExchangeDTO, error)
 	CreateExchange(req models.CreateExchangeRequest) (*models.ExchangeDTO, error)
 	DeleteExchange(vhost, name string, ifUnused bool) error

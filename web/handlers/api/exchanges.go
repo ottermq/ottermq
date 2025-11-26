@@ -19,7 +19,7 @@ import (
 // @Router /exchanges [get]
 // @Security BearerAuth
 func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
-	exchanges, err := b.Management.ListExchanges("/")
+	exchanges, err := b.Management.ListExchanges()
 	if err != nil || exchanges == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to list exchanges",
