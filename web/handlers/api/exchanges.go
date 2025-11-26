@@ -101,39 +101,3 @@ func DeleteExchange(c *fiber.Ctx, b *broker.Broker) error {
 
 	return c.Status(fiber.StatusNoContent).Send(nil)
 }
-
-// PublishMessage godoc
-// @Summary Publish a message to an exchange
-// @Description Publish a message to the specified exchange with a routing key
-// @Tags messages
-// @Accept json
-// @Produce json
-// @Param message body models.PublishMessageRequest true "Message details"
-// @Success 200 {object} models.SuccessResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
-// @Failure 500 {object} models.ErrorResponse
-// @Router /messages [post]
-// @Security BearerAuth
-func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
-	var request models.PublishMessageRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: err.Error(),
-		})
-	}
-	exchange := request.ExchangeName
-	if exchange == "(AMQP default)" {
-		exchange = ""
-	}
-
-	err := b.Management.PublishMessage(request)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: err.Error(),
-		})
-	}
-	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: "Message published",
-	})
-}
