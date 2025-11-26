@@ -25,7 +25,7 @@ var (
 // @title OtterMQ API
 // @version 1.0
 // @description API documentation for OtterMQ broker
-// @host localhost:3000
+// @host
 // @BasePath /api/
 // @securityDefinitions.apikey BearerAuth
 // @in header
