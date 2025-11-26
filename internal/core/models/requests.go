@@ -76,3 +76,18 @@ type PublishMessageRequest struct {
 	Mandatory bool `json:"mandatory"`
 	Immediate bool `json:"immediate"` // Deprecated in AMQP 0-9-1 (included for compatibility)
 }
+
+type GetMessageRequest struct {
+	QueueName string  `json:"queue" validate:"required"`
+	VHost     string  `json:"vhost"`    // Optional; defaults to "/"
+	AckMode   AckType `json:"ack_mode"` // "ack", "no_ack", "reject"
+}
+
+type AckType string
+
+const (
+	Ack           AckType = "ack"            // automatic ack
+	NoAck         AckType = "no_ack"         // no ack, requeue=ttrue
+	Reject        AckType = "reject"         // reject, requeue=false
+	RejectRequeue AckType = "reject_requeue" // reject, requeue=true
+)
