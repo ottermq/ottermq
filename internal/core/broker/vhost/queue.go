@@ -272,7 +272,13 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, connID Connect
 				existing.Props.AutoDelete != props.AutoDelete ||
 				existing.Props.Exclusive != props.Exclusive ||
 				!equalArgs(existing.Props.Arguments, props.Arguments) {
-				return nil, fmt.Errorf("queue %s already exists with different properties", name)
+				// Raise Precondition Failed error
+				return nil, errors.NewChannelError(
+					fmt.Sprintf("queue %s already exists with different properties", name),
+					uint16(amqp.PRECONDITION_FAILED),
+					uint16(amqp.QUEUE),
+					uint16(amqp.QUEUE_DECLARE),
+				)
 			}
 			log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
 			return existing, nil
