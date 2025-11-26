@@ -3,7 +3,6 @@ package api
 import (
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/rabbitmq/amqp091-go"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -116,25 +115,26 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /queues/{queue}/consume [post]
 // @Security BearerAuth
-func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
+func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
 	queueName := c.Params("queue")
 	if queueName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "Queue name is required",
 		})
 	}
-	msg, ok, err := ch.Get(queueName, false)
+	msgs, err := b.Management.GetMessages("/", queueName, 1, "ack")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
 		})
 	}
-	if !ok {
+	if len(msgs) == 0 {
 		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
 			Error: "No messages in queue",
 		})
 	}
+	msg := msgs[0]
 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: string(msg.Body),
+		Message: string(msg.Payload),
 	})
 }

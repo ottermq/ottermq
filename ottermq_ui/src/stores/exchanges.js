@@ -66,12 +66,36 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetchBindings(exchange)
     },
     async deleteBinding(exchange, routingKey, queue) {
-      await api.delete(`/bindings`, { data: { exchange_name: exchange, routing_key: routingKey, queue_name: queue } })
+      await api.delete(`/bindings`, { data: { 
+        vhost: "/",
+        source: exchange, 
+        routing_key: routingKey, 
+        destination: queue,
+        arguments: {},
+      } })
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
       await api.post(`/messages`, {
-        exchange_name: exchange, routing_key: routingKey, message
+        vhost: "/",
+        exchange: exchange, 
+        routing_key: routingKey, 
+        payload: message,
+        content_type: "text/plain",
+        content_encoding: "utf-8",
+        delivery_mode: 1, // 1 - transient, 2 - persistent
+        priority: 0,
+        correlation_id: "",
+        reply_to: "",
+        expiration: "",
+        message_id: "",
+        timestamp: null,
+        type: "",
+        user_id: "",
+        app_id: "",
+        headers: null,
+        mandatory: false,
+        immediate: false,
       })
     },
     select(exchange) { this.selected = exchange },
