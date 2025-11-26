@@ -21,7 +21,6 @@ func TestCreateQueue_WithAllProperties(t *testing.T) {
 	dlx := "my-dlx"
 
 	req := models.CreateQueueRequest{
-		QueueName:          "",
 		Durable:            true,
 		AutoDelete:         false,
 		MaxLength:          &maxLen,
@@ -29,7 +28,7 @@ func TestCreateQueue_WithAllProperties(t *testing.T) {
 		DeadLetterExchange: &dlx,
 	}
 
-	dto, err := service.CreateQueue("/", req)
+	dto, err := service.CreateQueue("/", "", req)
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, dto.Name) // Auto-generated name
@@ -47,26 +46,25 @@ func TestDeleteQueue_IfUnused(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "test-queue",
-	})
+	queueName := "test-queue"
+	service.CreateQueue("/", queueName, models.CreateQueueRequest{})
 
 	// Add consumer (simulate)
 	vh := broker.GetVHost("/")
-	vh.ConsumersByQueue["test-queue"] = []*vhost.Consumer{
+	vh.ConsumersByQueue[queueName] = []*vhost.Consumer{
 		{Tag: "consumer-1"},
 	}
 
 	// Try to delete with ifUnused=true (should fail)
-	err := service.DeleteQueue("/", "test-queue", true, false)
+	err := service.DeleteQueue("/", queueName, true, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "has 1 consumers")
 
 	// Remove consumer
-	vh.ConsumersByQueue["test-queue"] = nil
+	vh.ConsumersByQueue[queueName] = nil
 
 	// Try again (should succeed)
-	err = service.DeleteQueue("/", "test-queue", true, false)
+	err = service.DeleteQueue("/", queueName, true, false)
 	assert.NoError(t, err)
 }
 
@@ -75,13 +73,12 @@ func TestListQueues_ShowsUnackedCount(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "test-queue",
-	})
+	queueName := "test-queue"
+	service.CreateQueue("/", queueName, models.CreateQueueRequest{})
 
 	// Simulate unacked messages
 	vh := broker.GetVHost("/")
-	addUnackedMessages(vh, "test-queue", 5)
+	addUnackedMessages(vh, queueName, 5)
 
 	// List queues
 	dtos := service.ListQueues()
@@ -95,16 +92,16 @@ func TestGetQueue(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "get-queue",
-		Durable:   true,
+	queueName := "get-queue"
+	_, err := service.CreateQueue("/", queueName, models.CreateQueueRequest{
+		Durable: true,
 	})
 	require.NoError(t, err)
 
 	// Get queue
-	dto, err := service.GetQueue("/", "get-queue")
+	dto, err := service.GetQueue("/", queueName)
 	require.NoError(t, err)
-	assert.Equal(t, "get-queue", dto.Name)
+	assert.Equal(t, queueName, dto.Name)
 	assert.True(t, dto.Durable)
 }
 
@@ -113,9 +110,8 @@ func TestPurgeQueue(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "purge-queue",
-	})
+	queueName := "purge-queue"
+	_, err := service.CreateQueue("/", queueName, models.CreateQueueRequest{})
 	require.NoError(t, err)
 
 	// Add messages
@@ -126,21 +122,21 @@ func TestPurgeQueue(t *testing.T) {
 	}, "msg-id-1")
 
 	// Publish to default exchange (direct) with routing key = queue name
-	_, err = vh.Publish("", "purge-queue", &msg)
+	_, err = vh.Publish("", queueName, &msg)
 	require.NoError(t, err)
 
 	// Verify count before purge
-	dto, err := service.GetQueue("/", "purge-queue")
+	dto, err := service.GetQueue("/", queueName)
 	require.NoError(t, err)
 	assert.Equal(t, 1, dto.Messages)
 
 	// Purge queue
-	count, err := service.PurgeQueue("/", "purge-queue")
+	count, err := service.PurgeQueue("/", queueName)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Verify count after purge
-	dto, err = service.GetQueue("/", "purge-queue")
+	dto, err = service.GetQueue("/", queueName)
 	require.NoError(t, err)
 	assert.Equal(t, 0, dto.Messages)
 }
@@ -150,23 +146,21 @@ func TestCreateQueue_Idempotency(t *testing.T) {
 	service := NewService(broker)
 
 	// Create queue
-	_, err := service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "idempotent-queue",
-		Durable:   true,
+	queueName := "idempotent-queue"
+	_, err := service.CreateQueue("/", queueName, models.CreateQueueRequest{
+		Durable: true,
 	})
 	require.NoError(t, err)
 
 	// Create again with same props
-	_, err = service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "idempotent-queue",
-		Durable:   true,
+	_, err = service.CreateQueue("/", queueName, models.CreateQueueRequest{
+		Durable: true,
 	})
 	require.NoError(t, err)
 
 	// Create again with different props (should fail)
-	_, err = service.CreateQueue("/", models.CreateQueueRequest{
-		QueueName: "idempotent-queue",
-		Durable:   false, // Different
+	_, err = service.CreateQueue("/", queueName, models.CreateQueueRequest{
+		Durable: false, // Different
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "different properties")
