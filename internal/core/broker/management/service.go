@@ -47,8 +47,11 @@ type ManagementService interface {
 	// DeleteBinding deletes a binding between an exchange and a queue.
 	DeleteBinding(req models.DeleteBindingRequest) error
 
-	// Consumers
-	ListConsumers(vhost string) ([]models.ConsumerDTO, error)
+	/* Consumers */
+
+	// ListConsumers lists all consumers across all vhosts.
+	ListConsumers() ([]models.ConsumerDTO, error)
+	ListVhostConsumers(vhost string) ([]models.ConsumerDTO, error)
 	ListQueueConsumers(vhost, queue string) ([]models.ConsumerDTO, error)
 
 	/* Connections */
