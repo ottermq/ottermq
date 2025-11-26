@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
+// ListConsumers lists all consumers in the specified vhost.
 func (s *Service) ListConsumers(vhostName string) ([]models.ConsumerDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
@@ -27,6 +28,7 @@ func (s *Service) ListConsumers(vhostName string) ([]models.ConsumerDTO, error) 
 	return consumers, nil
 }
 
+// ListQueueConsumers lists all consumers for a specific queue in the specified vhost.
 func (s *Service) ListQueueConsumers(vhostName, queueName string) ([]models.ConsumerDTO, error) {
 	vh := s.broker.GetVHost(vhostName)
 	if vh == nil {
