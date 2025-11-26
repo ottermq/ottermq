@@ -3,6 +3,7 @@ package api
 import (
 	"net/url"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -77,6 +78,8 @@ func GetQueue(c *fiber.Ctx, b *broker.Broker) error {
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "VHost not found"
+// @Failure 404 {object} models.ErrorResponse "Queue not found in vhost"
 // @Failure 500 {object} models.ErrorResponse
 // @Router /queues [post]
 // @Security BearerAuth
@@ -99,6 +102,12 @@ func CreateQueue(c *fiber.Ctx, b *broker.Broker) error {
 
 	_, err := b.Management.CreateQueue(vhost, request)
 	if err != nil {
+		// if error is amqp error, verify if it's a 404 (not found) and contains 'no queue' in the text
+		if err.(errors.AMQPError).ReplyCode() == 404 {
+			return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+				Error: err.(errors.AMQPError).ReplyText(),
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),
 		})

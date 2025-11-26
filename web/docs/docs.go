@@ -803,6 +803,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Queue not found in vhost",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
