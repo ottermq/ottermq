@@ -164,3 +164,17 @@ type MessageDTO struct {
 	DeliveryTag uint64         `json:"delivery_tag"`
 	Redelivered bool           `json:"redelivered"`
 }
+
+// ChannelInfo represents information about a channel.
+type ChannelInfo struct {
+	Number           uint16 `json:"number"`
+	ConnectionName   string `json:"connection_name"`
+	VHost            string `json:"vhost"`
+	User             string `json:"user"`
+	State            string `json:"state"` // "running", "flow", "closing"
+	UnconfirmedCount int    `json:"unconfirmed_count"`
+	PrefetchCount    uint16 `json:"prefetch_count"`
+	UnackedCount     int    `json:"unacked_count"`
+	InTransaction    bool   `json:"in_transaction"`
+	ConfirmMode      bool   `json:"confirm_mode"`
+}
