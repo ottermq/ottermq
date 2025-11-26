@@ -291,6 +291,17 @@ func (b *Broker) ListConnections() []amqp.ConnectionInfo {
 	return connections
 }
 
+func (b *Broker) GetConnectionByName(name string) (*amqp.ConnectionInfo, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, c := range b.Connections {
+		if string(b.connToID[c.Client.Conn]) == name {
+			return c, nil
+		}
+	}
+	return nil, fmt.Errorf("connection '%s' not found", name)
+}
+
 func (b *Broker) Shutdown() {
 	for conn := range b.Connections {
 		conn.Close()

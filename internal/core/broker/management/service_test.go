@@ -43,6 +43,11 @@ func (fb *fakeBroker) CreateChannelInfo(connID vhost.ConnectionID, channelNum ui
 	return models.ChannelInfo{}, nil
 }
 
+func (fb *fakeBroker) GetConnectionByName(name string) (*amqp.ConnectionInfo, error) {
+	// For testing purposes, return nil.
+	return nil, nil
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()
