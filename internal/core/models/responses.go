@@ -27,3 +27,7 @@ type QueueDeleteResponse struct {
 type BindingListResponse struct {
 	Bindings []BindingDTO `json:"bindings"`
 }
+
+type ConsumerListResponse struct {
+	Consumers []ConsumerDTO `json:"consumers"`
+}
