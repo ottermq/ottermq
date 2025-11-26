@@ -782,7 +782,7 @@ GET    /api/overview                        # Global statistics and info
 
 **Goals**: Expose channel details and advanced broker features
 
-1. ⬜ Implement `management/channel.go`
+1. ✅ Implement `management/channel.go`
    - ListChannels (all channels across connections)
    - ListConnectionChannels (per-connection)
    - GetChannel (specific channel details)
