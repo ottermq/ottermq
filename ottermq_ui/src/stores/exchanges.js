@@ -48,16 +48,20 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async fetchBindings(exchange) {
         const {data} = await api.get(`/bindings/${encodeURIComponent(exchange)}`)
-        const map = data?.bindings ?? {}
-        const list = []
-        Object.entries(map).forEach(([routing_key, queues]) => {
-        (queues || []).forEach(q => list.push({routingKey: routing_key, queue: q}))
-        })
+        const list = Array.isArray(data?.bindings) 
+        ? data.bindings.map(b => ({
+            source: b.source,
+            destination_type: b.destination_type,
+            queue: b.destination,
+            routingKey: b.routing_key,
+            arguments: b.arguments,
+            propertiesKey: b.properties_key,
+        })) : []
         this.bindings = list
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        exchange_name: exchange, routing_key: routingKey, queue_name: queue
+        source: exchange, routing_key: routingKey, destination: queue
       })
       await this.fetchBindings(exchange)
     },
