@@ -345,12 +345,21 @@ func (b *Broker) Shutdown() {
 }
 
 // ListChannels returns all channels across all connections.
-func (b *Broker) ListChannels() ([]models.ChannelInfo, error) {
+func (b *Broker) ListChannels(vhost string) ([]models.ChannelInfo, error) {
+	filterSet := vhost != ""
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	channels := make([]models.ChannelInfo, 0, len(b.Connections))
-	for conn, c := range b.Connections {
-		channels = append(channels, b.listChannelsByConnection(c, conn)...)
+	if filterSet {
+		for conn, c := range b.Connections {
+			if c.VHostName == vhost {
+				channels = append(channels, b.listChannelsByConnection(c, conn)...)
+			}
+		}
+	} else { // filter not set
+		for conn, c := range b.Connections {
+			channels = append(channels, b.listChannelsByConnection(c, conn)...)
+		}
 	}
 
 	return channels, nil

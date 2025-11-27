@@ -306,14 +306,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/channels/connection": {
+        "/channels/:vhost": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a list of all channels for a specific connection",
+                "description": "Get a list of all channels for a specific VHost",
                 "consumes": [
                     "application/json"
                 ],
@@ -323,12 +323,27 @@ const docTemplate = `{
                 "tags": [
                     "channels"
                 ],
-                "summary": "List all channels for a specific connection",
+                "summary": "Get channels by VHost",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.ChannelListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or malformed request body",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
@@ -337,8 +352,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "VHost not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Failed to list channels",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -386,6 +407,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/connections/:name/channels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all channels for a specific connection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "List all channels for a specific connection",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChannelListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list channels",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/exchanges": {
             "get": {
                 "security": [
@@ -419,61 +480,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to list exchanges",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new exchange with the specified name and type",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "exchanges"
-                ],
-                "summary": "Create a new exchange",
-                "parameters": [
-                    {
-                        "description": "Exchange to create",
-                        "name": "exchange",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.CreateExchangeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Exchange created successfully",
-                        "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid or malformed request body",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -1577,6 +1583,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "number": {
+                    "description": "channel number",
                     "type": "integer"
                 },
                 "prefetch_count": {
@@ -1605,13 +1612,14 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ChannelDetails": {
+        "models.ChannelDetailsDTO": {
             "type": "object",
             "properties": {
                 "connection_name": {
                     "type": "string"
                 },
                 "number": {
+                    "description": "channel number",
                     "type": "integer"
                 },
                 "user": {
@@ -1685,12 +1693,12 @@ const docTemplate = `{
                 "active": {
                     "type": "boolean"
                 },
-                "arguments_count": {
+                "arguments": {
                     "type": "object",
                     "additionalProperties": {}
                 },
                 "channel_details": {
-                    "$ref": "#/definitions/models.ChannelDetails"
+                    "$ref": "#/definitions/models.ChannelDetailsDTO"
                 },
                 "consumer_tag": {
                     "type": "string"
@@ -1854,7 +1862,7 @@ const docTemplate = `{
         "models.ExchangeDTO": {
             "type": "object",
             "properties": {
-                "arguments_count": {
+                "arguments": {
                     "type": "object",
                     "additionalProperties": {}
                 },
@@ -2134,7 +2142,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "content_type": {
-                    "description": "Message properties (AMQP 0-9-1 spec)",
                     "type": "string"
                 },
                 "correlation_id": {
@@ -2151,14 +2158,6 @@ const docTemplate = `{
                 "headers": {
                     "type": "object",
                     "additionalProperties": {}
-                },
-                "immediate": {
-                    "description": "Deprecated in AMQP 0-9-1 (included for compatibility)",
-                    "type": "boolean"
-                },
-                "mandatory": {
-                    "description": "Routing flags",
-                    "type": "boolean"
                 },
                 "message_id": {
                     "type": "string"
@@ -2189,7 +2188,7 @@ const docTemplate = `{
         "models.QueueDTO": {
             "type": "object",
             "properties": {
-                "arguments_count": {
+                "arguments": {
                     "type": "object",
                     "additionalProperties": {}
                 },

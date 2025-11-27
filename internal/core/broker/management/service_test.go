@@ -28,7 +28,7 @@ func (fb *fakeBroker) ListConnections() []amqp.ConnectionInfo {
 	// For testing purposes, return an empty list.
 	return []amqp.ConnectionInfo{}
 }
-func (fb *fakeBroker) ListChannels() ([]models.ChannelInfo, error) {
+func (fb *fakeBroker) ListChannels(vhost string) ([]models.ChannelInfo, error) {
 	// For testing purposes, return an empty list.
 	return []models.ChannelInfo{}, nil
 }

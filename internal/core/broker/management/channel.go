@@ -1,18 +1,21 @@
 package management
 
 import (
+	"fmt"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
 // ListChannels returns all channels across all connections.
-func (s *Service) ListChannels() ([]models.ChannelDTO, error) {
-	vh := s.broker.GetVHost("/")
-	if vh == nil {
-		return nil, nil
+func (s *Service) ListChannels(vhost string) ([]models.ChannelDTO, error) {
+	if vhost != "" {
+		vh := s.broker.GetVHost(vhost)
+		if vh == nil {
+			return nil, fmt.Errorf("vhost '%s' not found", vhost)
+		}
 	}
-
-	channelsInfo, err := s.broker.ListChannels()
+	channelsInfo, err := s.broker.ListChannels(vhost)
 	if err != nil {
 		return nil, err
 	}
@@ -29,10 +32,6 @@ func (s *Service) ListChannels() ([]models.ChannelDTO, error) {
 }
 
 func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDTO, error) {
-	vh := s.broker.GetVHost("/")
-	if vh == nil {
-		return nil, nil
-	}
 
 	channelsInfo, err := s.broker.ListConnectionChannels(name)
 	if err != nil {

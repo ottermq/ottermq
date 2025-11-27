@@ -66,7 +66,7 @@ type ManagementService interface {
 	/* Channels */
 
 	// ListChannels lists all active channels.
-	ListChannels() ([]models.ChannelDTO, error)
+	ListChannels(vhost string) ([]models.ChannelDTO, error)
 	// ListConnectionChannels lists all channels for a specific connection.
 	ListConnectionChannels(connectionName string) ([]models.ChannelDTO, error)
 	// GetChannel retrieves details of a specific channel within a connection.

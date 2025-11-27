@@ -143,8 +143,23 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Delete("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.DeleteBinding(c, ws.Broker)
 	})
+
+	// Channel routes
+
+	apiGrp.Get("/channels", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListChannels(c, ws.Broker)
+	})
+	apiGrp.Get("/channels/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetChannelbyVhost(c, ws.Broker)
+	})
+
+	// Connection routes
+
 	apiGrp.Get("/connections", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)
+	})
+	apiGrp.Get("/connections/:name/channels", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListConnectionChannels(c, ws.Broker)
 	})
 }
 
