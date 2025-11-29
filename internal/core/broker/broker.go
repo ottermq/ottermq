@@ -674,3 +674,30 @@ func (b *Broker) getChannelCountByVHostUnlocked(vh *vhost.VHost) int {
 	}
 	return count
 }
+
+func (b *Broker) CloseConnection(name string, reason string) error {
+	b.mu.Lock()
+	var targetConn net.Conn
+	for conn := range b.Connections {
+		if string(b.connToID[conn]) == name {
+			targetConn = conn
+			break
+		}
+	}
+	b.mu.Unlock()
+
+	if targetConn == nil || b.Connections[targetConn].ClosingConnection {
+		return nil //nothing to do (idempotent)
+	}
+
+	log.Info().Str("connection", name).Str("reason", reason).Msg("Closing connection by management request")
+	b.sendConnectionClosing(targetConn,
+		0, // channel 0 for connection-level frames
+		uint16(amqp.CONNECTION_FORCED),
+		0,
+		0,
+		reason,
+	)
+	b.setConnectionClosingState(targetConn)
+	return nil
+}

@@ -31,5 +31,8 @@ func (s *Service) GetConnection(name string) (*models.ConnectionInfoDTO, error) 
 }
 
 func (s *Service) CloseConnection(name string, reason string) error {
-	panic("not implemented")
+	if s.broker == nil {
+		return fmt.Errorf("broker not initialized")
+	}
+	return s.broker.CloseConnection(name, reason)
 }

@@ -67,6 +67,10 @@ func (fb *fakeBroker) GetObjectTotalsOverview() models.OverviewObjectTotals {
 	return models.OverviewObjectTotals{}
 }
 
+func (fb *fakeBroker) CloseConnection(name string, reason string) error {
+	return nil
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()

@@ -20,4 +20,5 @@ type BrokerProvider interface {
 	GetBrokerOverviewDetails() models.OverviewBrokerDetails
 	GetOverviewNodeDetails() models.OverviewNodeDetails
 	GetObjectTotalsOverview() models.OverviewObjectTotals
+	CloseConnection(name string, reason string) error
 }
