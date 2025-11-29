@@ -306,7 +306,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/channels/:vhost": {
+        "/channels/{vhost}": {
             "get": {
                 "security": [
                     {
@@ -323,7 +323,7 @@ const docTemplate = `{
                 "tags": [
                     "channels"
                 ],
-                "summary": "Get channels by VHost",
+                "summary": "List channels by VHost",
                 "parameters": [
                     {
                         "type": "string",
@@ -401,46 +401,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to list connections",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connections/:name/channels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a list of all channels for a specific connection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "channels"
-                ],
-                "summary": "List all channels for a specific connection",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ChannelListResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to list channels",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -561,6 +521,61 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to close connection",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/connections/{name}/channels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all channels for a specific connection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "List all channels for a specific connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChannelListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Connection not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list channels",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }

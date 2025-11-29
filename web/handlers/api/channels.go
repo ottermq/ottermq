@@ -32,10 +32,12 @@ func ListChannels(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags channels
 // @Accept json
 // @Produce json
+// @Param name path string true "Connection ID"
 // @Success 200 {object} models.ChannelListResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "Connection not found"
 // @Failure 500 {object} models.ErrorResponse "Failed to list channels"
-// @Router /connections/:name/channels [get]
+// @Router /connections/{name}/channels [get]
 // @Security BearerAuth
 func ListConnectionChannels(c *fiber.Ctx, b *broker.Broker) error {
 	connectionID := c.Params("name")
@@ -51,6 +53,11 @@ func ListConnectionChannels(c *fiber.Ctx, b *broker.Broker) error {
 	}
 	channels, err := b.Management.ListConnectionChannels(connectionID)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+				Error: err.Error(),
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "Failed to get channels: " + err.Error(),
 		})
@@ -60,8 +67,8 @@ func ListConnectionChannels(c *fiber.Ctx, b *broker.Broker) error {
 	})
 }
 
-// GetChannelbyVhost godoc
-// @Summary Get channels by VHost
+// ListChannelsByVhost godoc
+// @Summary List channels by VHost
 // @Description Get a list of all channels for a specific VHost
 // @Tags channels
 // @Accept json
@@ -72,9 +79,9 @@ func ListConnectionChannels(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 404 {object} models.ErrorResponse "VHost not found"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse "Failed to get channels"
-// @Router /channels/:vhost [get]
+// @Router /channels/{vhost} [get]
 // @Security BearerAuth
-func GetChannelbyVhost(c *fiber.Ctx, b *broker.Broker) error {
+func ListChannelsByVhost(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost != "" {
 		decoded, err := url.PathUnescape(vhost)
@@ -91,7 +98,7 @@ func listChannelsByVhost(b *broker.Broker, vhost string, c *fiber.Ctx) error {
 		// TODO: improve error handling by using custom error types
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
-				Error: "VHost not found",
+				Error: err.Error(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{

@@ -162,7 +162,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListChannels(c, ws.Broker)
 	})
 	apiGrp.Get("/channels/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.GetChannelbyVhost(c, ws.Broker)
+		return api.ListChannelsByVhost(c, ws.Broker)
 	})
 	apiGrp.Get("/connections/:name/channels/:channel", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetChannel(c, ws.Broker)
