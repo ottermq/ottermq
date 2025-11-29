@@ -128,6 +128,7 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	connInfo, ok := b.Connections[conn]
 	if !ok {
 		b.mu.Unlock()
+		log.Debug().Msg("cleanupConnection: connection not found in b.Connections")
 		return
 	}
 	vhName := connInfo.VHostName
@@ -136,22 +137,16 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 
 	// Remove from bidirectional maps
 	b.connectionsMu.Lock()
-	connID := b.connToID[conn]
+	connID, hasConnID := b.connToID[conn]
 	delete(b.connections, connID)
 	delete(b.connToID, conn)
 	b.connectionsMu.Unlock()
 
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
-	if vh != nil {
-		connID, ok := b.GetConnectionID(conn)
-		if ok {
-			vh.CleanupConnection(connID)
-		} else {
-			log.Debug().Msg("Connection ID not found during connection cleanup")
-		}
-	} else {
-		log.Debug().Str("vhost", vhName).Msg("VHost not found during connection cleanup")
+	if vh != nil && hasConnID {
+		vh.CleanupConnection(connID)
+		log.Debug().Str("vhost", vhName).Str("conn_id", string(connID)).Msg("Cleaned up connection consumers and channels from vhost")
 	}
 }
 
