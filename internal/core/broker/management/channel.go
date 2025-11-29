@@ -8,7 +8,7 @@ import (
 )
 
 // ListChannels returns all channels across all connections.
-func (s *Service) ListChannels(vhost string) ([]models.ChannelDTO, error) {
+func (s *Service) ListChannels(vhost string) ([]models.ChannelDetailDTO, error) {
 	if vhost != "" {
 		vh := s.broker.GetVHost(vhost)
 		if vh == nil {
@@ -21,7 +21,7 @@ func (s *Service) ListChannels(vhost string) ([]models.ChannelDTO, error) {
 	}
 
 	// Map to DTOs
-	channels := make([]models.ChannelDTO, 0, len(channelsInfo))
+	channels := make([]models.ChannelDetailDTO, 0, len(channelsInfo))
 	for _, chInfo := range channelsInfo {
 
 		chDTO := mapChannelInfoToDTO(chInfo)
@@ -31,7 +31,7 @@ func (s *Service) ListChannels(vhost string) ([]models.ChannelDTO, error) {
 	return channels, nil
 }
 
-func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDTO, error) {
+func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDetailDTO, error) {
 
 	channelsInfo, err := s.broker.ListConnectionChannels(name)
 	if err != nil {
@@ -39,7 +39,7 @@ func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDTO, erro
 	}
 
 	// Map to DTOs
-	channels := make([]models.ChannelDTO, 0, len(channelsInfo))
+	channels := make([]models.ChannelDetailDTO, 0, len(channelsInfo))
 	for _, chInfo := range channelsInfo {
 
 		chDTO := mapChannelInfoToDTO(chInfo)
@@ -49,8 +49,8 @@ func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDTO, erro
 	return channels, nil
 }
 
-func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDTO {
-	chDTO := models.ChannelDTO{
+func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDetailDTO {
+	chDTO := models.ChannelDetailDTO{
 		Number:           chInfo.Number,
 		ConnectionName:   chInfo.ConnectionName,
 		VHost:            chInfo.VHost,
@@ -64,7 +64,7 @@ func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDTO {
 	return chDTO
 }
 
-func (s *Service) GetChannel(connectionName string, channelNumber uint16) (*models.ChannelDTO, error) {
+func (s *Service) GetChannel(connectionName string, channelNumber uint16) (*models.ChannelDetailDTO, error) {
 	vh := s.broker.GetVHost("/")
 	if vh == nil {
 		return nil, nil

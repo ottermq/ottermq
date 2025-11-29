@@ -44,7 +44,6 @@ func (fb *fakeBroker) CreateChannelInfo(connID vhost.ConnectionID, channelNum ui
 }
 
 func (fb *fakeBroker) GetConnectionByName(name string) (*amqp.ConnectionInfo, error) {
-	// For testing purposes, return nil.
 	return nil, nil
 }
 func (fb *fakeBroker) GetOverviewConnStats() models.OverviewConnectionStats {

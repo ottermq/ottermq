@@ -13,7 +13,7 @@ type ConnectionListResponse struct {
 }
 
 type ChannelListResponse struct {
-	Channels []ChannelDTO `json:"channels"`
+	Channels []ChannelDetailDTO `json:"channels"`
 }
 
 type ExchangeListResponse struct {

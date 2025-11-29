@@ -60,7 +60,7 @@ func (s *Service) ListQueueConsumers(vhostName, queueName string) ([]models.Cons
 
 func (s *Service) consumerToDTO(vh *vhost.VHost, queueName string, consumer *vhost.Consumer) models.ConsumerDTO {
 	// Get channel details from connection
-	var channelDetails models.ChannelDetailsDTO
+	var channelDetails models.ChannelInfoDTO
 
 	// Find connection for this consumer
 	connections := s.broker.ListConnections()
@@ -68,7 +68,7 @@ func (s *Service) consumerToDTO(vh *vhost.VHost, queueName string, consumer *vho
 		if conn.VHostName == vh.Name {
 			// Match consumer's channel to connection
 			// This requires adding channel tracking to ConnectionInfo
-			channelDetails = models.ChannelDetailsDTO{
+			channelDetails = models.ChannelInfoDTO{
 				Number:         consumer.Channel,
 				ConnectionName: conn.Client.Conn.RemoteAddr().String(),
 				User:           conn.Client.Config.Username,
