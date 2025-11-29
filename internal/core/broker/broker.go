@@ -422,7 +422,17 @@ func (*Broker) createChannelInfo(connID vhost.ConnectionID, channelNum uint16, v
 		Channel:      channelNum,
 	}
 
+	unackedCount := 0
+	prefetchCount := uint16(0)
 	deliveryState := vh.ChannelDeliveries[channelKey]
+	if deliveryState != nil {
+		if len(deliveryState.UnackedByTag) > 0 {
+			unackedCount = len(deliveryState.UnackedByTag)
+		}
+		if deliveryState.NextPrefetchCount > 0 {
+			prefetchCount = deliveryState.NextPrefetchCount
+		}
+	}
 	inTransaction := false
 	txState := vh.GetTransactionState(channelNum, connID)
 	if txState != nil {
@@ -431,6 +441,7 @@ func (*Broker) createChannelInfo(connID vhost.ConnectionID, channelNum uint16, v
 		txState.Unlock()
 	}
 	channelStateLabel := getChannelState(deliveryState, ch)
+
 	channelInfo := models.ChannelInfo{
 		VHost:            vh.Name,
 		Number:           channelNum,
@@ -438,8 +449,8 @@ func (*Broker) createChannelInfo(connID vhost.ConnectionID, channelNum uint16, v
 		User:             user,
 		State:            channelStateLabel,
 		UnconfirmedCount: 0, // Relevant only when publisher confirms mode is enabled. Not tracked yet.
-		UnackedCount:     len(deliveryState.UnackedByTag),
-		PrefetchCount:    deliveryState.NextPrefetchCount,
+		UnackedCount:     unackedCount,
+		PrefetchCount:    prefetchCount,
 		InTransaction:    inTransaction,
 		ConfirmMode:      false, // Not implemented yet
 	}
