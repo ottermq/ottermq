@@ -648,7 +648,7 @@ DELETE /api/consumers/:vhost/:queue/:tag    # Cancel consumer
 # Channels (NEW)
 GET    /api/channels                        # List all channels
 GET    /api/channels/:vhost                 # List channels for vhost
-GET    /api/connections/:name/channels      # List channels for connection
+GET    /api/connections/:name/channel/:channel      # List channels for connection
 
 # Connections (Enhanced)
 GET    /api/connections                     # List connections (with channel count)
