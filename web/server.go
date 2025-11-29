@@ -152,6 +152,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/consumers/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListVhostConsumers(c, ws.Broker)
 	})
+	apiGrp.Get("/queues/:vhost/:queueName/consumers", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListQueueConsumers(c, ws.Broker)
+	})
 
 	// Channel routes
 

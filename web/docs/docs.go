@@ -700,7 +700,7 @@ const docTemplate = `{
                         "default": "/",
                         "description": "VHost name",
                         "name": "vhost",
-                        "in": "query"
+                        "in": "path"
                     }
                 ],
                 "responses": {
@@ -1223,62 +1223,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/queues/{queueName}/consumers": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a list of consumers for a specific queue",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "consumers"
-                ],
-                "summary": "List consumers for a specific queue",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "/",
-                        "description": "VHost name",
-                        "name": "vhost",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Queue Name",
-                        "name": "queueName",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ConsumerListResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to list consumers for queue",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/queues/{vhost}/": {
             "post": {
                 "security": [
@@ -1342,6 +1286,68 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queueName}/consumers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of consumers for a specific queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "consumers"
+                ],
+                "summary": "List consumers for a specific queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue Name",
+                        "name": "queueName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ConsumerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Object not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list consumers for queue",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }

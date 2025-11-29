@@ -37,7 +37,7 @@ func ListConsumers(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags consumers
 // @Accept json
 // @Produce json
-// @Param vhost query string false "VHost name" default(/)
+// @Param vhost path string false "VHost name" default(/)
 // @Success 200 {object} models.ConsumerListResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse "Failed to list consumers for queue"
@@ -70,16 +70,35 @@ func ListVhostConsumers(c *fiber.Ctx, b *broker.Broker) error {
 // @Tags consumers
 // @Accept json
 // @Produce json
-// @Param vhost query string false "VHost name" default(/)
+// @Param vhost path string false "VHost name" default(/)
 // @Param queueName path string true "Queue Name"
 // @Success 200 {object} models.ConsumerListResponse
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "Object not found"
 // @Failure 500 {object} models.ErrorResponse "Failed to list consumers for queue"
-// @Router /queues/{queueName}/consumers [get]
+// @Router /queues/{vhost}/{queueName}/consumers [get]
 // @Security BearerAuth
 func ListQueueConsumers(c *fiber.Ctx, b *broker.Broker) error {
-	vhost := c.Query("vhost", "/")
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
 	queueName := c.Params("queueName")
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Queue name is required",
+		})
+	} else {
+		decoded, err := url.PathUnescape(queueName)
+		if err == nil {
+			queueName = decoded
+		}
+	}
 
 	consumers, err := b.Management.ListQueueConsumers(vhost, queueName)
 	if err != nil {
