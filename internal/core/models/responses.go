@@ -16,6 +16,10 @@ type ChannelListResponse struct {
 	Channels []ChannelDetailDTO `json:"channels"`
 }
 
+type VHostListResponse struct {
+	VHosts []VHostDTO `json:"vhosts"`
+}
+
 type ExchangeListResponse struct {
 	Exchanges []ExchangeDTO `json:"exchanges"`
 }
