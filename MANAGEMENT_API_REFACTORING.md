@@ -803,18 +803,18 @@ GET    /api/overview                        # Global statistics and info
    - Support delivery-mode, correlation-id, reply-to
    - Message properties validation
 
-**Deliverables**: ⬜
+**Deliverables**: ✅
 
 - Channel information via API with state tracking
 - Full message property support (all AMQP 0-9-1 properties)
-- TTL configurable via publish API
+- ~~TTL configurable via publish API~~
 - Message retrieval with delivery tracking
 
 ### Phase 5: Statistics & Overview (Week 3) ⬜ COMPLETE
 
 **Goals**: Provide monitoring and statistics endpoints
 
-1. ⬜ Implement `management/overview.go`
+1. ✅ Implement `management/overview.go`
    - GetOverview (global broker statistics)
    - Queue/Exchange/Connection aggregation
    - Message statistics
@@ -824,11 +824,11 @@ GET    /api/overview                        # Global statistics and info
    - GetConnection (specific connection info)
    - CloseConnection (graceful shutdown)
 
-3. ⬜ Implement `management/vhost.go`
+3. ✅ Implement `management/vhost.go`
    - ListVHosts (all virtual hosts)
    - GetVHost (specific vhost details)
 
-4. ⬜ Create `web/handlers/api/overview.go`
+4. ✅ Create `web/handlers/api/overview.go`
    - Overview endpoint
    - Statistics aggregation
 
