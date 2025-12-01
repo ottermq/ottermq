@@ -46,7 +46,14 @@ func MapConnectionInfoDTO(connection amqp.ConnectionInfo) ConnectionInfoDTO {
 	return connInfo
 }
 
+// VHostDTO represents a virtual host.
 type VHostDTO struct {
+	Name             string   `json:"name"`
+	Users            []string `json:"users,omitempty"` // list of users with access to this vhost
+	State            string   `json:"state"`           // "running", "idle"
+	UnconfirmedCount int      `json:"unconfirmed_count"`
+	PrefetchCount    uint16   `json:"prefetch_count"`
+	UnackedCount     int      `json:"unacked_count"`
 }
 
 type QueueDTO struct {
