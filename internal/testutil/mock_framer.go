@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -135,4 +136,36 @@ func (m *MockFramer) CreateTxCommitOkFrame(channel uint16) []byte {
 
 func (m *MockFramer) CreateTxRollbackOkFrame(channel uint16) []byte {
 	return []byte("tx-rollback-ok")
+}
+
+// MockFrameSender is a test double for vhost.FrameSender interface
+type MockFrameSender struct {
+	SentFrames []SentFrame
+	SendError  error
+}
+
+type SentFrame struct {
+	ConnID  string
+	Channel uint16
+	Frame   []byte
+}
+
+// SendFrame implements the FrameSender interface
+// Uses interface{} for connID to avoid importing vhost package
+func (m *MockFrameSender) SendFrame(connID interface{}, channel uint16, frame []byte) error {
+	if m.SendError != nil {
+		return m.SendError
+	}
+	// Convert connID to string for recording
+	connIDStr := ""
+	if connID != nil {
+		// Use Sprintf to convert any type to string safely
+		connIDStr = fmt.Sprintf("%v", connID)
+	}
+	m.SentFrames = append(m.SentFrames, SentFrame{
+		ConnID:  connIDStr,
+		Channel: channel,
+		Frame:   frame,
+	})
+	return nil
 }

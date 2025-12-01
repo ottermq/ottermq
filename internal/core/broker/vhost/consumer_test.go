@@ -77,9 +77,8 @@ func createTestVHost() *VHost {
 
 func TestRegisterConsumer_ValidConsumer(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
-
-	consumer := NewConsumer(conn, 1, "test-queue", "test-consumer", &ConsumerProperties{
+	connID := newTestConsumerConnID()
+	consumer := NewConsumer(connID, 1, "test-queue", "test-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -114,7 +113,7 @@ func TestRegisterConsumer_ValidConsumer(t *testing.T) {
 	}
 
 	// Check channel index
-	channelKey := ConnectionChannelKey{conn, 1}
+	channelKey := ConnectionChannelKey{connID, 1}
 	channelConsumers := vh.ConsumersByChannel[channelKey]
 	if len(channelConsumers) != 1 {
 		t.Errorf("Expected 1 consumer in channel index, got %d", len(channelConsumers))
@@ -125,9 +124,9 @@ func TestRegisterConsumer_ValidConsumer(t *testing.T) {
 
 func TestRegisterConsumer_NonExistentQueue(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
-	consumer := NewConsumer(conn, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{
+	consumer := NewConsumer(connID, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -152,10 +151,10 @@ func TestRegisterConsumer_NonExistentQueue(t *testing.T) {
 
 func TestRegisterConsumer_DuplicateConsumer(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register first consumer
-	consumer1 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{
+	consumer1 := NewConsumer(connID, 1, "test-queue", "duplicate-tag", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -167,7 +166,7 @@ func TestRegisterConsumer_DuplicateConsumer(t *testing.T) {
 	}
 
 	// Try to register second consumer with same tag and channel
-	consumer2 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{
+	consumer2 := NewConsumer(connID, 1, "test-queue", "duplicate-tag", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -192,10 +191,10 @@ func TestRegisterConsumer_DuplicateConsumer(t *testing.T) {
 
 func TestRegisterConsumer_ExclusiveConsumerExists(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register exclusive consumer
-	exclusiveConsumer := NewConsumer(conn, 1, "test-queue", "exclusive-consumer", &ConsumerProperties{
+	exclusiveConsumer := NewConsumer(connID, 1, "test-queue", "exclusive-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: true,
 		Arguments: nil,
@@ -207,7 +206,7 @@ func TestRegisterConsumer_ExclusiveConsumerExists(t *testing.T) {
 	}
 
 	// Try to register another consumer on the same queue
-	normalConsumer := NewConsumer(conn, 2, "test-queue", "normal-consumer", &ConsumerProperties{
+	normalConsumer := NewConsumer(connID, 2, "test-queue", "normal-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -227,10 +226,10 @@ func TestRegisterConsumer_ExclusiveConsumerExists(t *testing.T) {
 
 func TestRegisterConsumer_ExclusiveConsumerWithExistingConsumers(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register normal consumer first
-	normalConsumer := NewConsumer(conn, 1, "test-queue", "normal-consumer", &ConsumerProperties{
+	normalConsumer := NewConsumer(connID, 1, "test-queue", "normal-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -242,7 +241,7 @@ func TestRegisterConsumer_ExclusiveConsumerWithExistingConsumers(t *testing.T) {
 	}
 
 	// Try to register exclusive consumer when others exist
-	exclusiveConsumer := NewConsumer(conn, 2, "test-queue", "exclusive-consumer", &ConsumerProperties{
+	exclusiveConsumer := NewConsumer(connID, 2, "test-queue", "exclusive-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: true,
 		Arguments: nil,
@@ -262,10 +261,10 @@ func TestRegisterConsumer_ExclusiveConsumerWithExistingConsumers(t *testing.T) {
 
 func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register consumer on channel 1
-	consumer1 := NewConsumer(conn, 1, "test-queue", "consumer-1", &ConsumerProperties{
+	consumer1 := NewConsumer(connID, 1, "test-queue", "consumer-1", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -277,7 +276,7 @@ func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 	}
 
 	// Register consumer on channel 2
-	consumer2 := NewConsumer(conn, 2, "test-queue", "consumer-2", &ConsumerProperties{
+	consumer2 := NewConsumer(connID, 2, "test-queue", "consumer-2", &ConsumerProperties{
 		NoAck:     true,
 		Exclusive: false,
 		Arguments: nil,
@@ -300,13 +299,13 @@ func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 	}
 
 	// Check channel indexes
-	channel1Key := ConnectionChannelKey{conn, 1}
+	channel1Key := ConnectionChannelKey{connID, 1}
 	channel1Consumers := vh.ConsumersByChannel[channel1Key]
 	if len(channel1Consumers) != 1 {
 		t.Errorf("Expected 1 consumer on channel 1, got %d", len(channel1Consumers))
 	}
 
-	channel2Key := ConnectionChannelKey{conn, 2}
+	channel2Key := ConnectionChannelKey{connID, 2}
 	channel2Consumers := vh.ConsumersByChannel[channel2Key]
 	if len(channel2Consumers) != 1 {
 		t.Errorf("Expected 1 consumer on channel 2, got %d", len(channel2Consumers))
@@ -315,10 +314,10 @@ func TestRegisterConsumer_MultipleConsumersOnDifferentChannels(t *testing.T) {
 
 func TestCancelConsumer_ValidConsumer(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register consumer first
-	consumer := NewConsumer(conn, 1, "test-queue", "test-consumer", &ConsumerProperties{
+	consumer := NewConsumer(connID, 1, "test-queue", "test-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -347,7 +346,7 @@ func TestCancelConsumer_ValidConsumer(t *testing.T) {
 		t.Errorf("Expected 0 consumers in queue index, got %d", len(queueConsumers))
 	}
 
-	channelKey := ConnectionChannelKey{conn, 1}
+	channelKey := ConnectionChannelKey{connID, 1}
 	channelConsumers := vh.ConsumersByChannel[channelKey]
 	if len(channelConsumers) != 0 {
 		t.Errorf("Expected 0 consumers in channel index, got %d", len(channelConsumers))
@@ -371,16 +370,16 @@ func TestCancelConsumer_NonExistentConsumer(t *testing.T) {
 
 func TestCleanupChannel(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register multiple consumers on the same channel
-	consumer1 := NewConsumer(conn, 1, "test-queue", "consumer-1", &ConsumerProperties{
+	consumer1 := NewConsumer(connID, 1, "test-queue", "consumer-1", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
 	})
 
-	consumer2 := NewConsumer(conn, 1, "test-queue", "consumer-2", &ConsumerProperties{
+	consumer2 := NewConsumer(connID, 1, "test-queue", "consumer-2", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -402,7 +401,7 @@ func TestCleanupChannel(t *testing.T) {
 	}
 
 	// Cleanup the channel
-	vh.CleanupChannel(conn, 1)
+	vh.CleanupChannel(connID, 1)
 
 	// Check that all consumers on the channel were removed
 	if len(vh.Consumers) != 0 {
@@ -416,7 +415,7 @@ func TestCleanupChannel(t *testing.T) {
 	}
 
 	// Check that channel index is cleaned up
-	channelKey := ConnectionChannelKey{conn, 1}
+	channelKey := ConnectionChannelKey{connID, 1}
 	if _, exists := vh.ConsumersByChannel[channelKey]; exists {
 		t.Error("Channel index should have been cleaned up")
 	}
@@ -424,23 +423,23 @@ func TestCleanupChannel(t *testing.T) {
 
 func TestCleanupConnection(t *testing.T) {
 	vh := createTestVHost()
-	conn1 := NewMockConnection("conn-1")
-	conn2 := NewMockConnection("conn-2")
+	connId1 := newTestConsumerConnID()
+	connId2 := newTestConsumerConnID()
 
 	// Register consumers on different connections and channels
-	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer-1", &ConsumerProperties{
+	consumer1 := NewConsumer(connId1, 1, "test-queue", "consumer-1", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
 	})
 
-	consumer2 := NewConsumer(conn1, 2, "test-queue", "consumer-2", &ConsumerProperties{
+	consumer2 := NewConsumer(connId1, 2, "test-queue", "consumer-2", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
 	})
 
-	consumer3 := NewConsumer(conn2, 1, "test-queue", "consumer-3", &ConsumerProperties{
+	consumer3 := NewConsumer(connId2, 1, "test-queue", "consumer-3", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -467,7 +466,7 @@ func TestCleanupConnection(t *testing.T) {
 	}
 
 	// Cleanup connection 1
-	vh.CleanupConnection(conn1)
+	vh.CleanupConnection(connId1)
 
 	// Check that only consumers from conn1 were removed
 	if len(vh.Consumers) != 1 {
@@ -476,7 +475,7 @@ func TestCleanupConnection(t *testing.T) {
 
 	// Check that remaining consumer is from conn2
 	for _, consumer := range vh.Consumers {
-		if consumer.Connection != conn2 {
+		if consumer.ConnectionID != connId2 {
 			t.Error("Remaining consumer should be from conn2")
 		}
 	}
@@ -492,17 +491,17 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	// This test demonstrates the fix for the bug where CleanupChannel
 	// would clean up channels with the same number from different connections
 	vh := createTestVHost()
-	connA := NewMockConnection("conn-A")
-	connB := NewMockConnection("conn-B")
+	connIdA := newTestConsumerConnID()
+	connIdB := newTestConsumerConnID()
 
 	// Both connections have consumers on channel 1 (same channel number!)
-	consumerA1 := NewConsumer(connA, 1, "test-queue", "consumer-A1", &ConsumerProperties{
+	consumerA1 := NewConsumer(connIdA, 1, "test-queue", "consumer-A1", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
 	})
 
-	consumerB1 := NewConsumer(connB, 1, "test-queue", "consumer-B1", &ConsumerProperties{
+	consumerB1 := NewConsumer(connIdB, 1, "test-queue", "consumer-B1", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -525,7 +524,7 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	}
 
 	// Cleanup channel 1 on connection A only
-	vh.CleanupChannel(connA, 1)
+	vh.CleanupChannel(connIdA, 1)
 
 	// BUG FIX VERIFICATION: Only consumer A1 should be removed, B1 should remain
 	if len(vh.Consumers) != 1 {
@@ -537,7 +536,7 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	remainingConsumer, exists := vh.Consumers[keyB]
 	if !exists {
 		t.Error("Consumer B1 should still exist after cleaning up channel 1 on connection A")
-	} else if remainingConsumer.Connection != connB {
+	} else if remainingConsumer.ConnectionID != connIdB {
 		t.Error("Remaining consumer should be from connection B")
 	}
 
@@ -548,8 +547,8 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	}
 
 	// Check connection-scoped channel indexes
-	channelKeyA := ConnectionChannelKey{connA, 1}
-	channelKeyB := ConnectionChannelKey{connB, 1}
+	channelKeyA := ConnectionChannelKey{connIdA, 1}
+	channelKeyB := ConnectionChannelKey{connIdB, 1}
 
 	if _, exists := vh.ConsumersByChannel[channelKeyA]; exists {
 		t.Error("Channel index for connection A should have been cleaned up")
@@ -562,10 +561,10 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 
 func TestRegisterConsumer_GeneratesTagWhenEmpty(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Create consumer with empty tag
-	consumer := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{
+	consumer := NewConsumer(connID, 1, "test-queue", "", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
@@ -600,9 +599,9 @@ func TestRegisterConsumer_GeneratesTagWhenEmpty(t *testing.T) {
 }
 
 func TestNewConsumer_WithTag(t *testing.T) {
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
-	consumer := NewConsumer(conn, 2, "my-queue", "my-consumer-tag", &ConsumerProperties{
+	consumer := NewConsumer(connID, 2, "my-queue", "my-consumer-tag", &ConsumerProperties{
 		NoAck:     true,
 		Exclusive: true,
 		Arguments: map[string]any{"key": "value"},
@@ -620,7 +619,7 @@ func TestNewConsumer_WithTag(t *testing.T) {
 		t.Errorf("Expected queue name 'my-queue', got '%s'", consumer.QueueName)
 	}
 
-	if consumer.Connection != conn {
+	if consumer.ConnectionID != connID {
 		t.Error("Consumer connection should match provided connection")
 	}
 
@@ -645,12 +644,12 @@ func TestNewConsumer_WithTag(t *testing.T) {
 
 func TestRegisterConsumer_EmptyTagUniqueness(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register multiple consumers with empty tags on the same channel
-	consumer1 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
-	consumer2 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
-	consumer3 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer1 := NewConsumer(connID, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connID, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer3 := NewConsumer(connID, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
 
 	// Register all consumers
 	_, err := vh.RegisterConsumer(consumer1)
@@ -707,10 +706,10 @@ func TestRegisterConsumer_EmptyTagRetryLimit(t *testing.T) {
 	// We can't easily test the actual retry limit without mocking the random generator,
 	// but we can verify that normal operation works
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Create and register a consumer with empty tag
-	consumer := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer := NewConsumer(connID, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
 
 	_, err := vh.RegisterConsumer(consumer)
 	if err != nil {
@@ -731,10 +730,10 @@ func TestRegisterConsumer_EmptyTagRetryLimit(t *testing.T) {
 // Tests for delivery functionality
 func TestConsumerRegistrationAndCancellation(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Create consumer
-	consumer := NewConsumer(conn, 1, "test-queue", "test-consumer", &ConsumerProperties{NoAck: false})
+	consumer := NewConsumer(connID, 1, "test-queue", "test-consumer", &ConsumerProperties{NoAck: false})
 
 	// Test successful registration
 	_, err := vh.RegisterConsumer(consumer)
@@ -789,11 +788,11 @@ func TestConsumerRegistrationAndCancellation(t *testing.T) {
 
 func TestExclusiveConsumerLogic(t *testing.T) {
 	vh := createTestVHost()
-	conn1 := NewMockConnection("conn1")
-	conn2 := NewMockConnection("conn2")
+	connId1 := newTestConsumerConnID()
+	connId2 := newTestConsumerConnID()
 
 	// Register first consumer as exclusive
-	consumer1 := NewConsumer(conn1, 1, "test-queue", "exclusive-consumer", &ConsumerProperties{
+	consumer1 := NewConsumer(connId1, 1, "test-queue", "exclusive-consumer", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: true,
 	})
@@ -808,7 +807,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 	}
 
 	// Try to register second consumer (should fail due to exclusive)
-	consumer2 := NewConsumer(conn2, 1, "test-queue", "second-consumer", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connId2, 1, "test-queue", "second-consumer", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer2)
 	if err == nil {
 		t.Error("Expected error when registering second consumer with exclusive consumer present")
@@ -835,7 +834,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 	}
 
 	// Now should be able to register new consumer
-	consumer3 := NewConsumer(conn2, 1, "test-queue", "new-consumer", &ConsumerProperties{NoAck: false})
+	consumer3 := NewConsumer(connId2, 1, "test-queue", "new-consumer", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer after exclusive removed: %v", err)
@@ -851,7 +850,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 	}
 
 	// Test that regular consumers can coexist
-	consumer4 := NewConsumer(conn1, 2, "test-queue", "third-consumer", &ConsumerProperties{NoAck: false})
+	consumer4 := NewConsumer(connId1, 2, "test-queue", "third-consumer", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer4)
 	if err != nil {
 		t.Fatalf("Failed to register third consumer: %v", err)
@@ -867,7 +866,7 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 	}
 
 	// Now try to register exclusive consumer (should fail with existing consumers)
-	consumer5 := NewConsumer(conn1, 3, "test-queue", "late-exclusive", &ConsumerProperties{
+	consumer5 := NewConsumer(connId1, 3, "test-queue", "late-exclusive", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: true,
 	})
@@ -884,23 +883,23 @@ func TestExclusiveConsumerLogic(t *testing.T) {
 
 func TestConsumerCleanupOnConnectionClose(t *testing.T) {
 	vh := createTestVHost()
-	conn1 := NewMockConnection("conn1")
-	conn2 := NewMockConnection("conn2")
+	connId1 := newTestConsumerConnID()
+	connId2 := newTestConsumerConnID()
 
 	// Register consumers from both connections
-	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	consumer1 := NewConsumer(connId1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
 	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
-	consumer2 := NewConsumer(conn1, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connId1, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
 
-	consumer3 := NewConsumer(conn2, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
+	consumer3 := NewConsumer(connId2, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer3: %v", err)
@@ -916,7 +915,7 @@ func TestConsumerCleanupOnConnectionClose(t *testing.T) {
 	}
 
 	// Clean up conn1 consumers
-	vh.CleanupConnection(conn1)
+	vh.CleanupConnection(connId1)
 
 	// Verify only conn2 consumer remains
 	if len(vh.Consumers) != 1 {
@@ -959,16 +958,16 @@ func TestConsumerCleanupOnConnectionClose(t *testing.T) {
 
 func TestConsumerChannelCleanup(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Register consumers on different channels
-	consumer1 := NewConsumer(conn, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	consumer1 := NewConsumer(connID, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
 	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
-	consumer2 := NewConsumer(conn, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connID, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
@@ -980,7 +979,7 @@ func TestConsumerChannelCleanup(t *testing.T) {
 	}
 
 	// Clean up only channel 1
-	vh.CleanupChannel(conn, 1)
+	vh.CleanupChannel(connID, 1)
 
 	// Verify only consumer2 remains
 	if len(vh.Consumers) != 1 {
@@ -1017,24 +1016,24 @@ func TestConsumerChannelCleanup(t *testing.T) {
 
 func TestRoundRobinConsumerRotation(t *testing.T) {
 	vh := createTestVHost()
-	conn1 := NewMockConnection("conn1")
-	conn2 := NewMockConnection("conn2")
-	conn3 := NewMockConnection("conn3")
+	connId1 := newTestConsumerConnID()
+	connId2 := newTestConsumerConnID()
+	connId3 := newTestConsumerConnID()
 
 	// Register three consumers
-	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	consumer1 := NewConsumer(connId1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
 	_, err := vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register consumer1: %v", err)
 	}
 
-	consumer2 := NewConsumer(conn2, 1, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connId2, 1, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer2)
 	if err != nil {
 		t.Fatalf("Failed to register consumer2: %v", err)
 	}
 
-	consumer3 := NewConsumer(conn3, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
+	consumer3 := NewConsumer(connId3, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer3)
 	if err != nil {
 		t.Fatalf("Failed to register consumer3: %v", err)
@@ -1095,7 +1094,7 @@ func TestRoundRobinConsumerRotation(t *testing.T) {
 
 func TestConsumerEdgeCases(t *testing.T) {
 	vh := createTestVHost()
-	conn := NewMockConnection("test-conn")
+	connID := newTestConsumerConnID()
 
 	// Test getting consumers for non-existent queue
 	consumers := vh.GetActiveConsumersForQueue("non-existent-queue")
@@ -1110,7 +1109,7 @@ func TestConsumerEdgeCases(t *testing.T) {
 	}
 
 	// Test registering consumer for non-existent queue
-	consumer := NewConsumer(conn, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{NoAck: false})
+	consumer := NewConsumer(connID, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{NoAck: false})
 	_, err := vh.RegisterConsumer(consumer)
 	if err == nil {
 		t.Error("Expected error when registering consumer for non-existent queue")
@@ -1122,13 +1121,13 @@ func TestConsumerEdgeCases(t *testing.T) {
 	}
 
 	// Test duplicate consumer registration
-	consumer1 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
+	consumer1 := NewConsumer(connID, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer1)
 	if err != nil {
 		t.Fatalf("Failed to register first consumer: %v", err)
 	}
 
-	consumer2 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(connID, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
 	_, err = vh.RegisterConsumer(consumer2)
 	if err == nil {
 		t.Error("Expected error when registering duplicate consumer")

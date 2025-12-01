@@ -5,22 +5,29 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/broker/management"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/memento"
 	"github.com/rs/zerolog/log"
 
 	_ "github.com/andrelcunha/ottermq/internal/persistdb"
 )
 
 const (
-	platform = "golang"
-	product  = "OtterMQ"
+	PLATFORM         = "golang"
+	PRODUCT          = "OtterMQ"
+	DEFAULT_PROTOCOL = "AMQP 0-9-1"
 )
 
 type Broker struct {
@@ -30,20 +37,25 @@ type Broker struct {
 	Connections  map[net.Conn]*amqp.ConnectionInfo `json:"-"`
 	mu           sync.Mutex                        `json:"-"`
 	framer       amqp.Framer
-	ManagerApi   ManagerApi
 	ShuttingDown atomic.Bool
 	ActiveConns  sync.WaitGroup
 	rootCtx      context.Context
 	rootCancel   context.CancelFunc
 	persist      persistence.Persistence
 	Ready        chan struct{} // Signals when the broker is ready to accept connections
+	Management   management.ManagementService
+
+	connections   map[vhost.ConnectionID]net.Conn
+	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
+	connectionsMu sync.RWMutex
+	startedAt     time.Time
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
 	// Create persistence layer based on config
 	persistConfig := &persistence.Config{
 		Type:    "json", // from config or env var
-		DataDir: "data",
+		DataDir: config.DataDir,
 		Options: make(map[string]string),
 	}
 	persist, err := json.NewJsonPersistence(persistConfig)
@@ -54,11 +66,14 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	b := &Broker{
 		VHosts:      make(map[string]*vhost.VHost),
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connections: make(map[vhost.ConnectionID]net.Conn),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		config:      config,
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
 		persist:     persist,
 		Ready:       make(chan struct{}),
+		startedAt:   time.Now(),
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
@@ -67,10 +82,16 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-	b.VHosts["/"] = vhost.NewVhost("/", options)
+
+	defaultVHost := vhost.NewVhost("/", options)
+	b.VHosts["/"] = defaultVHost
+
 	b.framer = &amqp.DefaultFramer{}
 	b.VHosts["/"].SetFramer(b.framer)
-	b.ManagerApi = &DefaultManagerApi{b}
+
+	defaultVHost.SetFrameSender(b)
+
+	b.Management = management.NewService(b)
 	return b
 }
 
@@ -117,6 +138,7 @@ Y88b. .d88P Y88b. Y88b. Y8b.    888    888   "   888Y88b.Y8b88P
 
 func (b *Broker) setConfigurations() map[string]any {
 	capabilities := map[string]any{
+		// TODO: dynamically set capabilities based on enabled features
 		"basic.nack":             true,
 		"connection.blocked":     true,
 		"consumer_cancel_notify": true,
@@ -125,9 +147,9 @@ func (b *Broker) setConfigurations() map[string]any {
 
 	serverProperties := map[string]any{
 		"capabilities": capabilities,
-		"product":      product,
+		"product":      PRODUCT,
 		"version":      b.config.Version,
-		"platform":     platform,
+		"platform":     PLATFORM,
 	}
 
 	configurations := map[string]any{
@@ -138,7 +160,7 @@ func (b *Broker) setConfigurations() map[string]any {
 		"frameMax":          b.config.FrameMax,
 		"channelMax":        b.config.ChannelMax,
 		"ssl":               b.config.Ssl,
-		"protocol":          "AMQP 0-9-1",
+		"protocol":          DEFAULT_PROTOCOL,
 	}
 	return configurations
 }
@@ -232,8 +254,26 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.TX):
 		return b.txHandler(request, vh, conn)
 	default:
-		return nil, fmt.Errorf("unsupported command")
+		log.Debug().Uint16("class_id", request.ClassID).Msg("Unsupported class ID")
+		b.sendConnectionClosing(conn,
+			request.Channel,
+			uint16(amqp.COMMAND_INVALID),
+			uint16(request.ClassID),
+			uint16(request.MethodID),
+			fmt.Sprintf("unsupported class ID %d", request.ClassID),
+		)
+		b.setConnectionClosingState(conn)
+		return nil, nil
 	}
+}
+
+// isConnectionClosing checks if the connection is in the process of closing.
+// Shall be called after sending a connection closing frame.
+// Must be called with b.mu unlocked.
+func (b *Broker) setConnectionClosingState(conn net.Conn) {
+	b.mu.Lock()
+	b.Connections[conn].ClosingConnection = true
+	b.mu.Unlock()
 }
 
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
@@ -256,8 +296,468 @@ func (b *Broker) GetVHost(vhostName string) *vhost.VHost {
 	return nil
 }
 
+func (b *Broker) ListVHosts() []*vhost.VHost {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vhosts := make([]*vhost.VHost, 0, len(b.VHosts))
+	for _, vh := range b.VHosts {
+		vhosts = append(vhosts, vh)
+	}
+	return vhosts
+}
+
+// ListConnections returns all active connections in the broker.
+func (b *Broker) ListConnections() []amqp.ConnectionInfo {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	connections := make([]amqp.ConnectionInfo, 0, len(b.Connections))
+	for _, c := range b.Connections {
+		connections = append(connections, *c)
+	}
+	return connections
+}
+
+// listConnectionsPerVhosts returns a map of vhost names to their respective connections.
+func (b *Broker) listConnectionsPerVhostsUnlocked() map[string][]amqp.ConnectionInfo {
+	vhostConnections := make(map[string][]amqp.ConnectionInfo)
+	for _, c := range b.Connections {
+		vhostName := c.VHostName
+		vhostConnections[vhostName] = append(vhostConnections[vhostName], *c)
+	}
+	return vhostConnections
+}
+
+func (b *Broker) GetConnectionByName(name string) (*amqp.ConnectionInfo, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, c := range b.Connections {
+		if string(b.connToID[c.Client.Conn]) == name {
+			return c, nil
+		}
+	}
+	return nil, fmt.Errorf("connection '%s' not found", name)
+}
+
 func (b *Broker) Shutdown() {
 	for conn := range b.Connections {
 		conn.Close()
 	}
+}
+
+// ListVhostDetails returns details of all vhosts in the broker.
+func (b *Broker) ListVhostDetails() ([]models.VHostDTO, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// create a map with vhost name to channel info
+	vhosts := make([]models.VHostDTO, 0, len(b.VHosts))
+	// channelsPerVhost := make(map[string]models.ChannelInfo)
+	for _, vh := range b.VHosts {
+		VHostDTO, err := b.CreateVhostDto(vh)
+		if err != nil {
+			return nil, err
+		}
+		vhosts = append(vhosts, VHostDTO)
+	}
+	return vhosts, nil
+}
+
+func (b *Broker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
+	channels, err := b.ListChannels(vh.Name)
+	if err != nil {
+		return models.VHostDTO{}, err
+	}
+	var users map[string]bool = make(map[string]bool)
+	var unconfirmed_count, unacked_count int
+	var prefetch_count uint16 = 0
+	for _, ch := range channels {
+		users[ch.User] = true
+		unconfirmed_count += ch.UnconfirmedCount
+		prefetch_count += ch.PrefetchCount
+		unacked_count += ch.UnackedCount
+	}
+
+	// Convert users map keys to a slice
+	userList := make([]string, 0, len(users))
+	for user := range users {
+		userList = append(userList, user)
+	}
+
+	VHostDTO := models.VHostDTO{
+		Name:             vh.Name,
+		Users:            userList,
+		State:            "running", // Currently, if the vhost exists, it's running
+		UnconfirmedCount: unconfirmed_count,
+		PrefetchCount:    prefetch_count,
+		UnackedCount:     unacked_count,
+	}
+	return VHostDTO, nil
+}
+
+// ListChannels returns all channels across all connections.
+func (b *Broker) ListChannels(vhost string) ([]models.ChannelInfo, error) {
+	filterSet := vhost != ""
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	channels := make([]models.ChannelInfo, 0, len(b.Connections))
+	if filterSet {
+		for conn, c := range b.Connections {
+			if c.VHostName == vhost {
+				channels = append(channels, b.listChannelsByConnection(c, conn)...)
+			}
+		}
+	} else { // filter not set
+		for conn, c := range b.Connections {
+			channels = append(channels, b.listChannelsByConnection(c, conn)...)
+		}
+	}
+
+	return channels, nil
+}
+
+func (b *Broker) ListConnectionChannels(connName string) ([]models.ChannelInfo, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for conn, c := range b.Connections {
+		if connName == string(b.connToID[conn]) {
+			return b.listChannelsByConnection(c, conn), nil
+		}
+	}
+	return nil, fmt.Errorf("connection '%s' not found", connName)
+}
+
+// ListConnectionChannels returns all channels for a specific connection.
+func (b *Broker) listChannelsByConnection(connInfo *amqp.ConnectionInfo, conn net.Conn) []models.ChannelInfo {
+	channels := make([]models.ChannelInfo, 0, len(b.Connections))
+	vhostName := connInfo.VHostName
+	vh := b.VHosts[vhostName]
+	user := connInfo.Client.Config.Username
+	connID := b.connToID[conn]
+	for channelNum, ch := range connInfo.Channels {
+		channelInfo, err := b.createChannelInfo(connID, channelNum, vh, ch, user)
+		if err != nil {
+			log.Debug().Err(err).Msg("Failed to create channel summary")
+			continue
+		}
+		channels = append(channels, channelInfo)
+	}
+	return channels
+}
+
+func (b *Broker) CreateChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost) (models.ChannelInfo, error) {
+	b.mu.Lock()
+	connInfo := b.Connections[b.connections[connID]]
+	ch := connInfo.Channels[channelNum]
+	user := connInfo.Client.Config.Username
+	b.mu.Unlock()
+	return b.createChannelInfo(connID, channelNum, vh, ch, user)
+}
+
+// createChannelInfo creates a summary of the channel state.
+func (*Broker) createChannelInfo(connID vhost.ConnectionID, channelNum uint16, vh *vhost.VHost, ch *amqp.ChannelState, user string) (models.ChannelInfo, error) {
+	if connID == "" {
+		return models.ChannelInfo{}, fmt.Errorf("connection ID is empty")
+	}
+
+	if vh == nil {
+		return models.ChannelInfo{}, fmt.Errorf("vhost is nil")
+	}
+
+	if ch == nil {
+		return models.ChannelInfo{}, fmt.Errorf("channel state is nil")
+	}
+
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: connID,
+		Channel:      channelNum,
+	}
+
+	unackedCount := 0
+	prefetchCount := uint16(0)
+	deliveryState := vh.ChannelDeliveries[channelKey]
+	if deliveryState != nil {
+		if len(deliveryState.UnackedByTag) > 0 {
+			unackedCount = len(deliveryState.UnackedByTag)
+		}
+		if deliveryState.NextPrefetchCount > 0 {
+			prefetchCount = deliveryState.NextPrefetchCount
+		}
+	}
+	inTransaction := false
+	txState := vh.GetTransactionState(channelNum, connID)
+	if txState != nil {
+		txState.Lock()
+		inTransaction = txState.InTransaction
+		txState.Unlock()
+	}
+	channelStateLabel := getChannelState(deliveryState, ch)
+
+	channelInfo := models.ChannelInfo{
+		VHost:            vh.Name,
+		Number:           channelNum,
+		ConnectionName:   string(connID),
+		User:             user,
+		State:            channelStateLabel,
+		UnconfirmedCount: 0, // Relevant only when publisher confirms mode is enabled. Not tracked yet.
+		UnackedCount:     unackedCount,
+		PrefetchCount:    prefetchCount,
+		InTransaction:    inTransaction,
+		ConfirmMode:      false, // Not implemented yet
+	}
+	return channelInfo, nil
+}
+
+// getChannelState returns the state of the channel as a string ("running" or "flow").
+func getChannelState(deliveryState *vhost.ChannelDeliveryState, channelState *amqp.ChannelState) string {
+	if channelState != nil && channelState.ClosingChannel {
+		return "closing"
+	}
+	if deliveryState != nil && !deliveryState.FlowActive {
+		return "flow"
+	}
+	return "running"
+}
+
+func GenerateConnectionID(conn net.Conn) string {
+	// connID := fmt.Sprintf("%s:%s", conn.RemoteAddr().String(), uuid.New().String()[:8])
+	connID := fmt.Sprintf("%s", conn.RemoteAddr().String())
+	return connID
+}
+
+// GetConnectionID returns the ConnectionID for a given net.Conn
+func (b *Broker) GetConnectionID(conn net.Conn) (vhost.ConnectionID, bool) {
+	b.connectionsMu.RLock()
+	defer b.connectionsMu.RUnlock()
+	connID, ok := b.connToID[conn]
+	return connID, ok
+}
+
+func (b *Broker) SendFrame(connID vhost.ConnectionID, channelID uint16, frame []byte) error {
+	b.connectionsMu.RLock()
+	conn := b.connections[connID]
+	b.connectionsMu.RUnlock()
+
+	if conn == nil {
+		return fmt.Errorf("connection %s not found", connID)
+	}
+
+	return b.framer.SendFrame(conn, frame)
+}
+
+func (b *Broker) GetBrokerOverviewConfig() models.BrokerConfigOverview {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	enabledFeatures := b.getEnabledFeatures()
+	ctx := b.getContexts()
+
+	persistence := b.getPersistenceBackend()
+
+	return models.BrokerConfigOverview{
+		AMQPPort:           b.config.BrokerPort,
+		SSL:                b.config.Ssl, // this one refers to AMQP SSL/TLS
+		HTTPPort:           b.config.WebPort,
+		EnabledFeatures:    enabledFeatures,
+		ChannelMax:         int(b.config.ChannelMax),
+		FrameMax:           int(b.config.FrameMax),
+		QueueBufferSize:    b.config.QueueBufferSize,
+		PersistenceBackend: persistence,
+		HTTPContexts:       ctx,
+	}
+}
+
+// getPersistenceBackend returns the name of the persistence backend in use.
+func (b *Broker) getPersistenceBackend() string {
+	persistence := "unknown"
+	switch b.persist.(type) {
+	case *json.JsonPersistence:
+		persistence = "json"
+	case *dummy.DummyPersistence:
+		persistence = "dummy"
+	case *memento.MementoPersistence:
+		persistence = "memento"
+	}
+	return persistence
+}
+
+// getContexts returns the list of HTTP contexts (e.g., management UI, prometheus) available in the broker.
+func (b *Broker) getContexts() []models.HttpContext {
+	ctx := make([]models.HttpContext, 0)
+	if b.config.EnableWebAPI && b.config.EnableUI {
+		ctx = append(ctx, models.HttpContext{
+			Name: "management",
+			Port: b.config.WebPort,
+			Path: "/",
+		})
+	}
+	// Prometheus context in the future
+	return ctx
+}
+
+// getEnabledPlugins returns the list of enabled plugins in the node.
+func (b *Broker) getEnabledPlugins() []string {
+	enabledPlugins := []string{}
+	if b.config.EnableWebAPI {
+		enabledPlugins = append(enabledPlugins, "WebAPI")
+
+	}
+	if b.config.EnableSwagger {
+		enabledPlugins = append(enabledPlugins, "Swagger")
+
+	}
+	if b.config.EnableUI {
+		enabledPlugins = append(enabledPlugins, "WebUI")
+
+	}
+	return enabledPlugins
+}
+
+// getEnabledFeatures returns the list of enabled features in the node.
+func (b *Broker) getEnabledFeatures() []string {
+	enabledFeatures := []string{}
+	if b.config.EnableDLX {
+		enabledFeatures = append(enabledFeatures, "DLX")
+	}
+	if b.config.EnableTTL {
+		enabledFeatures = append(enabledFeatures, "TTL")
+	}
+	if b.config.EnableQLL {
+		enabledFeatures = append(enabledFeatures, "QLL")
+	}
+	return enabledFeatures
+}
+
+// GetOverviewNodeDetails returns detailed information about the node.
+func (b *Broker) GetOverviewNodeDetails() models.OverviewNodeDetails {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	nodeName := fmt.Sprintf("ottermq@%s", getHostname())
+
+	node := models.OverviewNodeDetails{
+		Name:            nodeName,
+		FDUsed:          int(getFileDescriptors()),
+		FDLimit:         int(getFileDescriptorLimit()),
+		Goroutines:      runtime.NumGoroutine(),
+		GoroutinesLimit: 0, // No hard limit in Go, TBD if we should set one
+		MemoryUsage:     int(getMemoryUsage()),
+		Cores:           runtime.NumCPU(),
+		// Info: models.NodeInfo{
+	}
+	sysInfo, err := getSysInfo()
+	if err == nil {
+		node.MemoryLimit = int(sysInfo.TotalRam)
+		node.UptimeSecs = int(sysInfo.Uptime)
+		node.DiskTotal = int(sysInfo.TotalDisk)
+		node.DiskAvailable = int(sysInfo.AvailDisk)
+	}
+
+	node.Info = models.NodeInfo{
+		MessageRates:   "basic", // default strategy
+		EnabledPlugins: b.getEnabledPlugins(),
+	}
+	return node
+}
+
+func (b *Broker) GetOverviewConnStats() models.OverviewConnectionStats {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	var stats models.OverviewConnectionStats
+	for _, connInfo := range b.Connections {
+		stats.Total++
+		if connInfo.ClosingConnection {
+			stats.Closing++
+		} else {
+			stats.Running++
+		}
+		if connInfo.Client.Config.Protocol == DEFAULT_PROTOCOL {
+			stats.AMQP091++
+		}
+	}
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+		Channel:      0,
+	}
+	for _, vh := range b.VHosts {
+		ch := vh.GetChannelDelivery(channelKey)
+		if ch != nil {
+			stats.Total++   // each management connection has one channel (0) on each vhost
+			stats.Running++ // management channels are always running
+		}
+	}
+
+	stats.ClientConnections = stats.Total // In the future, exclude management connections
+
+	return stats
+}
+
+// GetBrokerOverviewDetails returns detailed information about the broker.
+func (b *Broker) GetBrokerOverviewDetails() models.OverviewBrokerDetails {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	build := getCommitInfo(b.config.Version)
+	return models.OverviewBrokerDetails{
+		Product:      PRODUCT,
+		Version:      build.Version,
+		CommitNumber: build.CommitNum,
+		CommitHash:   build.CommitHash,
+		Platform:     PLATFORM,
+		GoVersion:    runtime.Version(),
+		UptimeSecs:   int(time.Since(b.startedAt).Seconds()),
+		StartTime:    b.startedAt.Format(time.RFC3339),
+		DataDir:      b.config.DataDir,
+	}
+}
+
+func (b *Broker) GetObjectTotalsOverview() models.OverviewObjectTotals {
+	// Count objects across all vhosts
+	var totals models.OverviewObjectTotals
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vhostConnections := b.listConnectionsPerVhostsUnlocked()
+	for _, vh := range b.VHosts {
+		totals.Connections += len(vhostConnections[vh.Name])
+		totals.Channels += b.getChannelCountByVHostUnlocked(vh)
+		totals.Exchanges += len(vh.GetAllExchanges())
+		totals.Queues += len(vh.GetAllQueues())
+		totals.Consumers += len(vh.GetAllConsumers())
+	}
+	return totals
+}
+
+func (b *Broker) getChannelCountByVHostUnlocked(vh *vhost.VHost) int {
+	count := 0
+	for _, connInfo := range b.Connections {
+		if connInfo.VHostName == vh.Name {
+			count += len(connInfo.Channels)
+		}
+	}
+	return count
+}
+
+func (b *Broker) CloseConnection(name string, reason string) error {
+	b.mu.Lock()
+	var targetConn net.Conn
+	for conn := range b.Connections {
+		if string(b.connToID[conn]) == name {
+			targetConn = conn
+			break
+		}
+	}
+	b.mu.Unlock()
+
+	if targetConn == nil || b.Connections[targetConn].ClosingConnection {
+		return nil //nothing to do (idempotent)
+	}
+
+	log.Info().Str("connection", name).Str("reason", reason).Msg("Closing connection by management request")
+	b.sendConnectionClosing(targetConn,
+		0, // channel 0 for connection-level frames
+		uint16(amqp.CONNECTION_FORCED),
+		0,
+		0,
+		reason,
+	)
+	b.setConnectionClosingState(targetConn)
+	return nil
 }

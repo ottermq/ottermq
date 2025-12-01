@@ -10,6 +10,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type Alias map[string](string)
+
+const DEFAULT_EXCHANGE_ALIAS = "(AMQP default)"
+
+var defaultAlias Alias = Alias{
+	DEFAULT_EXCHANGE:       DEFAULT_EXCHANGE_ALIAS,
+	EMPTY_EXCHANGE:         DEFAULT_EXCHANGE_ALIAS,
+	DEFAULT_EXCHANGE_ALIAS: DEFAULT_EXCHANGE,
+}
+
+func (e *Exchange) NameOrAlias() string {
+	if alias, ok := defaultAlias[e.Name]; ok {
+		return alias
+	}
+	return e.Name
+}
+
 type Exchange struct {
 	Name     string                `json:"name"`
 	Typ      ExchangeType          `json:"type"`
@@ -72,6 +89,26 @@ func NewExchange(name string, typ ExchangeType, props *ExchangeProperties) *Exch
 		Bindings: make(map[string][]*Binding),
 		Props:    props,
 	}
+}
+
+func (e *Exchange) BindingCount() int {
+	count := 0
+	for _, bindings := range e.Bindings {
+		count += len(bindings)
+	}
+	return count
+}
+
+func (e *Exchange) GetBindings() map[string][]Binding {
+	bindings := make(map[string][]Binding)
+	for routingKey, bs := range e.Bindings {
+		var bindingList []Binding
+		for _, binding := range bs {
+			bindingList = append(bindingList, *binding)
+		}
+		bindings[routingKey] = bindingList
+	}
+	return bindings
 }
 
 // Candidate to be on an ExchangeManager interface

@@ -11,7 +11,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added GitHub commit activity badge to README
+- **Management API Refactoring (Phases 1-6 Complete)**: Professional service layer architecture
+  - Management service layer (`internal/core/broker/management/`) separating business logic from HTTP handlers
+  - `BrokerProvider` interface pattern to avoid circular dependencies
+  - **Queue Management**: Complete DTOs with all properties (TTL, DLX, QLL, consumers, unacked count)
+    - Operations: List, Get, Create, Delete, Purge with full property support
+  - **Exchange Management**: Complete DTOs with properties and metadata
+    - Operations: List, Get, Create, Delete with property configuration
+  - **Binding Management**: Structured binding operations with DTOs
+    - Operations: List, Create, Delete with source/destination/routing key
+  - **Consumer Visibility**: API endpoints for active consumer monitoring
+    - Operations: List all consumers, List by queue, with detailed consumer info
+  - **Channel Monitoring**: Channel information exposure via API
+    - Operations: List all channels, List by connection, Get channel details
+  - **Message Operations**: Publish and get messages with full AMQP properties
+    - Operations: Publish with properties (TTL, priority, headers), Get messages with ack modes
+  - **Connection Management**: Connection information and control
+    - Operations: List connections, Get connection details, Close connection
+  - **VHost Operations**: Virtual host information
+    - Operations: List vhosts, Get vhost details with statistics
+  - **Statistics & Overview**: Comprehensive broker monitoring
+    - Overview endpoint with broker/node/object totals
+    - Message statistics aggregation across all queues
+    - Connection statistics by state and protocol
+    - Broker configuration details
+  - Enhanced request models with validation tags (`CreateQueueRequest`, `CreateExchangeRequest`, `PublishMessageRequest`)
+  - VHost helper methods for thread-safe statistics (`GetAllQueues()`, `GetConsumerCountsAllQueues()`)
+  - **Comprehensive test coverage**: 52 tests covering all management operations (66% coverage)
+  - Added GitHub commit activity badge to README
+  - **Management API Examples** in README with curl commands for all operations
+
+### Changed
+
+- **API Handlers Refactored**: Complete removal of AMQP client dependency from web layer
+  - All handlers now use `management.Service` instead of `amqp091.Channel`
+  - Proper separation of concerns: HTTP layer → Service layer → Broker core
+  - Thread-safe operations with proper lock management
+  - Removed legacy `internal/core/broker/public.go` interface
+  - Removed `ManagerApi` interface and AMQP client from `web/server.go`
+  - Bindings API returns structured `BindingDTO` instead of raw maps
+
+### Fixed
+
+- **Import Cycle Resolution**: Management service uses interface pattern for broker access
+- **Lock Management**: VHost operations handle locking internally, preventing deadlocks
+- **Encapsulation**: Removed direct `broker.mu` access from management code
+- **Consumer Cleanup**: Fixed bug where `vh.CleanupConnection()` was never called on connection close
+- **Channel Reopening**: Fixed channel state not being removed after close, preventing reopening
+- **Overview Deadlock**: Fixed `GetObjectTotalsOverview()` deadlock by holding lock throughout operation
+- **Nil Pointer Protection**: Added defensive checks in `createChannelInfo()` for nil channel states
+
+### Performance
+
+- Direct broker access eliminates AMQP protocol overhead for management operations
+- O(1) queue/exchange lookups via map access
+- Efficient statistics gathering with dedicated VHost methods
+- No protocol serialization/deserialization for management operations
+
+## [v0.14.0] - 2025-11-18
+
+### Added
+
+- **Management API Refactoring (Phase 1-2)**: Professional service layer architecture
+  - Management service layer (`internal/core/broker/management/`) separating business logic from HTTP handlers
+  - `BrokerProvider` interface pattern to avoid circular dependencies
+  - Complete Queue DTOs with all properties (TTL, DLX, QLL, consumers, unacked count)
+  - Complete Exchange DTOs with properties and metadata
+  - Enhanced request models with validation tags (`CreateQueueRequest`, `CreateExchangeRequest`)
+  - VHost helper methods for thread-safe statistics (`GetAllQueues()`, `GetConsumerCountsAllQueues()`)
+  - Queue operations: List, Get, Create, Delete, Purge with full property support
+  - Exchange operations: List, Get, Create, Delete with property configuration
+
+### Changed
+
+- **API Handlers Refactored**: Removed AMQP client dependency from management endpoints
+  - Queue handlers now use `management.Service` instead of `amqp091.Channel`
+  - Exchange handlers refactored for direct broker access
+  - Proper separation of concerns: HTTP layer → Service layer → Broker core
+  - Thread-safe operations with proper lock management
+
+### Fixed
+
+- **Import Cycle Resolution**: Management service uses interface pattern for broker access
+- **Lock Management**: VHost operations handle locking internally, preventing deadlocks
+- **Encapsulation**: Removed direct `broker.mu` access from management code
+
+### Performance
+
+- Direct broker access eliminates AMQP protocol overhead for management operations
+- O(1) queue/exchange lookups via map access
+- Efficient statistics gathering with dedicated VHost methods
+
+## [v0.14.0] - 2025-11-18
+
+### Added
+
 - **Per-consumer unacked message tracking**: Implemented dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
 - **Consumer cancel E2E tests**: Added 6 comprehensive tests for consumer cancel behavior and edge cases
 - Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)

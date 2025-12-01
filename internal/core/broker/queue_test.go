@@ -12,7 +12,8 @@ import (
 // Mock connection for testing
 type mockConn struct {
 	net.Conn
-	written []byte
+	written    []byte
+	remoteAddr net.Addr
 }
 
 func (m *mockConn) Write(b []byte) (int, error) {
@@ -20,9 +21,24 @@ func (m *mockConn) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+func (m *mockConn) RemoteAddr() net.Addr {
+	if m.remoteAddr != nil {
+		return m.remoteAddr
+	}
+	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 5672}
+}
+
+type mockAddr struct {
+	addr string
+}
+
+func (m *mockAddr) Network() string { return "tcp" }
+func (m *mockAddr) String() string  { return m.addr }
+
 func TestQueuePurgeHandler_Success(t *testing.T) {
 	b := &Broker{
-		framer: &amqp.DefaultFramer{},
+		framer:   &amqp.DefaultFramer{},
+		connToID: make(map[net.Conn]vhost.ConnectionID),
 	}
 
 	var options = vhost.VHostOptions{
@@ -31,8 +47,9 @@ func TestQueuePurgeHandler_Success(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connID := newTestConsumerConnID()
 	// Create queue and seed messages
-	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("purge-q", &vhost.QueueProperties{Durable: false}, connID)
 	vh.Queues["purge-q"].Push(vhost.Message{ID: "1", Body: []byte("a")})
 	vh.Queues["purge-q"].Push(vhost.Message{ID: "2", Body: []byte("b")})
 
@@ -47,6 +64,8 @@ func TestQueuePurgeHandler_Success(t *testing.T) {
 	}
 
 	conn := &mockConn{}
+	// Register connection ID
+	b.connToID[conn] = connID
 
 	_, err := b.queuePurgeHandler(request, vh, conn)
 	if err != nil {
@@ -66,6 +85,7 @@ func TestQueuePurgeHandler_QueueNotFound_SendsChannelClose(t *testing.T) {
 	b := &Broker{
 		framer:      &amqp.DefaultFramer{},
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 	}
 
 	var options = vhost.VHostOptions{
@@ -76,12 +96,16 @@ func TestQueuePurgeHandler_QueueNotFound_SendsChannelClose(t *testing.T) {
 	vh.SetFramer(b.framer)
 
 	conn := &mockConn{}
+	connID := newTestConsumerConnID()
 
 	// Register connection and channel so sendChannelErrorResponse can mark closing
 	b.mu.Lock()
 	b.Connections[conn] = &amqp.ConnectionInfo{Channels: make(map[uint16]*amqp.ChannelState)}
 	b.Connections[conn].Channels[1] = &amqp.ChannelState{}
 	b.mu.Unlock()
+
+	// Register connection ID
+	b.connToID[conn] = connID
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -139,7 +163,8 @@ func TestQueuePurgeHandler_InvalidContentType(t *testing.T) {
 
 func TestQueueUnbindHandler_Success(t *testing.T) {
 	b := &Broker{
-		framer: &amqp.DefaultFramer{},
+		framer:   &amqp.DefaultFramer{},
+		connToID: make(map[net.Conn]vhost.ConnectionID),
 	}
 
 	var options = vhost.VHostOptions{
@@ -148,11 +173,12 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connID := newTestConsumerConnID()
 
 	// Create exchange and queue
 	vh.CreateExchange("test-exchange", vhost.DIRECT, &vhost.ExchangeProperties{Durable: false})
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
-	vh.BindQueue("test-exchange", "test-queue", "test.key", nil, nil)
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, connID)
+	vh.BindQueue("test-exchange", "test-queue", "test.key", nil, connID)
 
 	// Create unbind request
 	request := &amqp.RequestMethodMessage{
@@ -168,6 +194,8 @@ func TestQueueUnbindHandler_Success(t *testing.T) {
 	}
 
 	conn := &mockConn{}
+	// Register connection ID
+	b.connToID[conn] = connID
 
 	// Execute handler
 	_, err := b.queueUnbindHandler(request, vh, conn)
@@ -192,6 +220,7 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 	b := &Broker{
 		framer:      &amqp.DefaultFramer{},
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 	}
 
 	var options = vhost.VHostOptions{
@@ -201,9 +230,10 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
 
-	// Create only queue, no exchange
-	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, nil)
+	connID := newTestConsumerConnID()
 
+	// Create only queue, no exchange
+	vh.CreateQueue("test-queue", &vhost.QueueProperties{Durable: false}, connID)
 	conn := &mockConn{}
 
 	// Register connection and channel in broker
@@ -215,6 +245,9 @@ func TestQueueUnbindHandler_ExchangeNotFound(t *testing.T) {
 		ClosingChannel: false,
 	}
 	b.mu.Unlock()
+
+	// Register connection ID
+	b.connToID[conn] = connID
 
 	request := &amqp.RequestMethodMessage{
 		Channel:  1,

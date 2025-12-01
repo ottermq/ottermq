@@ -43,7 +43,8 @@ func TestDLX_Simple(t *testing.T) {
 	t.Logf("Created DLQ: %s", dlq.Name)
 
 	// Start DLQ consumer FIRST (before any messages are published)
-	dlqMsgs := tc.StartConsumer(dlq.Name, "dlq-consumer", true)
+	dlqConsumerTag := tc.UniqueConsumerTag("dlq-consumer")
+	dlqMsgs := tc.StartConsumer(dlq.Name, dlqConsumerTag, true)
 	t.Log("Started DLQ consumer")
 
 	// Publish a message
@@ -55,7 +56,8 @@ func TestDLX_Simple(t *testing.T) {
 	t.Log("Published message")
 
 	// Consume it from main queue
-	msgs := tc.StartConsumer(mainQueue.Name, "test", false)
+	mainConsumerTag := tc.UniqueConsumerTag("test")
+	msgs := tc.StartConsumer(mainQueue.Name, mainConsumerTag, false)
 	msg, ok := tc.ConsumeWithTimeout(msgs, 2*time.Second)
 	require.True(t, ok, "Should receive message")
 

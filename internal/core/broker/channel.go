@@ -99,7 +99,11 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 	// Architecture decision: always honor flow change requested by client
 	// Further improvements may include broker policies to override client requests
 	flowInitiatedByBroker := false
-	err := vh.HandleChannelFlow(conn, channel, flowActive, flowInitiatedByBroker)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	err := vh.HandleChannelFlow(connID, channel, flowActive, flowInitiatedByBroker)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to handle channel flow in vhost")
 		// Should raise 541 error if vhost fails to handle flow
@@ -164,7 +168,7 @@ func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn ne
 
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	b.mu.Lock()
-	channelState, exists := b.Connections[conn].Channels[request.Channel]
+	_, exists := b.Connections[conn].Channels[request.Channel]
 	if !exists {
 		log.Debug().Uint16("channel", request.Channel).Msg("Channel already closed") // no need to rise an error here
 		return nil, nil
@@ -177,14 +181,15 @@ func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net
 		log.Error().Err(err).Msg("Failed to send channel close ok frame")
 		return nil, err
 	}
-	b.mu.Lock()
-	channelState.ClosingChannel = true
-	b.mu.Unlock()
+	b.removeChannel(conn, request.Channel)
+	log.Debug().Uint16("channel", request.Channel).Msg("Channel closed (client-initiated)")
 	return nil, nil
 }
 
 func (b *Broker) handleChannelCloseOk(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	// Server-initiated channel close: we sent channel.close and now client is acknowledging with channel.close-ok
 	b.removeChannel(conn, request.Channel)
+	log.Debug().Uint16("channel", request.Channel).Msg("Channel closed (server-initiated)")
 	return nil, nil
 }
 

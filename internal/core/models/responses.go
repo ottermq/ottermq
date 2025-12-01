@@ -12,6 +12,14 @@ type ConnectionListResponse struct {
 	Connections []ConnectionInfoDTO `json:"connections"`
 }
 
+type ChannelListResponse struct {
+	Channels []ChannelDetailDTO `json:"channels"`
+}
+
+type VHostListResponse struct {
+	VHosts []VHostDTO `json:"vhosts"`
+}
+
 type ExchangeListResponse struct {
 	Exchanges []ExchangeDTO `json:"exchanges"`
 }
@@ -25,5 +33,9 @@ type QueueDeleteResponse struct {
 }
 
 type BindingListResponse struct {
-	Bindings map[string][]string `json:"bindings"`
+	Bindings []BindingDTO `json:"bindings"`
+}
+
+type ConsumerListResponse struct {
+	Consumers []ConsumerDTO `json:"consumers"`
 }

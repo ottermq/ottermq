@@ -3,7 +3,6 @@ package vhost
 import (
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
@@ -21,7 +20,7 @@ type Queue struct {
 	messages  chan Message     `json:"-"`
 	count     int              `json:"-"`
 	mu        sync.Mutex       `json:"-"`
-	OwnerConn net.Conn         `json:"-"`
+	OwnerConn ConnectionID     `json:"-"`
 
 	vh *VHost `json:"-"` // Reference to parent VHost
 	/* Delivery */
@@ -54,6 +53,13 @@ func NewQueue(name string, bufferSize int, vh *VHost) *Queue {
 		maxLength:  0,
 		vh:         vh,
 	}
+}
+
+func (q *Queue) IsPersistenceEnabled() bool {
+	return q.Props != nil &&
+		q.Props.Durable &&
+		q.vh != nil &&
+		q.vh.persist != nil
 }
 
 func (q *Queue) startDeliveryLoop(vh *VHost) {
@@ -132,7 +138,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 					// Try each consumer once per round
 					for i := 0; i < len(consumers); i++ {
 						consumer := consumers[i]
-						state := vh.getChannelDeliveryState(consumer.Connection, consumer.Channel)
+						state := vh.getChannelDeliveryState(consumer.ConnectionID, consumer.Channel)
 
 						if vh.shouldThrottle(consumer, state) {
 							continue // Try next consumer
@@ -168,7 +174,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 						// Try to get a signal from any consumer's channel
 						var anyState *ChannelDeliveryState
 						for _, c := range consumers {
-							if s := vh.getChannelDeliveryState(c.Connection, c.Channel); s != nil {
+							if s := vh.getChannelDeliveryState(c.ConnectionID, c.Channel); s != nil {
 								anyState = s
 								break
 							}
@@ -219,35 +225,64 @@ func (q *Queue) stopDeliveryLoop() {
 	q.deliveryMu.Unlock()
 }
 
-func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn) (*Queue, error) {
+func (vh *VHost) CreateQueue(name string, props *QueueProperties, connID ConnectionID) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	// Passive declaration: error if queue doesn't exist
-	if props != nil && props.Passive {
-		queue := vh.Queues[name]
-		if queue == nil {
-			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
-			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
-		} else {
-			log.Debug().Str("queue", name).Msg("Passive queue declare: queue exists")
-			return queue, nil
+	if name == "" {
+		maxRetries := 5
+		ok := false
+		for range maxRetries {
+			name = generateRandomQueueName()
+			if _, exists := vh.Queues[name]; !exists {
+				log.Debug().Str("queue", name).Msg("Generated random queue name")
+				ok = true
+				break
+			} else {
+				log.Debug().Str("queue", name).Msg("Generated already existing queue name, retrying")
+			}
 		}
-	}
+		if !ok {
+			serverErr := errors.NewChannelError(
+				fmt.Sprintf("fail to generate queue name on '%s'", vh.Name),
+				uint16(amqp.INTERNAL_ERROR),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DECLARE),
+			)
+			return nil, serverErr
+		}
+		log.Debug().Str("queue", name).Msg("Using generated queue name")
+	} else {
+		// Passive declaration: error if queue doesn't exist
+		existing, err := vh.retrievePassiveQueue(props, name)
+		if err != nil {
+			return nil, err
+		}
+		if existing == nil && props != nil && !props.Passive {
+			existing = vh.Queues[name]
+		}
 
-	// Queue already exists: validate compatibility
-	if existing, ok := vh.Queues[name]; ok {
-		if existing.Props == nil || props == nil {
-			return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
+		// Queue already exists: validate compatibility
+		// Idempotent if properties match
+		if existing != nil {
+			if existing.Props == nil || props == nil {
+				return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
+			}
+			if existing.Props.Durable != props.Durable ||
+				existing.Props.AutoDelete != props.AutoDelete ||
+				existing.Props.Exclusive != props.Exclusive ||
+				!equalArgs(existing.Props.Arguments, props.Arguments) {
+				// Raise Precondition Failed error
+				return nil, errors.NewChannelError(
+					fmt.Sprintf("queue %s already exists with different properties", name),
+					uint16(amqp.PRECONDITION_FAILED),
+					uint16(amqp.QUEUE),
+					uint16(amqp.QUEUE_DECLARE),
+				)
+			}
+			log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
+			return existing, nil
 		}
-		if existing.Props.Durable != props.Durable ||
-			existing.Props.AutoDelete != props.AutoDelete ||
-			existing.Props.Exclusive != props.Exclusive ||
-			!equalArgs(existing.Props.Arguments, props.Arguments) {
-			return nil, fmt.Errorf("queue %s already exists with different properties", name)
-		}
-		log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
-		return existing, nil
 	}
 
 	// Create new queue
@@ -259,7 +294,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, conn net.Conn)
 	queue.Props = props
 
 	if props.Exclusive {
-		queue.OwnerConn = conn
+		queue.OwnerConn = connID
 	}
 	vh.Queues[name] = queue
 
@@ -428,7 +463,7 @@ func (q *Queue) Len() int {
 	return q.count
 }
 
-func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
+func (vh *VHost) PurgeQueue(name string, connID ConnectionID) (uint32, error) {
 	vh.mu.Lock()
 	queue, exists := vh.Queues[name]
 	vh.mu.Unlock()
@@ -438,7 +473,7 @@ func (vh *VHost) PurgeQueue(name string, conn net.Conn) (uint32, error) {
 	}
 
 	// Validate ownership for exclusive queues
-	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+	if queue.Props.Exclusive && queue.OwnerConn != connID {
 		return 0, errors.NewChannelError(
 			fmt.Sprintf("queue '%s' is exclusive to another connection", name),
 			uint16(amqp.ACCESS_REFUSED),
@@ -479,4 +514,23 @@ func (q *Queue) StreamPurge(process func(*Message)) uint32 {
 		purged++
 	}
 	return purged
+}
+
+// retrievePassiveQueue checks if a passive queue declaration is requested and retrieves the queue if it exists.
+func (vh *VHost) retrievePassiveQueue(props *QueueProperties, name string) (*Queue, error) {
+	if props != nil && props.Passive {
+		queue := vh.Queues[name]
+		if queue == nil {
+			text := amqp.NOT_FOUND.Format(fmt.Sprintf("no queue '%s' in vhost '%s'", name, vh.Name))
+			return nil, errors.NewChannelError(text, uint16(amqp.NOT_FOUND), uint16(amqp.CHANNEL), uint16(amqp.QUEUE_DECLARE))
+		} else {
+			log.Debug().Str("queue", name).Msg("Passive queue declare: queue exists")
+			return queue, nil
+		}
+	}
+	return nil, nil
+}
+
+func generateRandomQueueName() string {
+	return "amq.gen-" + generatePseudoRandomString(16)
 }

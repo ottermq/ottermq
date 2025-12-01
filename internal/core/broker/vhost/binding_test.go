@@ -20,12 +20,12 @@ func TestUnbindQueue_Success(t *testing.T) {
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
 	routingKey := "test.key"
-
+	connID := newTestConsumerConnID()
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
 
 	// Bind queue to exchange
-	err := vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
+	err := vh.BindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("BindQueue failed: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestUnbindQueue_Success(t *testing.T) {
 	}
 
 	// Unbind queue
-	err = vh.UnbindQueue(exchangeName, queueName, routingKey, nil, nil)
+	err = vh.UnbindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -60,11 +60,12 @@ func TestUnbindQueue_ExchangeNotFound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	connID := newTestConsumerConnID()
 
 	queueName := "test-queue"
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
 
-	err := vh.UnbindQueue("ghost-exchange", queueName, "test.key", nil, nil)
+	err := vh.UnbindQueue("ghost-exchange", queueName, "test.key", nil, connID)
 
 	if err == nil {
 		t.Fatal("Expected error for non-existent exchange")
@@ -91,12 +92,11 @@ func TestUnbindQueue_QueueNotFound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
-
+	connID := newTestConsumerConnID()
 	exchangeName := "test-exchange"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
 
-	err := vh.UnbindQueue(exchangeName, "ghost-queue", "test.key", nil, nil)
-
+	err := vh.UnbindQueue(exchangeName, "ghost-queue", "test.key", nil, connID)
 	if err == nil {
 		t.Fatal("Expected error for non-existent queue")
 	}
@@ -125,12 +125,12 @@ func TestUnbindQueue_BindingNotFound(t *testing.T) {
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
-
+	connID := newTestConsumerConnID()
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
 
 	// Try to unbind without creating a binding first
-	err := vh.UnbindQueue(exchangeName, queueName, "nonexistent.key", nil, nil)
+	err := vh.UnbindQueue(exchangeName, queueName, "nonexistent.key", nil, connID)
 
 	if err == nil {
 		t.Fatal("Expected error for non-existent binding")
@@ -160,24 +160,22 @@ func TestUnbindQueue_MultipleBindings(t *testing.T) {
 
 	exchangeName := "test-exchange"
 	routingKey := "shared.key"
-
+	connID := newTestConsumerConnID()
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
-	vh.CreateQueue("queue3", &QueueProperties{Durable: false}, nil)
-
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, connID)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, connID)
+	vh.CreateQueue("queue3", &QueueProperties{Durable: false}, connID)
 	// Bind all queues to same routing key
-	vh.BindQueue(exchangeName, "queue1", routingKey, nil, nil)
-	vh.BindQueue(exchangeName, "queue2", routingKey, nil, nil)
-	vh.BindQueue(exchangeName, "queue3", routingKey, nil, nil)
-
+	vh.BindQueue(exchangeName, "queue1", routingKey, nil, connID)
+	vh.BindQueue(exchangeName, "queue2", routingKey, nil, connID)
+	vh.BindQueue(exchangeName, "queue3", routingKey, nil, connID)
 	exchange := vh.Exchanges[exchangeName]
 	if len(exchange.Bindings[routingKey]) != 3 {
 		t.Fatalf("Expected 3 bindings, got %d", len(exchange.Bindings[routingKey]))
 	}
 
 	// Unbind queue2
-	err := vh.UnbindQueue(exchangeName, "queue2", routingKey, nil, nil)
+	err := vh.UnbindQueue(exchangeName, "queue2", routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -224,10 +222,10 @@ func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
 	routingKey := "test.key"
-
+	connID := newTestConsumerConnID()
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
-	vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
+	vh.BindQueue(exchangeName, queueName, routingKey, nil, connID)
 
 	exchange := vh.Exchanges[exchangeName]
 	if _, exists := exchange.Bindings[routingKey]; !exists {
@@ -235,7 +233,7 @@ func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
 	}
 
 	// Unbind the only queue
-	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, nil)
+	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -256,12 +254,12 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 
 	exchangeName := "test-fanout"
 	queueName := "test-queue"
+	connID := newTestConsumerConnID()
 
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
-
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
 	// Bind queue to fanout exchange
-	err := vh.BindQueue(exchangeName, queueName, "", nil, nil)
+	err := vh.BindQueue(exchangeName, queueName, "", nil, connID)
 	if err != nil {
 		t.Fatalf("BindQueue failed: %v", err)
 	}
@@ -283,7 +281,7 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 	}
 
 	// Unbind queue
-	err = vh.UnbindQueue(exchangeName, queueName, "", nil, nil)
+	err = vh.UnbindQueue(exchangeName, queueName, "", nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -309,13 +307,14 @@ func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
 	routingKey := "test.key"
+	connID := newTestConsumerConnID()
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
 		Durable:    false,
 		AutoDelete: true,
 	})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
-	vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
+	vh.BindQueue(exchangeName, queueName, routingKey, nil, connID)
 
 	// Verify exchange exists
 	if _, exists := vh.Exchanges[exchangeName]; !exists {
@@ -323,7 +322,7 @@ func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
 	}
 
 	// Unbind the only queue (should trigger auto-delete)
-	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, nil)
+	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -344,19 +343,20 @@ func TestUnbindQueue_NoAutoDeleteWhenOtherBindingsExist(t *testing.T) {
 
 	exchangeName := "test-exchange"
 	routingKey := "test.key"
+	connID := newTestConsumerConnID()
 
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
 		Durable:    false,
 		AutoDelete: true,
 	})
-	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, nil)
-	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue("queue1", &QueueProperties{Durable: false}, connID)
+	vh.CreateQueue("queue2", &QueueProperties{Durable: false}, connID)
 
-	vh.BindQueue(exchangeName, "queue1", routingKey, nil, nil)
-	vh.BindQueue(exchangeName, "queue2", routingKey, nil, nil)
+	vh.BindQueue(exchangeName, "queue1", routingKey, nil, connID)
+	vh.BindQueue(exchangeName, "queue2", routingKey, nil, connID)
 
 	// Unbind one queue
-	err := vh.UnbindQueue(exchangeName, "queue1", routingKey, nil, nil)
+	err := vh.UnbindQueue(exchangeName, "queue1", routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("UnbindQueue failed: %v", err)
 	}
@@ -425,19 +425,19 @@ func TestUnbindQueue_AlreadyUnbound(t *testing.T) {
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
 	routingKey := "test.key"
-
+	connID := newTestConsumerConnID()
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
-	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, nil)
+	vh.CreateQueue(queueName, &QueueProperties{Durable: false}, connID)
 
 	// Bind and then unbind
-	vh.BindQueue(exchangeName, queueName, routingKey, nil, nil)
-	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, nil)
+	vh.BindQueue(exchangeName, queueName, routingKey, nil, connID)
+	err := vh.UnbindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err != nil {
 		t.Fatalf("First unbind failed: %v", err)
 	}
 
 	// Try to unbind again
-	err = vh.UnbindQueue(exchangeName, queueName, routingKey, nil, nil)
+	err = vh.UnbindQueue(exchangeName, queueName, routingKey, nil, connID)
 	if err == nil {
 		t.Fatal("Expected error when unbinding already unbound queue")
 	}

@@ -124,6 +124,7 @@ func convertToPersistedProperties(amqpProps amqp.BasicProperties) persistence.Me
 	return msgProps
 }
 
+// Publish publishes a message to the specified exchange with the given routing key.
 func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -255,6 +256,7 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 	return msg
 }
 
+// GetMessageCount returns the number of messages in the specified queue.
 func (vh *VHost) GetMessageCount(queueName string) (int, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()

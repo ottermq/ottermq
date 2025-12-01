@@ -113,7 +113,51 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/bindings": {
+        "/bindings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all bindings for the specified exchange",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "List all bindings for an exchange",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -133,12 +177,12 @@ const docTemplate = `{
                 "summary": "Bind a queue to an exchange",
                 "parameters": [
                     {
-                        "description": "Binding details",
+                        "description": "Binding to create",
                         "name": "binding",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.BindQueueRequest"
+                            "$ref": "#/definitions/models.CreateBindingRequest"
                         }
                     }
                 ],
@@ -168,9 +212,7 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/bindings": {
+            },
             "delete": {
                 "security": [
                     {
@@ -224,14 +266,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/bindings/{exchange}": {
+        "/channels": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a list of all bindings for the specified exchange",
+                "description": "Get a list of all channels",
                 "consumes": [
                     "application/json"
                 ],
@@ -239,14 +281,55 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "bindings"
+                    "channels"
                 ],
-                "summary": "List all bindings for an exchange",
+                "summary": "List all channels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChannelListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list channels",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/channels/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all channels for a specific VHost",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "List channels by VHost",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Exchange name",
-                        "name": "exchange",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
                         "in": "path",
                         "required": true
                     }
@@ -255,11 +338,11 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.BindingListResponse"
+                            "$ref": "#/definitions/models.ChannelListResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid or malformed request body",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -270,8 +353,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "VHost not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Failed to get channels",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -319,6 +408,338 @@ const docTemplate = `{
                 }
             }
         },
+        "/connections/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific connection by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Get connection details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ConnectionInfoDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Connection ID is required",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Connection not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get connection",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Close a specific connection by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Close a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Reason for closing the connection",
+                        "name": "reason",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Connection ID is required",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to close connection",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/connections/{name}/channels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all channels for a specific connection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "List all channels for a specific connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChannelListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Connection not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list channels",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/connections/{name}/channels/{channel}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific channel by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "Get channel details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Channel ID",
+                        "name": "channel",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ChannelInfoDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Channel ID is required",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Channel not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get channel",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/consumers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all consumers",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "consumers"
+                ],
+                "summary": "List all consumers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ConsumerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list consumers",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/consumers/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of consumers for a specific queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "consumers"
+                ],
+                "summary": "List consumers for a specific queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ConsumerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list consumers for queue",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/exchanges": {
             "get": {
                 "security": [
@@ -357,6 +778,62 @@ const docTemplate = `{
                         }
                     }
                 }
+            }
+        },
+        "/exchanges/{vhost}/{exchange}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get an exchange by name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "Get an exchange",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ExchangeDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get exchange",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
             },
             "post": {
                 "security": [
@@ -376,6 +853,20 @@ const docTemplate = `{
                 ],
                 "summary": "Create a new exchange",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "Exchange to create",
                         "name": "exchange",
@@ -412,9 +903,7 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/exchanges/{exchange}": {
+            },
             "delete": {
                 "security": [
                     {
@@ -435,6 +924,13 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
                         "description": "Exchange name",
                         "name": "exchange",
                         "in": "path",
@@ -444,6 +940,133 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/exchanges/{vhost}/{exchange}/bindings/source": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all bindings where the specified exchange is the source",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "Get bindings where the exchange is the source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get bindings",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/exchanges/{vhost}/{exchange}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Publish a message to the specified exchange with a routing key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Publish a message to an exchange",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Message details",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.PublishMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -512,14 +1135,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/messages": {
-            "post": {
+        "/overview": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publish a message to the specified exchange with a routing key",
+                "description": "Retrieve basic information about the message broker",
                 "consumes": [
                     "application/json"
                 ],
@@ -527,41 +1150,18 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "messages"
+                    "overview"
                 ],
-                "summary": "Publish a message to an exchange",
-                "parameters": [
-                    {
-                        "description": "Message details",
-                        "name": "message",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.PublishMessageRequest"
-                        }
-                    }
-                ],
+                "summary": "Get broker overview",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "$ref": "#/definitions/models.OverviewDTO"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Failed to get broker information",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -569,14 +1169,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/messages/{id}/ack": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Acknowledge a message with the specified ID",
+        "/overview/broker": {
+            "get": {
+                "description": "Retrieve basic information about the message broker",
                 "consumes": [
                     "application/json"
                 ],
@@ -584,39 +1179,18 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "messages"
+                    "overview"
                 ],
-                "summary": "Acknowledge a message",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Message ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get basic broker information",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid JWT token",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "$ref": "#/definitions/models.OverviewBrokerDetails"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Failed to get broker information",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -662,14 +1236,16 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/queues/{vhost}/": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new queue with the specified name",
+                "description": "Create a new queue with a generated name",
                 "consumes": [
                     "application/json"
                 ],
@@ -679,11 +1255,18 @@ const docTemplate = `{
                 "tags": [
                     "queues"
                 ],
-                "summary": "Create a new queue",
+                "summary": "Create a new queue with generated name",
                 "parameters": [
                     {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
                         "description": "Queue to create",
-                        "name": "queue",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -710,6 +1293,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Queue not found in vhost",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -719,7 +1308,198 @@ const docTemplate = `{
                 }
             }
         },
-        "/queues/{queue}": {
+        "/queues/{vhost}/{queueName}/consumers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of consumers for a specific queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "consumers"
+                ],
+                "summary": "List consumers for a specific queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue Name",
+                        "name": "queueName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ConsumerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Object not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list consumers for queue",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queue}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a queue by name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Get a queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.QueueDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list queues",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new queue with the specified name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Create a new queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Queue to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateQueueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found in vhost",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -740,10 +1520,29 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
                         "description": "Queue name",
                         "name": "queue",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "If true, the server will only delete the queue if it has no consumers",
+                        "name": "ifUnused",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "If true, the server will only delete the queue if it is empty",
+                        "name": "ifEmpty",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -771,7 +1570,131 @@ const docTemplate = `{
                 }
             }
         },
-        "/queues/{queue}/consume": {
+        "/queues/{vhost}/{queue}/bindings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all bindings for the specified queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "List all bindings for a queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queue}/content": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove all messages from a queue with the specified name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "queues"
+                ],
+                "summary": "Purge a queue",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Queue name",
+                        "name": "queue",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Number of messages purged",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{vhost}/{queue}/get": {
             "post": {
                 "security": [
                     {
@@ -796,6 +1719,13 @@ const docTemplate = `{
                         "name": "queue",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path"
                     }
                 ],
                 "responses": {
@@ -853,16 +1783,33 @@ const docTemplate = `{
                 }
             }
         },
-        "models.BindQueueRequest": {
+        "models.BindingDTO": {
             "type": "object",
             "properties": {
-                "exchange_name": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "destination": {
+                    "description": "Destination = Queue name (or Exchange name if exchange-to-exchange binding )",
                     "type": "string"
                 },
-                "queue_name": {
+                "destination_type": {
+                    "description": "\"queue\" or \"exchange\"",
+                    "type": "string"
+                },
+                "properties_key": {
+                    "description": "Hash for idempotency",
                     "type": "string"
                 },
                 "routing_key": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Source = Exchange name",
+                    "type": "string"
+                },
+                "vhost": {
                     "type": "string"
                 }
             }
@@ -871,12 +1818,121 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "bindings": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.BindingDTO"
+                    }
+                }
+            }
+        },
+        "models.BrokerConfigOverview": {
+            "type": "object",
+            "properties": {
+                "amqp_port": {
+                    "type": "string"
+                },
+                "channel_max": {
+                    "type": "integer"
+                },
+                "enabled_features": {
+                    "description": "e.g., [\"DLX\", \"TTL\", \"QLL\"]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "frame_max": {
+                    "type": "integer"
+                },
+                "http_contexts": {
+                    "description": "e.g., Context:path [\"management:/\", \"swagger:/\", \"prometheus:/\"]",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.HttpContext"
+                    }
+                },
+                "http_port": {
+                    "type": "string"
+                },
+                "persistence_backend": {
+                    "description": "\"json\", \"memento\" (future)",
+                    "type": "string"
+                },
+                "queue_buffer_size": {
+                    "type": "integer"
+                },
+                "ssl": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.ChannelDetailDTO": {
+            "type": "object",
+            "properties": {
+                "ack_rate": {
+                    "type": "number"
+                },
+                "confirm_rate": {
+                    "type": "number"
+                },
+                "connection_name": {
+                    "type": "string"
+                },
+                "deliver_rate": {
+                    "type": "number"
+                },
+                "number": {
+                    "description": "channel number",
+                    "type": "integer"
+                },
+                "prefetch_count": {
+                    "type": "integer"
+                },
+                "publish_rate": {
+                    "description": "Stats",
+                    "type": "number"
+                },
+                "state": {
+                    "description": "\"running\", \"flow\", \"closing\"",
+                    "type": "string"
+                },
+                "unacked_count": {
+                    "type": "integer"
+                },
+                "unconfirmed_count": {
+                    "description": "Details",
+                    "type": "integer"
+                },
+                "user": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ChannelInfoDTO": {
+            "type": "object",
+            "properties": {
+                "connection_name": {
+                    "type": "string"
+                },
+                "number": {
+                    "description": "channel number",
+                    "type": "integer"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ChannelListResponse": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ChannelDetailDTO"
                     }
                 }
             }
@@ -926,35 +1982,170 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CreateExchangeRequest": {
+        "models.ConsumerDTO": {
             "type": "object",
             "properties": {
-                "exchange_name": {
+                "ack_required": {
+                    "description": "!NoAck",
+                    "type": "boolean"
+                },
+                "active": {
+                    "type": "boolean"
+                },
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "channel_details": {
+                    "$ref": "#/definitions/models.ChannelInfoDTO"
+                },
+                "consumer_tag": {
                     "type": "string"
                 },
-                "exchange_type": {
+                "exclusive": {
+                    "type": "boolean"
+                },
+                "prefetch_count": {
+                    "type": "integer"
+                },
+                "queue_name": {
                     "type": "string"
+                }
+            }
+        },
+        "models.ConsumerListResponse": {
+            "type": "object",
+            "properties": {
+                "consumers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ConsumerDTO"
+                    }
+                }
+            }
+        },
+        "models.CreateBindingRequest": {
+            "type": "object",
+            "required": [
+                "destination",
+                "source"
+            ],
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "destination": {
+                    "description": "Queue (?or Exchange too??)",
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Exchange",
+                    "type": "string"
+                },
+                "vhost": {
+                    "description": "Optional; defaults to \"/\"",
+                    "type": "string"
+                }
+            }
+        },
+        "models.CreateExchangeRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "type": "boolean"
+                },
+                "no_wait": {
+                    "description": "not needed for management API. Included for completeness",
+                    "type": "boolean"
+                },
+                "passive": {
+                    "description": "Properties",
+                    "type": "boolean"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "direct",
+                        "fanout",
+                        "topic",
+                        "headers"
+                    ]
                 }
             }
         },
         "models.CreateQueueRequest": {
             "type": "object",
             "properties": {
-                "queue_name": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "durable": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "max_length": {
+                    "description": "Convenience fields (auto-mapped to arguments)",
+                    "type": "integer"
+                },
+                "message_ttl": {
+                    "type": "integer"
+                },
+                "passive": {
+                    "description": "Properties/flags",
+                    "type": "boolean",
+                    "default": false
+                },
+                "x-dead-letter-exchange": {
+                    "type": "string"
+                },
+                "x-dead-letter-routing-key": {
                     "type": "string"
                 }
             }
         },
         "models.DeleteBindingRequest": {
             "type": "object",
+            "required": [
+                "destination",
+                "source"
+            ],
             "properties": {
-                "exchange_name": {
-                    "type": "string"
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
                 },
-                "queue_name": {
+                "destination": {
+                    "description": "Queue (?or Exchange too??)",
                     "type": "string"
                 },
                 "routing_key": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Exchange",
+                    "type": "string"
+                },
+                "vhost": {
+                    "description": "Optional; defaults to \"/\"",
                     "type": "string"
                 }
             }
@@ -970,6 +2161,31 @@ const docTemplate = `{
         "models.ExchangeDTO": {
             "type": "object",
             "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "description": "Properties/flags",
+                    "type": "boolean"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "message_stats_in": {
+                    "description": "Stats",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.MessageStats"
+                        }
+                    ]
+                },
+                "message_stats_out": {
+                    "$ref": "#/definitions/models.MessageStats"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -977,6 +2193,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "vhost": {
+                    "description": "Identity",
                     "type": "string"
                 }
             }
@@ -992,16 +2209,277 @@ const docTemplate = `{
                 }
             }
         },
-        "models.PublishMessageRequest": {
+        "models.HttpContext": {
             "type": "object",
             "properties": {
-                "exchange_name": {
+                "bound_to": {
                     "type": "string"
                 },
-                "message": {
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                },
+                "ssl": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.MessageStats": {
+            "type": "object",
+            "properties": {
+                "deliver_get": {
+                    "type": "integer"
+                },
+                "deliver_get_details.rate": {
+                    "type": "number"
+                },
+                "publish": {
+                    "type": "integer"
+                },
+                "publish_details.rate": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.NodeInfo": {
+            "type": "object",
+            "properties": {
+                "enabled_plugins": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message_rates": {
+                    "description": "message rates strategy",
+                    "type": "string"
+                }
+            }
+        },
+        "models.OverviewBrokerDetails": {
+            "type": "object",
+            "properties": {
+                "commit_hash": {
+                    "type": "string"
+                },
+                "commit_number": {
+                    "type": "string"
+                },
+                "data_dir": {
+                    "type": "string"
+                },
+                "go_version": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "product": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "uptime_secs": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.OverviewConnectionStats": {
+            "type": "object",
+            "properties": {
+                "amqp091": {
+                    "description": "Protocol breakdown",
+                    "type": "integer"
+                },
+                "client_connections": {
+                    "description": "Excludes management connections",
+                    "type": "integer"
+                },
+                "closing": {
+                    "type": "integer"
+                },
+                "running": {
+                    "description": "By state",
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.OverviewDTO": {
+            "type": "object",
+            "properties": {
+                "broker": {
+                    "$ref": "#/definitions/models.OverviewBrokerDetails"
+                },
+                "configuration": {
+                    "$ref": "#/definitions/models.BrokerConfigOverview"
+                },
+                "connection_stats": {
+                    "$ref": "#/definitions/models.OverviewConnectionStats"
+                },
+                "message_stats": {
+                    "$ref": "#/definitions/models.OverviewMessageStats"
+                },
+                "node": {
+                    "$ref": "#/definitions/models.OverviewNodeDetails"
+                },
+                "object_totals": {
+                    "$ref": "#/definitions/models.OverviewObjectTotals"
+                }
+            }
+        },
+        "models.OverviewMessageStats": {
+            "type": "object",
+            "properties": {
+                "messages_ready": {
+                    "description": "Current state (easy to calculate now)",
+                    "type": "integer"
+                },
+                "messages_total": {
+                    "description": "Ready + Unacked",
+                    "type": "integer"
+                },
+                "messages_unacknowledged": {
+                    "description": "Sum of unacked",
+                    "type": "integer"
+                },
+                "queue_stats": {
+                    "description": "Per-queue breakdown",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.QueueMessageBreakdown"
+                    }
+                }
+            }
+        },
+        "models.OverviewNodeDetails": {
+            "type": "object",
+            "properties": {
+                "cores": {
+                    "type": "integer"
+                },
+                "disk_available": {
+                    "description": "in bytes",
+                    "type": "integer"
+                },
+                "disk_total": {
+                    "description": "in bytes",
+                    "type": "integer"
+                },
+                "fd_limit": {
+                    "type": "integer"
+                },
+                "fd_used": {
+                    "type": "integer"
+                },
+                "goroutines": {
+                    "type": "integer"
+                },
+                "goroutines_limit": {
+                    "type": "integer"
+                },
+                "info": {
+                    "$ref": "#/definitions/models.NodeInfo"
+                },
+                "memory_limit": {
+                    "description": "in bytes",
+                    "type": "integer"
+                },
+                "memory_usage": {
+                    "description": "in bytes",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "uptime_secs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.OverviewObjectTotals": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "integer"
+                },
+                "connections": {
+                    "type": "integer"
+                },
+                "consumers": {
+                    "type": "integer"
+                },
+                "exchanges": {
+                    "type": "integer"
+                },
+                "queues": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.PublishMessageRequest": {
+            "type": "object",
+            "required": [
+                "payload"
+            ],
+            "properties": {
+                "app_id": {
+                    "type": "string"
+                },
+                "content_encoding": {
+                    "type": "string"
+                },
+                "content_type": {
+                    "type": "string"
+                },
+                "correlation_id": {
+                    "type": "string"
+                },
+                "delivery_mode": {
+                    "description": "1=transient, 2=persistent",
+                    "type": "integer"
+                },
+                "expiration": {
+                    "description": "TTL in milliseconds as string",
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "message_id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "reply_to": {
                     "type": "string"
                 },
                 "routing_key": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -1009,16 +2487,76 @@ const docTemplate = `{
         "models.QueueDTO": {
             "type": "object",
             "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "consumers": {
+                    "description": "Consumers stats",
+                    "type": "integer"
+                },
+                "consumers_active": {
+                    "type": "integer"
+                },
+                "dead_letter_exchange": {
+                    "description": "DLX Configuration (extracted for convenience)",
+                    "type": "string"
+                },
+                "dead_letter_routing_key": {
+                    "type": "string"
+                },
+                "durable": {
+                    "description": "Properties/flags",
+                    "type": "boolean"
+                },
+                "exclusive": {
+                    "type": "boolean"
+                },
+                "max_length": {
+                    "description": "Queue Length Limit (QLL AKA Max Length)",
+                    "type": "integer"
+                },
+                "message_ttl": {
+                    "description": "TTL Configuration",
+                    "type": "integer"
+                },
                 "messages": {
+                    "description": "Message counts (RabbitMQ compatible field names)",
+                    "type": "integer"
+                },
+                "messages_persistent": {
+                    "type": "integer"
+                },
+                "messages_ready": {
+                    "description": "Alias",
+                    "type": "integer"
+                },
+                "messages_total": {
+                    "description": "Ready + Unacked",
+                    "type": "integer"
+                },
+                "messages_unacked": {
                     "type": "integer"
                 },
                 "name": {
                     "type": "string"
                 },
-                "vhost": {
+                "owner_connection": {
+                    "description": "Metadata",
                     "type": "string"
                 },
-                "vhost_id": {
+                "persistence_enabled": {
+                    "type": "boolean"
+                },
+                "state": {
+                    "description": "State",
+                    "type": "string"
+                },
+                "vhost": {
+                    "description": "Identity",
                     "type": "string"
                 }
             }
@@ -1031,6 +2569,23 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.QueueDTO"
                     }
+                }
+            }
+        },
+        "models.QueueMessageBreakdown": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "integer"
+                },
+                "messages_unacknowledged": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
                 }
             }
         },
@@ -1108,7 +2663,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:3000",
+	Host:             "",
 	BasePath:         "/api/",
 	Schemes:          []string{},
 	Title:            "OtterMQ API",

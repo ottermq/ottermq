@@ -1,15 +1,20 @@
 package broker
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/google/uuid"
 )
 
 // Reuse mockConn from queue_test.go in this package
+func newTestConsumerConnID() vhost.ConnectionID {
+	return vhost.ConnectionID(fmt.Sprintf("%s:%s", "test-host", uuid.New().String()[:8]))
+}
 
 func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
@@ -19,17 +24,18 @@ func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connOwner := &mockConn{}
+	connOwnerID := newTestConsumerConnID()
 
 	// Create queue
-	q, err := vh.CreateQueue("qdel.ifunused", &vhost.QueueProperties{Durable: false}, nil)
+	q, err := vh.CreateQueue("qdel.ifunused", &vhost.QueueProperties{Durable: false}, connOwnerID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 	_ = q
 
 	// Register a consumer to make queue 'in use'
-	connOwner := &mockConn{}
-	consumer := vhost.NewConsumer(connOwner, 1, "qdel.ifunused", "ctag-1", &vhost.ConsumerProperties{})
+	consumer := vhost.NewConsumer(connOwnerID, 1, "qdel.ifunused", "ctag-1", &vhost.ConsumerProperties{})
 	if _, err := vh.RegisterConsumer(consumer); err != nil {
 		t.Fatalf("RegisterConsumer failed: %v", err)
 	}
@@ -38,6 +44,14 @@ func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	b.mu.Lock()
 	b.Connections[connOwner] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
+
+	// Initialize and register connection ID in broker's map
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[connOwner] = connOwnerID
+	b.connectionsMu.Unlock()
 
 	// Build request with IfUnused=true
 	req := &amqp.RequestMethodMessage{
@@ -79,18 +93,27 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	conn := &mockConn{}
+	connID := newTestConsumerConnID()
 
 	// Create queue and seed messages
-	q, err := vh.CreateQueue("qdel.ifempty", &vhost.QueueProperties{Durable: false}, nil)
+	q, err := vh.CreateQueue("qdel.ifempty", &vhost.QueueProperties{Durable: false}, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 	q.Push(vhost.Message{ID: "1", Body: []byte("A")})
 
-	conn := &mockConn{}
 	b.mu.Lock()
 	b.Connections[conn] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
+
+	// Initialize and register connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
 
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -131,9 +154,10 @@ func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connID := newTestConsumerConnID()
 
 	// Create queue and seed messages
-	q, err := vh.CreateQueue("qdel.ok", &vhost.QueueProperties{Durable: false}, nil)
+	q, err := vh.CreateQueue("qdel.ok", &vhost.QueueProperties{Durable: false}, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
@@ -141,6 +165,14 @@ func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 	q.Push(vhost.Message{ID: "2"})
 
 	conn := &mockConn{}
+
+	// Initialize and register connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
 
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,
@@ -178,22 +210,32 @@ func TestQueueDeleteHandler_ExclusiveOwnerMismatch_AccessRefused(t *testing.T) {
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	connOwnerID := newTestConsumerConnID()
 
 	// Owner connection declares exclusive queue
-	owner := &mockConn{}
-	q, err := vh.CreateQueue("qdel.excl", &vhost.QueueProperties{Durable: false, Exclusive: true}, owner)
+	// owner := &mockConn{}
+	q, err := vh.CreateQueue("qdel.excl", &vhost.QueueProperties{Durable: false, Exclusive: true}, connOwnerID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
-	if q.OwnerConn != owner {
+	if q.OwnerConn != connOwnerID {
 		t.Fatalf("expected owner to be set on exclusive queue")
 	}
 
 	// Another connection attempts delete
 	foreign := &mockConn{}
+	foreignID := newTestConsumerConnID()
 	b.mu.Lock()
 	b.Connections[foreign] = &amqp.ConnectionInfo{Channels: map[uint16]*amqp.ChannelState{1: {}}}
 	b.mu.Unlock()
+
+	// Initialize and register foreign connection ID
+	b.connectionsMu.Lock()
+	if b.connToID == nil {
+		b.connToID = make(map[net.Conn]vhost.ConnectionID)
+	}
+	b.connToID[foreign] = foreignID
+	b.connectionsMu.Unlock()
 
 	req := &amqp.RequestMethodMessage{
 		Channel:  1,

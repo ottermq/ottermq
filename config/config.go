@@ -13,6 +13,7 @@ type Config struct {
 	ShowLogo   bool
 	BrokerPort string
 	BrokerHost string
+	DataDir    string
 
 	// AMQP Settings
 	HeartbeatIntervalMax uint16
@@ -31,6 +32,9 @@ type Config struct {
 	EnableWebAPI  bool
 	EnableUI      bool
 	EnableSwagger bool
+
+	WebAPIPath  string
+	SwaggerPath string
 
 	// Web Admin
 	WebPort   string
@@ -52,6 +56,7 @@ func LoadConfig(version string) *Config {
 		ShowLogo:   getEnvAsBool("OTTERMQ_SHOW_LOGO", false),
 		BrokerPort: getEnv("OTTERMQ_BROKER_PORT", "5672"),
 		BrokerHost: getEnv("OTTERMQ_BROKER_HOST", ""),
+		DataDir:    getEnv("OTTERMQ_DATA_DIR", "data"),
 
 		HeartbeatIntervalMax: getEnvAsUint16("OTTERMQ_HEARTBEAT_INTERVAL", 60),
 		ChannelMax:           getEnvAsUint16("OTTERMQ_CHANNEL_MAX", 2048),
@@ -66,6 +71,8 @@ func LoadConfig(version string) *Config {
 		EnableWebAPI:  getEnvAsBool("OTTERMQ_ENABLE_WEB_API", true),
 		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
 		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
+		WebAPIPath:    getEnv("OTTERMQ_WEB_API_PATH", "/api"),
+		SwaggerPath:   getEnv("OTTERMQ_SWAGGER_PATH", "/docs"),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
 		Username:  getEnv("OTTERMQ_USERNAME", "guest"),

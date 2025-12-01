@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -18,9 +17,10 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 		Persistence:     fp,
 	}
 	vh := NewVhost("/", options)
+	connID := newTestConsumerConnID()
 
 	// Create a durable queue
-	_, err := vh.CreateQueue("q1", &QueueProperties{Durable: true}, nil)
+	_, err := vh.CreateQueue("q1", &QueueProperties{Durable: true}, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {
 		t.Fatalf("precondition: expected 3 messages in queue, got %d", got)
 	}
 
-	purged, err := vh.PurgeQueue("q1", nil)
+	purged, err := vh.PurgeQueue("q1", connID)
 	if err != nil {
 		t.Fatalf("PurgeQueue returned error: %v", err)
 	}
@@ -62,8 +62,9 @@ func TestPurgeQueue_QueueNotFoundReturnsAMQPError(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	connID := newTestConsumerConnID()
 
-	_, err := vh.PurgeQueue("does-not-exist", nil)
+	_, err := vh.PurgeQueue("does-not-exist", connID)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -91,17 +92,17 @@ func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing
 	vh := NewVhost("/", options)
 
 	// Mock connections
-	ownerConn := &mockConn{}
-	otherConn := &mockConn{}
+	ownerConnID := newTestConsumerConnID()
+	otherConnID := newTestConsumerConnID()
 
 	// Create exclusive queue with owner connection
-	_, err := vh.CreateQueue("exclusive-q", &QueueProperties{Exclusive: true}, ownerConn)
+	_, err := vh.CreateQueue("exclusive-q", &QueueProperties{Exclusive: true}, ownerConnID)
 	if err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)
 	}
 
 	// Try to purge from different connection
-	_, err = vh.PurgeQueue("exclusive-q", otherConn)
+	_, err = vh.PurgeQueue("exclusive-q", otherConnID)
 	if err == nil {
 		t.Fatalf("expected error when purging exclusive queue from wrong connection")
 	}
@@ -121,13 +122,8 @@ func TestPurgeQueue_ExclusiveQueueWrongConnectionReturnsAccessRefused(t *testing
 	}
 
 	// Owner should be able to purge
-	_, err = vh.PurgeQueue("exclusive-q", ownerConn)
+	_, err = vh.PurgeQueue("exclusive-q", ownerConnID)
 	if err != nil {
 		t.Fatalf("owner connection should be able to purge: %v", err)
 	}
-}
-
-// mockConn for testing
-type mockConn struct {
-	net.Conn
 }

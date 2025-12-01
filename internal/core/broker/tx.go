@@ -32,7 +32,11 @@ func (b *Broker) txHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, 
 func (b *Broker) txSelectHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
 
-	txState := vh.GetOrCreateTransactionState(channel, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -53,7 +57,11 @@ func (b *Broker) txSelectHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
 
-	txState := vh.GetOrCreateTransactionState(channel, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
 
@@ -129,11 +137,11 @@ func (b *Broker) txCommitHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		var err error
 		switch ack.Operation {
 		case vhost.AckOperationAck:
-			err = vh.HandleBasicAck(conn, channel, ack.DeliveryTag, ack.Multiple)
+			err = vh.HandleBasicAck(connID, channel, ack.DeliveryTag, ack.Multiple)
 		case vhost.AckOperationNack:
-			err = vh.HandleBasicNack(conn, channel, ack.DeliveryTag, ack.Multiple, ack.Requeue)
+			err = vh.HandleBasicNack(connID, channel, ack.DeliveryTag, ack.Multiple, ack.Requeue)
 		case vhost.AckOperationReject:
-			err = vh.HandleBasicReject(conn, channel, ack.DeliveryTag, ack.Requeue)
+			err = vh.HandleBasicReject(connID, channel, ack.DeliveryTag, ack.Requeue)
 		}
 		if err != nil {
 			ackErrors = append(ackErrors, err)
@@ -170,7 +178,11 @@ func (*Broker) clearBufferedTransactionDataUnlocked(txState *vhost.ChannelTransa
 
 func (b *Broker) txRollbackHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	channel := request.Channel
-	txState := vh.GetOrCreateTransactionState(channel, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	txState := vh.GetOrCreateTransactionState(channel, connID)
 	txState.Lock()
 	defer txState.Unlock()
 

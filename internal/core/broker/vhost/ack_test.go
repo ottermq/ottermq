@@ -1,22 +1,28 @@
 package vhost
 
 import (
-	"net"
+	"fmt"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // helper to build a minimal consumer
-func newTestConsumer(conn net.Conn, ch uint16, queue string, noAck bool) *Consumer {
+func newTestConsumer(connID ConnectionID, ch uint16, queue string, noAck bool) *Consumer {
 	return &Consumer{
-		Tag:        "ctag-test",
-		Channel:    ch,
-		QueueName:  queue,
-		Connection: conn,
-		Active:     true,
+		Tag:          "ctag-test",
+		Channel:      ch,
+		QueueName:    queue,
+		ConnectionID: connID,
+		Active:       true,
 		Props: &ConsumerProperties{
 			NoAck: noAck,
 		},
 	}
+}
+
+func newTestConsumerConnID() ConnectionID {
+	return ConnectionID(fmt.Sprintf("%s:%s", "test-host", uuid.New().String()[:8]))
 }
 
 func TestChannelDeliveryState_SingleAck(t *testing.T) {
@@ -27,13 +33,14 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 	vh := NewVhost("test-vhost", options)
 
 	// Fake connection (nil is sufficient for HandleBasicAck)
-	var conn net.Conn = nil
+	// var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 
 	// Register consumer (manual ack)
-	c := newTestConsumer(conn, 1, "q1", false)
+	c := newTestConsumer(connID, 1, "q1", false)
 
 	// Manually simulate two deliveries by recording unacked entries
-	key := ConnectionChannelKey{conn, c.Channel}
+	key := ConnectionChannelKey{ConnectionID: connID, Channel: c.Channel}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -71,7 +78,7 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 	}
 
 	// Ack first only (single)
-	if err := vh.HandleBasicAck(conn, c.Channel, t1, false); err != nil {
+	if err := vh.HandleBasicAck(connID, c.Channel, t1, false); err != nil {
 		t.Fatalf("HandleBasicAck error: %v", err)
 	}
 
@@ -91,8 +98,8 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
-	key := ConnectionChannelKey{conn, 1}
+	connID := newTestConsumerConnID()
+	key := ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -102,7 +109,7 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 	vh.ChannelDeliveries[key] = ch
 	vh.mu.Unlock()
 	// Register consumer
-	c := newTestConsumer(conn, 1, "q-multi", false)
+	c := newTestConsumer(connID, 1, "q-multi", false)
 	// Simulate deliveries to track unacked messages
 
 	// create 3 tags
@@ -124,7 +131,7 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 
 	// multiple ack up to second tag
 	upTo := uint64(2)
-	if err := vh.HandleBasicAck(conn, 1, upTo, true); err != nil {
+	if err := vh.HandleBasicAck(connID, 1, upTo, true); err != nil {
 		t.Fatalf("HandleBasicAck error: %v", err)
 	}
 
@@ -144,9 +151,9 @@ func TestChannelDeliveryState_UnknownTag(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	// Ack when there is no state — should return error in current implementation
-	if err := vh.HandleBasicAck(conn, 1, 42, false); err == nil {
+	if err := vh.HandleBasicAck(connID, 1, 42, false); err == nil {
 		t.Fatalf("expected error when channel delivery state is missing")
 	}
 }
@@ -157,8 +164,8 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
-	key := ConnectionChannelKey{conn, 2}
+	connID := newTestConsumerConnID()
+	key := ConnectionChannelKey{ConnectionID: connID, Channel: 2}
 
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
@@ -169,7 +176,7 @@ func TestDeliverTracking_NoAckFlag(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Register consumer
-	c := newTestConsumer(conn, 2, "q-noack", false)
+	c := newTestConsumer(connID, 2, "q-noack", false)
 
 	// Simulate manual-ack delivery — stored
 	ch.mu.Lock()
@@ -199,15 +206,15 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	var conn net.Conn = nil
+	connID := newTestConsumerConnID()
 	// Create a queue
-	q, err := vh.CreateQueue("q-clean", nil, conn)
+	q, err := vh.CreateQueue("q-clean", nil, connID)
 	if err != nil {
 		t.Fatalf("CreateQueue error: %v", err)
 	}
 
 	// Prepare an unacked record on channel (conn=nil, ch=3)
-	key := ConnectionChannelKey{conn, 3}
+	key := ConnectionChannelKey{ConnectionID: connID, Channel: 3}
 	ch := &ChannelDeliveryState{
 		UnackedByTag:      make(map[uint64]*DeliveryRecord),
 		UnackedByConsumer: make(map[string]map[uint64]*DeliveryRecord),
@@ -217,7 +224,7 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Register consumer
-	c := newTestConsumer(conn, 3, q.Name, false)
+	c := newTestConsumer(connID, 3, q.Name, false)
 
 	msg := Message{ID: "mx", Body: []byte("x")}
 	ch.mu.Lock()
@@ -231,7 +238,7 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 	ch.mu.Unlock()
 
 	// Cleanup should requeue the unacked message into q
-	vh.CleanupChannel(conn, 3)
+	vh.CleanupChannel(connID, 3)
 
 	if got := q.Len(); got != 1 {
 		t.Fatalf("expected queue length 1 after requeue, got %d", got)

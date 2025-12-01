@@ -56,7 +56,19 @@ func (b *Broker) queueDeleteHandler(request *amqp.RequestMethodMessage, vh *vhos
 	}
 
 	// Exclusive queues can only be deleted by their owning connection
-	if queue.Props.Exclusive && queue.OwnerConn != nil && queue.OwnerConn != conn {
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return sendChannelErrorResponse(
+			errors.NewChannelError(
+				"connection not found",
+				uint16(amqp.INTERNAL_ERROR),
+				uint16(amqp.QUEUE),
+				uint16(amqp.QUEUE_DELETE),
+			),
+			b, conn, request,
+		)
+	}
+	if queue.Props.Exclusive && queue.OwnerConn != connID {
 		return sendChannelErrorResponse(
 			errors.NewChannelError(
 				fmt.Sprintf("queue '%s' is exclusive to another connection", queueName),
@@ -121,7 +133,11 @@ func (b *Broker) queuePurgeHandler(request *amqp.RequestMethodMessage, vh *vhost
 	log.Debug().Interface("content", content).Msg("Content")
 	queueName := content.QueueName
 	var messageCount uint32 = 0
-	messageCount, err := vh.PurgeQueue(queueName, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	messageCount, err := vh.PurgeQueue(queueName, connID)
 	if err != nil {
 		return sendChannelErrorResponse(err, b, conn, request)
 	}
@@ -151,7 +167,11 @@ func (b *Broker) queueBindHandler(request *amqp.RequestMethodMessage, vh *vhost.
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.BindQueue(exchange, queue, routingKey, args, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	err := vh.BindQueue(exchange, queue, routingKey, args, connID)
 	if err != nil {
 		return sendChannelErrorResponse(err, b, conn, request)
 	}
@@ -173,7 +193,11 @@ func (b *Broker) queueUnbindHandler(request *amqp.RequestMethodMessage, vh *vhos
 	routingKey := content.RoutingKey
 	args := content.Arguments
 
-	err := vh.UnbindQueue(exchange, queue, routingKey, args, conn)
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
+	err := vh.UnbindQueue(exchange, queue, routingKey, args, connID)
 	if err != nil {
 		return sendChannelErrorResponse(err, b, conn, request)
 	}
@@ -193,14 +217,17 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 	}
 
 	queueName := content.QueueName
-
+	connID, ok := b.GetConnectionID(conn)
+	if !ok {
+		return nil, fmt.Errorf("connection not found")
+	}
 	queue, err := vh.CreateQueue(queueName, &vhost.QueueProperties{
 		Passive:    content.Passive,
 		Durable:    content.Durable,
 		AutoDelete: content.AutoDelete,
 		Exclusive:  content.Exclusive,
 		Arguments:  content.Arguments,
-	}, conn)
+	}, connID)
 	if err != nil {
 		return sendChannelErrorResponse(err, b, conn, request)
 	}

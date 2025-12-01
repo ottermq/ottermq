@@ -2,10 +2,10 @@ package vhost
 
 import (
 	"context"
-	"net"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
@@ -54,6 +54,13 @@ type VHost struct {
 	QueueLengthLimiter QueueLengthLimiter
 
 	ActiveExtensions map[string]bool
+
+	// injected by the broker to allow consumers to send frames
+	frameSender FrameSender
+}
+
+type FrameSender interface {
+	SendFrame(connID ConnectionID, channel uint16, frame []byte) error
 }
 
 type VHostOptions struct {
@@ -91,6 +98,12 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	vh.setupExtensions(options)
 
 	return vh
+}
+
+func (vh *VHost) SetFrameSender(sender FrameSender) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	vh.frameSender = sender
 }
 
 func (vh *VHost) setupExtensions(options VHostOptions) {
@@ -139,11 +152,11 @@ func (vh *VHost) GetUnackedMessageCountsAllQueues() map[string]int {
 }
 
 // GetUnackedMessageCountByChannel returns the count of unacknowledged messages for a specific connection and channel.
-func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) int {
+func (vh *VHost) GetUnackedMessageCountByChannel(connID ConnectionID, channel uint16) int {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	key := ConnectionChannelKey{conn, channel}
+	key := ConnectionChannelKey{connID, channel}
 	channelState := vh.ChannelDeliveries[key]
 	if channelState == nil {
 		return 0
@@ -154,6 +167,86 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	channelState.mu.Unlock()
 
 	return count
+}
+
+// GetConsumerCountsAllQueues returns a map of queue names to the number of active consumers.
+func (vh *VHost) GetConsumerCountsAllQueues() map[string]int {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	counts := make(map[string]int)
+	for queueName, consumers := range vh.ConsumersByQueue {
+		counts[queueName] = len(consumers)
+	}
+	return counts
+}
+
+// GetConsumersByQueue returns a slice of consumers for the specified queue.
+func (vh *VHost) GetConsumersByQueue(queueName string) []*Consumer {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	return vh.ConsumersByQueue[queueName]
+}
+
+// GetExchangeUniqueNames returns a map of unique exchange names across all vhosts.
+// Necessary to avoid duplicates when listing exchanges (e.g., default exchange "" and amqp.default).
+// It lists the default exchange as "(AMQP default)", which is more client-friendly than "" (empty string).
+
+func (vh *VHost) GetExchangeUniqueNames() map[string]bool {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	exchangeNames := make(map[string]bool)
+	for _, exchange := range vh.Exchanges {
+		if exchange.Name != EMPTY_EXCHANGE {
+			exchangeNames[exchange.Name] = true
+		}
+	}
+
+	return exchangeNames
+}
+
+// GetAllExchanges returns a slice of all (deduplicated) exchanges in this vhost.
+func (vh *VHost) GetAllExchanges() []*Exchange {
+	exchangeNames := vh.GetExchangeUniqueNames()
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	exchanges := make([]*Exchange, 0, len(exchangeNames))
+	for name := range exchangeNames {
+		exchanges = append(exchanges, vh.Exchanges[name])
+	}
+	return exchanges
+}
+
+// GetExchange retrieves an exchange by name.
+func (vh *VHost) GetExchange(exchangeName string) *Exchange {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	// get actual exchange name in case an alias was used
+	actualName := exchangeName
+	if exchangeName == DEFAULT_EXCHANGE_ALIAS || exchangeName == EMPTY_EXCHANGE {
+		actualName = DEFAULT_EXCHANGE
+	}
+	return vh.Exchanges[actualName]
+}
+
+// GetAllQueues returns a copy of all queues in this vhost.
+func (vh *VHost) GetAllQueues() []*Queue {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	queues := make([]*Queue, 0, len(vh.Queues))
+	for _, queue := range vh.Queues {
+		queues = append(queues, queue)
+	}
+	return queues
+}
+
+// GetQueue retrieves a queue by name.
+func (vh *VHost) GetQueue(queueName string) *Queue {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.Queues[queueName]
 }
 
 func (vh *VHost) loadPersistedState() {
@@ -206,10 +299,55 @@ func (vh *VHost) loadPersistedState() {
 			if skippedQueues[bindingData.QueueName] {
 				continue
 			}
-			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments, nil)
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey, exchange.Properties.Arguments, INTERNAL_CONN_ID)
 			if err != nil {
 				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
 			}
 		}
 	}
+}
+
+func (vh *VHost) ListConsumers(cb func(queueName string, consumer Consumer, dtos []models.ConsumerDTO)) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	// Iterate through all queues and their consumers
+	for queueName, queueConsumers := range vh.ConsumersByQueue {
+		for _, consumer := range queueConsumers {
+			cb(queueName, *consumer, nil)
+		}
+	}
+	return nil
+}
+
+type NoConsumersError interface {
+	error
+}
+
+func (vh *VHost) ListQueueConsumers(queueName string, cb func(consumer Consumer, dtos []any)) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	queueConsumers, err := vh.getConsumersByQueue(queueName)
+	if err != nil {
+		return err
+	}
+	if len(queueConsumers) == 0 {
+		return nil // No consumers
+	}
+
+	consumers := make([]any, 0, len(queueConsumers))
+	for _, consumer := range queueConsumers {
+		cb(*consumer, consumers)
+	}
+	return nil
+
+}
+
+func (vh *VHost) getConsumersByQueue(queueName string) ([]*Consumer, error) {
+	queueConsumers, exists := vh.ConsumersByQueue[queueName]
+	if !exists {
+		return nil, nil
+	}
+	return queueConsumers, nil
 }

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -87,7 +89,23 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			}
 		}
 		if _, err := b.processRequest(conn, newState); err != nil {
-			log.Error().Err(err).Msg("Failed to process request")
+			// if the error reaches here, it means that the error is at connection level and unexpected
+			// Expected errors should be handled at method level and send channel.close instead
+			if _, isChannelError := err.(*errors.ChannelError); isChannelError {
+				log.Error().Err(err).Msg("Unexpected channel error at connection level")
+			} else if _, isMethodError := err.(*errors.ConnectionError); isMethodError {
+				log.Error().Err(err).Msg("Failed to process request")
+			}
+			request := newState.MethodFrame
+
+			b.sendConnectionClosing(conn,
+				request.Channel,
+				uint16(amqp.INTERNAL_ERROR),
+				uint16(request.ClassID),
+				uint16(request.MethodID),
+				err.Error(),
+			)
+			b.setConnectionClosingState(conn)
 		}
 	}
 }
@@ -96,6 +114,13 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 	b.mu.Lock()
 	b.Connections[conn] = connInfo
 	b.mu.Unlock()
+
+	// Register connection ID in bidirectional maps
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	b.connectionsMu.Lock()
+	b.connections[connID] = conn
+	b.connToID[conn] = connID
+	b.connectionsMu.Unlock()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
@@ -103,18 +128,25 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	connInfo, ok := b.Connections[conn]
 	if !ok {
 		b.mu.Unlock()
+		log.Debug().Msg("cleanupConnection: connection not found in b.Connections")
 		return
 	}
 	vhName := connInfo.VHostName
 	delete(b.Connections, conn)
 	b.mu.Unlock()
 
+	// Remove from bidirectional maps
+	b.connectionsMu.Lock()
+	connID, hasConnID := b.connToID[conn]
+	delete(b.connections, connID)
+	delete(b.connToID, conn)
+	b.connectionsMu.Unlock()
+
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
-	if vh != nil {
-		vh.CleanupConnection(conn)
-	} else {
-		log.Debug().Str("vhost", vhName).Msg("VHost not found during connection cleanup")
+	if vh != nil && hasConnID {
+		vh.CleanupConnection(connID)
+		log.Debug().Str("vhost", vhName).Str("conn_id", string(connID)).Msg("Cleaned up connection consumers and channels from vhost")
 	}
 }
 

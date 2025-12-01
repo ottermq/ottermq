@@ -48,26 +48,54 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async fetchBindings(exchange) {
         const {data} = await api.get(`/bindings/${encodeURIComponent(exchange)}`)
-        const map = data?.bindings ?? {}
-        const list = []
-        Object.entries(map).forEach(([routing_key, queues]) => {
-        (queues || []).forEach(q => list.push({routingKey: routing_key, queue: q}))
-        })
+        const list = Array.isArray(data?.bindings) 
+        ? data.bindings.map(b => ({
+            source: b.source,
+            destination_type: b.destination_type,
+            queue: b.destination,
+            routingKey: b.routing_key,
+            arguments: b.arguments,
+            propertiesKey: b.properties_key,
+        })) : []
         this.bindings = list
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        exchange_name: exchange, routing_key: routingKey, queue_name: queue
+        source: exchange, routing_key: routingKey, destination: queue
       })
       await this.fetchBindings(exchange)
     },
     async deleteBinding(exchange, routingKey, queue) {
-      await api.delete(`/bindings`, { data: { exchange_name: exchange, routing_key: routingKey, queue_name: queue } })
+      await api.delete(`/bindings`, { data: { 
+        vhost: "/",
+        source: exchange, 
+        routing_key: routingKey, 
+        destination: queue,
+        arguments: {},
+      } })
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
       await api.post(`/messages`, {
-        exchange_name: exchange, routing_key: routingKey, message
+        vhost: "/",
+        exchange: exchange, 
+        routing_key: routingKey, 
+        payload: message,
+        content_type: "text/plain",
+        content_encoding: "utf-8",
+        delivery_mode: 1, // 1 - transient, 2 - persistent
+        priority: 0,
+        correlation_id: "",
+        reply_to: "",
+        expiration: "",
+        message_id: "",
+        timestamp: null,
+        type: "",
+        user_id: "",
+        app_id: "",
+        headers: null,
+        mandatory: false,
+        immediate: false,
       })
     },
     select(exchange) { this.selected = exchange },

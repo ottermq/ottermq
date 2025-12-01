@@ -16,31 +16,45 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		return b.handleExchangeDeclare(request, channel, vh, conn)
 
 	case uint16(amqp.EXCHANGE_DELETE):
-		log.Debug().Interface("request", request).Msg("Received exchange.delete request")
-		log.Debug().Uint16("channel", channel).Msg("Channel")
-		content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
-		if !ok {
-			log.Error().Msg("Invalid content type for ExchangeDeleteMessage")
-			return nil, fmt.Errorf("invalid content type for ExchangeDeleteMessage")
-		}
-		log.Debug().Interface("content", content).Msg("Content")
-		exchangeName := content.ExchangeName
-
-		err := vh.DeleteExchange(exchangeName)
-		if err != nil {
-			return nil, err
-		}
-
-		frame := b.framer.CreateExchangeDeleteFrame(request.Channel)
-
-		if err := b.framer.SendFrame(conn, frame); err != nil {
-			log.Error().Err(err).Msg("Failed to send exchange delete frame")
-		}
-		return nil, nil
+		return b.handleExchangeDelete(request, channel, vh, conn)
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func (b *Broker) handleExchangeDelete(request *amqp.RequestMethodMessage, channel uint16, vh *vhost.VHost, conn net.Conn) (any, error) {
+	log.Debug().Interface("request", request).Msg("Received exchange.delete request")
+	log.Debug().Uint16("channel", channel).Msg("Channel")
+	content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for ExchangeDeleteMessage")
+		return nil, fmt.Errorf("invalid content type for ExchangeDeleteMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	exchangeName := content.ExchangeName
+	ifUnused := content.IfUnused
+
+	if ifUnused {
+		exchange, exists := vh.Exchanges[exchangeName]
+		if !exists {
+			return nil, fmt.Errorf("exchange '%s' does not exist", exchangeName)
+		}
+		if exchange.BindingCount() > 0 {
+			return nil, fmt.Errorf("exchange '%s' has active bindings", exchangeName)
+		}
+	}
+	err := vh.DeleteExchange(exchangeName)
+	if err != nil {
+		return nil, err
+	}
+
+	frame := b.framer.CreateExchangeDeleteFrame(request.Channel)
+
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send exchange delete frame")
+	}
+	return nil, nil
 }
 
 func (b *Broker) handleExchangeDeclare(request *amqp.RequestMethodMessage, channel uint16, vh *vhost.VHost, conn net.Conn) (any, error) {

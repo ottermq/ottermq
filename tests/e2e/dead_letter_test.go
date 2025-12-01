@@ -319,9 +319,16 @@ func TestDLX_WithoutConfiguration(t *testing.T) {
 	tc := NewTestConnection(t, brokerURL)
 	defer tc.Close()
 
-	// Create queue WITHOUT DLX configuration
-	q, err := tc.Ch.QueueDeclare("no-dlx-queue", false, true, false, false, nil)
+	// Create queue WITHOUT DLX configuration (use unique name)
+	// NOTE: Using auto-delete=false so queue persists for inspection
+	queueName := tc.UniqueQueueName("no-dlx-queue")
+	q, err := tc.Ch.QueueDeclare(queueName, false, false, false, false, nil)
 	require.NoError(t, err)
+
+	// Ensure cleanup at end
+	defer func() {
+		_, _ = tc.Ch.QueueDelete(q.Name, false, false, false)
+	}()
 
 	// Publish message
 	err = tc.Ch.Publish("", q.Name, false, false, amqp.Publishing{
@@ -330,7 +337,8 @@ func TestDLX_WithoutConfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Consume and reject
-	msgs := tc.StartConsumer(q.Name, "", false)
+	consumerTag := tc.UniqueConsumerTag("consumer")
+	msgs := tc.StartConsumer(q.Name, consumerTag, false)
 	msg, ok := tc.ConsumeWithTimeout(msgs, 2*time.Second)
 	if !ok {
 		t.Fatal("timeout waiting for message")
@@ -409,7 +417,8 @@ func TestDLX_MultipleNack(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Check DLQ has 2 messages
-	dlqInspected, err := tc.Ch.QueueInspect(dlq.Name)
+	// dlqInspected, err := tc.Ch.QueueInspect(dlq.Name)
+	dlqInspected, err := tc.Ch.QueueDeclarePassive(dlq.Name, false, true, false, false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, dlqInspected.Messages, "two messages should be in DLQ")
 
@@ -419,7 +428,16 @@ func TestDLX_MultipleNack(t *testing.T) {
 
 	// After acking msg3, the main queue should be completely empty
 	time.Sleep(50 * time.Millisecond)
-	inspected, err := tc.Ch.QueueInspect(mainQueue.Name)
+	inspected, err := tc.Ch.QueueDeclarePassive(mainQueue.Name,
+		false,
+		true,
+		false,
+		false,
+		amqp.Table{
+			"x-dead-letter-exchange":    "dlx-multi",
+			"x-dead-letter-routing-key": "dead",
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, 0, inspected.Messages, "main queue should be empty after all messages processed")
 }

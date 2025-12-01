@@ -42,6 +42,7 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
 	}
 
@@ -72,6 +73,10 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 		Channels:  make(map[uint16]*amqp.ChannelState),
 	}
 	broker.Connections[conn].Channels[1] = &amqp.ChannelState{}
+
+	// Register connection ID
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
+	broker.connToID[conn] = connID
 
 	return broker, mockFramer, conn
 }
@@ -141,8 +146,8 @@ func TestBasicConsumeHandler_ValidConsumer(t *testing.T) {
 	}
 
 	channelKey := vhost.ConnectionChannelKey{
-		Connection: conn,
-		Channel:    1,
+		ConnectionID: vhost.ConnectionID(GenerateConnectionID(conn)),
+		Channel:      1,
 	}
 	channelConsumers := vh.ConsumersByChannel[channelKey]
 	if len(channelConsumers) != 1 {
@@ -239,9 +244,9 @@ func TestBasicConsumeHandler_NonExistentQueue(t *testing.T) {
 func TestBasicConsumeHandler_DuplicateConsumer(t *testing.T) {
 	broker, _, conn := createTestBroker()
 	vh := broker.VHosts["test-vhost"]
-
+	connID := vhost.ConnectionID(GenerateConnectionID(conn))
 	// Register first consumer
-	consumer1 := vhost.NewConsumer(conn, 1, "test-queue", "duplicate-tag", &vhost.ConsumerProperties{
+	consumer1 := vhost.NewConsumer(connID, 1, "test-queue", "duplicate-tag", &vhost.ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,

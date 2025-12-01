@@ -25,7 +25,7 @@ var (
 // @title OtterMQ API
 // @version 1.0
 // @description API documentation for OtterMQ broker
-// @host localhost:3000
+// @host
 // @BasePath /api/
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -109,19 +109,14 @@ func main() {
 			WebServerPort: cfg.WebPort,
 			EnableUI:      cfg.EnableUI,
 			EnableSwagger: cfg.EnableSwagger,
+			SwaggerPrefix: cfg.SwaggerPath,
+			ApiPrefix:     cfg.WebAPIPath,
 		}
-		// initialize amqp client connection
-		conn, err := web.GetBrokerClient(webConfig)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to connect to broker")
-		}
-		defer conn.Close()
 
-		webServer, err = web.NewWebServer(webConfig, b, conn)
+		webServer, err = web.NewWebServer(webConfig, b)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to create web server")
 		}
-		defer webServer.Close()
 
 		// open "server.log" for appending
 		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
