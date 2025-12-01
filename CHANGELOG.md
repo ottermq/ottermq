@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Performance
+
+## [v0.15.0] - 2025-12-01
+
+### Added
+
 - **Management API Refactoring (Phases 1-6 Complete)**: Professional service layer architecture
   - Management service layer (`internal/core/broker/management/`) separating business logic from HTTP handlers
   - `BrokerProvider` interface pattern to avoid circular dependencies
@@ -257,11 +267,12 @@ For releases prior to v0.7.1, please refer to [GitHub Releases](https://github.c
 
 ---
 
-[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.15.0...HEAD
+[v0.15.0]: https://github.com/ottermq/ottermq/releases/tag/v0.15.0
+[v0.14.0]: https://github.com/ottermq/ottermq/releases/tag/v0.14.0
 [0.13.0]: https://github.com/ottermq/ottermq/releases/tag/v0.13.0
 [0.12.0]: https://github.com/ottermq/ottermq/releases/tag/v0.12.0
 [0.10.0]: https://github.com/ottermq/ottermq/releases/tag/v0.10.0
 [0.9.0]: https://github.com/ottermq/ottermq/releases/tag/v0.9.0
 [0.8.0]: https://github.com/ottermq/ottermq/releases/tag/v0.8.0
 [0.7.1]: https://github.com/ottermq/ottermq/releases/tag/v0.7.1
-
