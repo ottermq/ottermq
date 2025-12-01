@@ -98,8 +98,8 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 
 func propertiesToMap(props amqp.BasicProperties) map[string]any {
 	result := make(map[string]any)
-	result["ContentType"] = props.ContentType
-	result["ContentEncoding"] = props.ContentEncoding
+	result["ContentType"] = string(props.ContentType)
+	result["ContentEncoding"] = string(props.ContentEncoding)
 	result["Headers"] = props.Headers
 	result["DeliveryMode"] = fmt.Sprintf("%d", props.DeliveryMode)
 	result["Priority"] = fmt.Sprintf("%d", props.Priority)

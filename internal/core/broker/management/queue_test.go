@@ -182,8 +182,10 @@ func addUnackedMessages(vh *vhost.VHost, queueName string, count int) {
 	if state.UnackedByConsumer[consumerTag] == nil {
 		state.UnackedByConsumer[consumerTag] = make(map[uint64]*vhost.DeliveryRecord)
 	}
+	// Start from LastDeliveryTag+1 to avoid overwriting previous unacked messages
+	startTag := state.LastDeliveryTag + 1
 	for i := 0; i < count; i++ {
-		tag := uint64(i + 1)
+		tag := startTag + uint64(i)
 		rec := &vhost.DeliveryRecord{DeliveryTag: tag, ConsumerTag: consumerTag, QueueName: queueName}
 		state.UnackedByTag[tag] = rec
 		state.UnackedByConsumer[consumerTag][tag] = rec
