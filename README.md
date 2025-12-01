@@ -178,6 +178,136 @@ make docs
 
 This will update the Swagger spec and refresh the documentation served at `/docs`.
 
+### Management API Examples
+
+OtterMQ provides a comprehensive REST API for managing queues, exchanges, bindings, and monitoring broker state. The API supports all broker features including TTL, DLX, QLL, and QoS.
+
+#### Queue Management
+
+**Create a queue with TTL and DLX:**
+
+```sh
+curl -X POST http://localhost:3000/api/queues/my-vhost/my-queue \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "durable": true,
+    "auto_delete": false,
+    "arguments": {
+      "x-message-ttl": 60000,
+      "x-dead-letter-exchange": "dlx-exchange",
+      "x-max-length": 10000
+    }
+  }'
+```
+
+**List all queues:**
+
+```sh
+curl http://localhost:3000/api/queues \
+  -H "Authorization: Bearer <token>"
+```
+
+**Get queue details:**
+
+```sh
+curl http://localhost:3000/api/queues/my-vhost/my-queue \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Exchange Management
+
+**Create a topic exchange:**
+
+```sh
+curl -X POST http://localhost:3000/api/exchanges/my-vhost/my-exchange \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "topic",
+    "durable": true,
+    "auto_delete": false,
+    "internal": false
+  }'
+```
+
+#### Binding Management
+
+**Bind a queue to an exchange:**
+
+```sh
+curl -X POST http://localhost:3000/api/bindings/my-vhost \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "my-exchange",
+    "destination": "my-queue",
+    "destination_type": "queue",
+    "routing_key": "events.#"
+  }'
+```
+
+#### Message Operations
+
+**Publish a message:**
+
+```sh
+curl -X POST http://localhost:3000/api/messages/my-vhost/my-exchange \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routing_key": "events.user.created",
+    "payload": "Hello, OtterMQ!",
+    "content_type": "text/plain",
+    "delivery_mode": 2,
+    "priority": 5
+  }'
+```
+
+**Get messages from a queue:**
+
+```sh
+curl -X POST http://localhost:3000/api/messages/my-vhost/my-queue/get \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 10,
+    "ack_mode": "ack_requeue_true"
+  }'
+```
+
+#### Monitoring & Statistics
+
+**Get broker overview:**
+
+```sh
+curl http://localhost:3000/api/overview \
+  -H "Authorization: Bearer <token>"
+```
+
+**List active consumers:**
+
+```sh
+curl http://localhost:3000/api/consumers \
+  -H "Authorization: Bearer <token>"
+```
+
+**List active connections:**
+
+```sh
+curl http://localhost:3000/api/connections \
+  -H "Authorization: Bearer <token>"
+```
+
+**List channels:**
+
+```sh
+curl http://localhost:3000/api/channels \
+  -H "Authorization: Bearer <token>"
+```
+
+For complete API reference, see the Swagger documentation at `/docs`.
+
 ## 📄 Project Pages (Status & AMQP Compliance)
 
 We publish a live status site that tracks protocol/class/method support, planned work, and compatibility notes—similar to RabbitMQ’s specification page.

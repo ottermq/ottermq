@@ -60,6 +60,24 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Management API Refactoring** - Professional service layer architecture (v0.15.0)
+  - [x] Complete separation of HTTP handlers from broker logic
+  - [x] Service layer in `internal/core/broker/management/` with 11 service modules
+  - [x] Zero AMQP protocol overhead for management operations
+  - [x] Full feature exposure: Queues, Exchanges, Bindings, Consumers, Channels, Connections, Messages
+  - [x] Complete DTOs with all properties (TTL, DLX, QLL, QoS, consumer counts, unacked messages)
+  - [x] Structured binding operations (no raw maps)
+  - [x] Consumer visibility API (list all, list by queue, detailed consumer info)
+  - [x] Channel monitoring (list all, list by connection, channel details)
+  - [x] Message operations with full AMQP properties (publish with TTL/priority/headers, get with ack modes)
+  - [x] Connection management (list, get details, close connections)
+  - [x] VHost operations with statistics
+  - [x] Overview endpoint (broker/node/object totals, message stats, connection stats)
+  - [x] BrokerProvider interface pattern to avoid circular dependencies
+  - [x] Thread-safe operations with proper lock management
+  - [x] Comprehensive test coverage (52 tests, 66% coverage)
+  - [x] Updated Swagger documentation
+  - [x] API examples in README with curl commands
 - [x] **Message TTL and Expiration** - RabbitMQ-compatible time-to-live for messages (v0.13.0)
   - [x] Per-message TTL via `Expiration` property (relative milliseconds)
   - [x] Per-queue TTL via `x-message-ttl` argument
