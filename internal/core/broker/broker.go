@@ -344,6 +344,55 @@ func (b *Broker) Shutdown() {
 	}
 }
 
+// ListVhostDetails returns details of all vhosts in the broker.
+func (b *Broker) ListVhostDetails() ([]models.VHostDTO, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// create a map with vhost name to channel info
+	vhosts := make([]models.VHostDTO, 0, len(b.VHosts))
+	// channelsPerVhost := make(map[string]models.ChannelInfo)
+	for _, vh := range b.VHosts {
+		VHostDTO, err := b.CreateVhostDto(vh)
+		if err != nil {
+			return nil, err
+		}
+		vhosts = append(vhosts, VHostDTO)
+	}
+	return vhosts, nil
+}
+
+func (b *Broker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
+	channels, err := b.ListChannels(vh.Name)
+	if err != nil {
+		return models.VHostDTO{}, err
+	}
+	var users map[string]bool = make(map[string]bool)
+	var unconfirmed_count, unacked_count int
+	var prefetch_count uint16 = 0
+	for _, ch := range channels {
+		users[ch.User] = true
+		unconfirmed_count += ch.UnconfirmedCount
+		prefetch_count += ch.PrefetchCount
+		unacked_count += ch.UnackedCount
+	}
+
+	// Convert users map keys to a slice
+	userList := make([]string, 0, len(users))
+	for user := range users {
+		userList = append(userList, user)
+	}
+
+	VHostDTO := models.VHostDTO{
+		Name:             vh.Name,
+		Users:            userList,
+		State:            "running", // Currently, if the vhost exists, it's running
+		UnconfirmedCount: unconfirmed_count,
+		PrefetchCount:    prefetch_count,
+		UnackedCount:     unacked_count,
+	}
+	return VHostDTO, nil
+}
+
 // ListChannels returns all channels across all connections.
 func (b *Broker) ListChannels(vhost string) ([]models.ChannelInfo, error) {
 	filterSet := vhost != ""
