@@ -1152,7 +1152,7 @@ const docTemplate = `{
                 "tags": [
                     "overview"
                 ],
-                "summary": "Get basic broker information",
+                "summary": "Get broker overview",
                 "responses": {
                     "200": {
                         "description": "OK",
