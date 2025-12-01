@@ -70,6 +70,16 @@ func (fb *fakeBroker) CloseConnection(name string, reason string) error {
 	return nil
 }
 
+func (fb *fakeBroker) ListVhostDetails() ([]models.VHostDTO, error) {
+	// For testing purposes, return an empty list.
+	return []models.VHostDTO{}, nil
+}
+
+func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
+	// For testing purposes, return a default VHostDTO.
+	return models.VHostDTO{Name: vh.Name}, nil
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()

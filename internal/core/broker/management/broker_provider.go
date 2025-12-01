@@ -10,6 +10,8 @@ import (
 type BrokerProvider interface {
 	GetVHost(vhostName string) *vhost.VHost
 	ListVHosts() []*vhost.VHost
+	ListVhostDetails() ([]models.VHostDTO, error)
+	CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error)
 	ListConnections() []amqp.ConnectionInfo
 	ListChannels(vhost string) ([]models.ChannelInfo, error)
 	ListConnectionChannels(connectionName string) ([]models.ChannelInfo, error)
