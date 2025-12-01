@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -159,7 +160,7 @@ func (m *MockFrameSender) SendFrame(connID interface{}, channel uint16, frame []
 	connIDStr := ""
 	if connID != nil {
 		// Use Sprintf to convert any type to string safely
-		connIDStr = string(connID.(interface{ String() string }).String())
+		connIDStr = fmt.Sprintf("%v", connID)
 	}
 	m.SentFrames = append(m.SentFrames, SentFrame{
 		ConnID:  connIDStr,

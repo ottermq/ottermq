@@ -19,8 +19,8 @@ func GetBasicBrokerInfo(c *fiber.Ctx, b *broker.Broker) error {
 	return c.Status(fiber.StatusOK).JSON(info)
 }
 
-// GetBasicBrokerInfo godoc
-// @Summary Get basic broker information
+// GetOverview godoc
+// @Summary Get broker overview
 // @Description Retrieve basic information about the message broker
 // @Tags overview
 // @Accept json

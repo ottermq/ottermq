@@ -117,9 +117,9 @@ func createQueue(c *fiber.Ctx, b *broker.Broker, queue string) error {
 	q, err := b.Management.CreateQueue(vhost, queue, request)
 	if err != nil {
 		// if error is amqp error, verify if it's a 404 (not found) and contains 'no queue' in the text
-		if err.(errors.AMQPError).ReplyCode() == 404 {
+		if amqpErr, ok := err.(errors.AMQPError); ok && amqpErr.ReplyCode() == 404 {
 			return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
-				Error: err.(errors.AMQPError).ReplyText(),
+				Error: amqpErr.ReplyText(),
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
