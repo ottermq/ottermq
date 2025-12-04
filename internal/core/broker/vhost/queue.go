@@ -95,132 +95,180 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 			case <-q.deliveryCtx.Done():
 				log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
 				return
-			case msg := <-q.messages:
-				q.mu.Lock()
-				q.count--
-				q.mu.Unlock()
-
-				// Check if we're shutting down - if so, put message back and exit
-				select {
-				case <-q.deliveryCtx.Done():
-					log.Debug().Str("queue", q.Name).Msg("Delivery loop cancelled, requeuing message and stopping")
-					// Put the message back before exiting
-					q.mu.Lock()
-					q.count++
-					q.mu.Unlock()
-					// Use non-blocking send since channel might be closed
-					select {
-					case q.messages <- msg:
-					default:
-						log.Warn().Str("queue", q.Name).Msg("Could not requeue message on shutdown - channel full or closed")
-					}
-					return
-				default:
-					// Continue with delivery
-				}
-
-				// Verify if TTL is enabled
-				if vh.handleTTLExpiration(msg, q) {
-					continue
-				}
-
-				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
-				consumers := vh.GetActiveConsumersForQueue(q.Name)
-
-				// No consumers available, requeue and wait
-				if len(consumers) == 0 {
-					log.Debug().Str("queue", q.Name).Msg("No consumers available, requeuing message")
-					// Check if context was cancelled before requeuing
-					select {
-					case <-q.deliveryCtx.Done():
-						log.Debug().Str("queue", q.Name).Msg("Delivery loop stopped, not requeuing")
-						return
-					default:
-						q.Push(msg)
-						time.Sleep(100 * time.Millisecond)
-						continue
-					}
-				}
-
-				delivered := false
-				maxRounds := 100 // Prevent infinite loop
-				rounds := 0
-
-				for !delivered && rounds < maxRounds {
-					rounds++
-					allThrottled := true
-
-					// Try each consumer once per round
-					for i := 0; i < len(consumers); i++ {
-						consumer := consumers[i]
-						state := vh.getChannelDeliveryState(consumer.ConnectionID, consumer.Channel)
-
-						if vh.shouldThrottle(consumer, state) {
-							continue // Try next consumer
-						}
-
-						// Found available consumer
-						allThrottled = false
-						if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
-							log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
-							if cancelErr := vh.CancelConsumer(consumer.Channel, consumer.Tag); cancelErr != nil {
-								log.Error().Err(cancelErr).Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
-							}
-							// Refresh consumer list and retry
-							consumers = vh.GetActiveConsumersForQueue(q.Name)
-							if len(consumers) == 0 {
-								// Check if context was cancelled before requeuing
-								select {
-								case <-q.deliveryCtx.Done():
-									delivered = true // Exit loop without requeuing
-								default:
-									q.Push(msg)
-									delivered = true // Exit loop
-								}
-							}
-							break // Retry with new consumer list
-						}
-						delivered = true
-						break // Successfully delivered
-					}
-
-					if allThrottled && !delivered {
-						// All consumers are throttled, wait for signal or timeout
-						// Try to get a signal from any consumer's channel
-						var anyState *ChannelDeliveryState
-						for _, c := range consumers {
-							if s := vh.getChannelDeliveryState(c.ConnectionID, c.Channel); s != nil {
-								anyState = s
-								break
-							}
-						}
-
-						if anyState != nil {
-							select {
-							case <-anyState.unackedChanged:
-								// A slot opened up, retry immediately
-								continue
-							case <-time.After(1 * time.Second):
-								// Timeout, will retry or give up based on maxRounds
-								continue
-							case <-q.deliveryCtx.Done():
-								return
-							}
-						} else {
-							// No state available, just sleep briefly
-							time.Sleep(100 * time.Millisecond)
-						}
-					}
-				}
-
-				// If we exhausted retries, requeue the message
-				if !delivered {
-					log.Warn().Str("queue", q.Name).Int("rounds", rounds).Msg("Could not deliver after max rounds, requeuing")
-					q.Push(msg)
+			default:
+				if q.maxPriority > 0 {
+					q.deliverFromPriorityQueue(vh)
+				} else {
+					q.deliverFromFIFOQueue(vh)
 				}
 			}
 		}
 	}()
+}
+
+func (q *Queue) deliverFromPriorityQueue(vh *VHost) {
+	select {
+	case <-q.deliveryCtx.Done():
+		log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
+		return
+	case <-q.messageSignal:
+		// There is at least one message in the priority queue
+		msg := q.Pop()
+		if msg == nil {
+			return
+		}
+		q.deliverMessage(vh, *msg)
+
+		isDone := requeueOnShutdown(q, *msg)
+		if isDone {
+			return
+		}
+	}
+}
+
+func (q *Queue) deliverFromFIFOQueue(vh *VHost) {
+	select {
+	case <-q.deliveryCtx.Done():
+		log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
+		return
+	case msg := <-q.messages:
+		q.mu.Lock()
+		q.count--
+		q.mu.Unlock()
+		q.deliverMessage(vh, msg)
+
+		isDone := requeueOnShutdown(q, msg)
+		if isDone {
+			return
+		}
+	}
+}
+
+// requeueOnShutdown checks if the delivery context is done and requeues the message if so.
+// It returns true if the delivery loop should stop.
+func requeueOnShutdown(q *Queue, msg Message) bool {
+	// Check if we're shutting down - if so, put message back and exit
+
+	select {
+	case <-q.deliveryCtx.Done():
+		log.Debug().Str("queue", q.Name).Msg("Delivery loop cancelled, requeuing message and stopping")
+		// Put the message back before exiting
+		q.mu.Lock()
+		q.count++
+		q.mu.Unlock()
+		// Use non-blocking send since channel might be closed
+		select {
+		case q.messages <- msg:
+		default:
+			log.Warn().Str("queue", q.Name).Msg("Could not requeue message on shutdown - channel full or closed")
+		}
+		return true // Indicate that delivery loop should stop
+	default:
+		// Continue with delivery
+	}
+	return false
+}
+
+func (q *Queue) deliverMessage(vh *VHost, msg Message) {
+	// Verify if TTL is enabled
+	if vh.handleTTLExpiration(msg, q) {
+		return
+	}
+
+	log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
+	consumers := vh.GetActiveConsumersForQueue(q.Name)
+
+	// No consumers available, requeue and wait
+	if len(consumers) == 0 {
+		log.Debug().Str("queue", q.Name).Msg("No consumers available, requeuing message")
+		// Check if context was cancelled before requeuing
+		select {
+		case <-q.deliveryCtx.Done():
+			log.Debug().Str("queue", q.Name).Msg("Delivery loop stopped, not requeuing")
+			return
+		default:
+			q.Push(msg)
+			time.Sleep(100 * time.Millisecond)
+			return
+		}
+	}
+
+	delivered := false
+	maxRounds := 100 // Prevent infinite loop
+	rounds := 0
+
+	for !delivered && rounds < maxRounds {
+		rounds++
+		allThrottled := true
+
+		// Try each consumer once per round
+		for i := 0; i < len(consumers); i++ {
+			consumer := consumers[i]
+			state := vh.getChannelDeliveryState(consumer.ConnectionID, consumer.Channel)
+
+			if vh.shouldThrottle(consumer, state) {
+				continue // Try next consumer
+			}
+
+			// Found available consumer
+			allThrottled = false
+			if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
+				log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
+				if cancelErr := vh.CancelConsumer(consumer.Channel, consumer.Tag); cancelErr != nil {
+					log.Error().Err(cancelErr).Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
+				}
+				// Refresh consumer list and retry
+				consumers = vh.GetActiveConsumersForQueue(q.Name)
+				if len(consumers) == 0 {
+					// Check if context was cancelled before requeuing
+					select {
+					case <-q.deliveryCtx.Done():
+						delivered = true // Exit loop without requeuing
+					default:
+						q.Push(msg)
+						delivered = true // Exit loop
+					}
+				}
+				break // Retry with new consumer list
+			}
+			delivered = true
+			break // Successfully delivered
+		}
+
+		if allThrottled && !delivered {
+			// All consumers are throttled, wait for signal or timeout
+			// Try to get a signal from any consumer's channel
+			var anyState *ChannelDeliveryState
+			for _, c := range consumers {
+				if s := vh.getChannelDeliveryState(c.ConnectionID, c.Channel); s != nil {
+					anyState = s
+					break
+				}
+			}
+
+			if anyState != nil {
+				select {
+				case <-anyState.unackedChanged:
+					// A slot opened up, retry immediately
+					continue
+				case <-time.After(1 * time.Second):
+					// Timeout, will retry or give up based on maxRounds
+					continue
+				case <-q.deliveryCtx.Done():
+					return
+				}
+			} else {
+				// No state available, just sleep briefly
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}
+
+	// If we exhausted retries, requeue the message
+	if !delivered {
+		log.Warn().Str("queue", q.Name).Int("rounds", rounds).Msg("Could not deliver after max rounds, requeuing")
+		q.Push(msg)
+	}
 }
 
 func (q *Queue) stopDeliveryLoop() {
