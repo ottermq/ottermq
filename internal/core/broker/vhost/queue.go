@@ -12,6 +12,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	MIN_BUFFER_SIZE = 100
+)
+
 type QueueArgs map[string]any
 
 type Queue struct {
@@ -460,7 +464,55 @@ func (q *Queue) Push(msg Message) {
 	if q.maxLength > 0 && q.vh != nil {
 		q.vh.QueueLengthLimiter.EnforceMaxLength(q)
 	}
-	q.push(msg)
+
+	if q.maxPriority > 0 {
+		q.pushPriority(msg)
+	} else {
+		q.push(msg)
+	}
+}
+
+func (q *Queue) pushPriority(msg Message) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	// Clamp priority to max
+	priority := min(msg.Properties.Priority, q.maxPriority)
+
+	// Lazy chan allocation
+	ch, exists := q.priorityMessages[priority]
+	if !exists {
+		// divide the buffer size equally among priority levels
+		bufferPerPriority := q.vh.queueBufferSize / int(q.maxPriority+1)
+		if bufferPerPriority < MIN_BUFFER_SIZE {
+			bufferPerPriority = MIN_BUFFER_SIZE
+		}
+		ch = make(chan Message, bufferPerPriority)
+		q.priorityMessages[priority] = ch
+	}
+
+	select {
+	case ch <- msg:
+		q.count++
+		log.Debug().
+			Str("queue", q.Name).
+			Str("id", msg.ID).
+			Uint8("priority", priority).
+			Msg("Pushed message to queue")
+
+		// Notify delivery loop that a new message is available
+		select {
+		case q.messageSignal <- struct{}{}:
+		default:
+			// signal already pending
+		}
+	default:
+		log.Debug().
+			Str("queue", q.Name).
+			Str("id", msg.ID).
+			Uint8("priority", priority).
+			Msg("Queue channel full, dropping message")
+	}
 }
 
 func (q *Queue) push(msg Message) {
@@ -469,9 +521,15 @@ func (q *Queue) push(msg Message) {
 	select {
 	case q.messages <- msg:
 		q.count++
-		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Bytes("body", msg.Body).Msg("Pushed message to queue")
+		log.Debug().
+			Str("queue", q.Name).
+			Str("id", msg.ID).
+			Msg("Pushed message to queue")
 	default:
-		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Queue channel full, dropping message")
+		log.Debug().
+			Str("queue", q.Name).
+			Str("id", msg.ID).
+			Msg("Queue channel full, dropping message")
 	}
 }
 
