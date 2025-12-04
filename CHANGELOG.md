@@ -11,11 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Priority Queues**: Full AMQP 0.9.1 priority queue implementation
+  - Queue-level priority support via `x-max-priority` argument (1-255 range, default limit: 10)
+  - Message priority field (0-255) with higher priority delivered first
+  - FIFO ordering maintained within same priority level
+  - Map-of-channels architecture with lazy allocation
+  - Configurable via `OTTERMQ_MAX_PRIORITY` environment variable
+  - Zero overhead for non-priority queues (backward compatible)
+  - Integration with DLX (priority preserved in dead letters)
+  - Integration with TTL (expiration works with priority)
+  - Integration with QLL (max-length works with priority)
+
 ### Changed
 
 ### Fixed
 
+- **E2E Tests**: Fixed `TestPriorityQueue_WithDLX` test logic - consume without auto-ack before manual rejection
+- **Delivery Loop**: Fixed priority queue delivery to process all pending messages, not just one per signal
+
 ### Performance
+
+- Priority queue delivery: O(P) priority scan where P = max_priority (negligible for P ≤ 10)
+- Lazy channel allocation: Memory usage scales with actual priority levels used, not max configured
 
 ## [v0.15.0] - 2025-12-01
 

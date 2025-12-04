@@ -20,8 +20,8 @@ Status levels:
 | connection | 100% | All methods fully implemented |
 | channel | 100% | All methods fully implemented including flow control |
 | exchange | 100% | All exchange types fully implemented |
-| queue | 100% | All methods fully implemented |
-| basic | 100% | All methods fully implemented |
+| queue | 100% | All methods fully implemented including priority queues |
+| basic | 100% | All methods fully implemented including priority delivery |
 | tx | 100% | All transaction methods fully implemented |
 
 ## connection
@@ -89,16 +89,28 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| queue.declare | ✅ | |
+| queue.declare | ✅ | Supports `x-max-priority` argument (1-255, configurable limit) |
 | queue.declare-ok | ✅ | |
 | queue.bind | ✅ | |
 | queue.bind-ok | ✅ | |
 | queue.unbind | ✅ | |
 | queue.unbind-ok | ✅ | |
-| queue.purge | ✅ | |
+| queue.purge | ✅ | Works with priority queues |
 | queue.purge-ok | ✅ | |
 | queue.delete | ✅ | |
 | queue.delete-ok | ✅ | |
+
+**Priority Queue Features:**
+
+- ✅ Queue-level priority configuration via `x-max-priority` argument
+- ✅ Priority range: 0-255 (configurable max, default: 10)
+- ✅ Higher priority messages delivered first
+- ✅ FIFO ordering within same priority level
+- ✅ Messages without priority default to 0 (lowest)
+- ✅ Priority clamped to queue's max-priority setting
+- ✅ Lazy channel allocation (memory efficient)
+- ✅ Backward compatible (queues without x-max-priority remain FIFO)
+- ✅ Integration with DLX, TTL, and QLL extensions
 
 ## basic
 
@@ -112,8 +124,8 @@ Status levels:
 | basic.cancel-ok | ✅ | |
 | basic.publish | ✅ | |
 | basic.return | ✅ | ‼️`immediate` flag is deprecated and will not be implemented |
-| basic.deliver | ✅ | |
-| basic.get | ✅ | |
+| basic.deliver | ✅ | Respects message priority for delivery order |
+| basic.get | ✅ | Returns highest priority message first |
 | basic.get-ok | ✅ | |
 | basic.get-empty | ✅ | |
 | basic.ack | ✅ | |
