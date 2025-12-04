@@ -15,12 +15,20 @@ import (
 type QueueArgs map[string]any
 
 type Queue struct {
-	Name      string           `json:"name"`
-	Props     *QueueProperties `json:"properties"`
-	messages  chan Message     `json:"-"`
-	count     int              `json:"-"`
-	mu        sync.Mutex       `json:"-"`
-	OwnerConn ConnectionID     `json:"-"`
+	Name  string           `json:"name"`
+	Props *QueueProperties `json:"properties"`
+
+	// FIFO queue (non-priority)
+	messages chan Message `json:"-"`
+
+	// Priority queue (when x-max-priority > 0)
+	priorityMessages map[uint8]chan Message `json:"-"`
+	maxPriority      uint8                  `json:"-"`
+	messageSignal    chan struct{}          `json:"-"` // Avoid blocking on empty priority queue
+
+	count     int          `json:"-"`
+	mu        sync.Mutex   `json:"-"`
+	OwnerConn ConnectionID `json:"-"`
 
 	vh *VHost `json:"-"` // Reference to parent VHost
 	/* Delivery */
@@ -45,13 +53,16 @@ type QueueProperties struct {
 func NewQueue(name string, bufferSize int, vh *VHost) *Queue {
 
 	return &Queue{
-		Name:       name,
-		Props:      &QueueProperties{},
-		messages:   make(chan Message, bufferSize),
-		count:      0,
-		delivering: false,
-		maxLength:  0,
-		vh:         vh,
+		Name:             name,
+		Props:            &QueueProperties{},
+		messages:         make(chan Message, bufferSize), // Default FIFO
+		priorityMessages: nil,                            // lazily init
+		maxPriority:      0,
+		messageSignal:    nil,
+		count:            0,
+		delivering:       false,
+		maxLength:        0,
+		vh:               vh,
 	}
 }
 
@@ -292,6 +303,31 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties, connID Connect
 	// DLX properties comes directly from arguments: single source of truth
 	queue := NewQueue(name, vh.queueBufferSize, vh)
 	queue.Props = props
+
+	/* check for x-max-priority argument*/
+	if maxPrio, ok := parseMaxPriorityArgument(props.Arguments); ok {
+		if maxPrio > vh.maxPriority { // Clamp to VHost max
+			log.Warn().
+				Str("queue", name).
+				Uint8("requested", maxPrio).
+				Uint8("vhost_max", vh.maxPriority).
+				Msg("Requested x-max-priority exceeds VHost limit, clamping")
+			maxPrio = vh.maxPriority
+		}
+
+		if maxPrio > 0 {
+			log.Debug().
+				Str("queue", name).
+				Uint8("max_priority", maxPrio).
+				Msg("Initializing priority queue")
+			queue.maxPriority = maxPrio
+			queue.priorityMessages = make(map[uint8]chan Message)
+			queue.messageSignal = make(chan struct{}, 1)
+			// Channels are lazily created on fist push to each priority level
+			//  -- avoids unnecessary memory usage
+		}
+
+	}
 
 	if props.Exclusive {
 		queue.OwnerConn = connID
