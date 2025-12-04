@@ -536,6 +536,11 @@ func (q *Queue) push(msg Message) {
 func (q *Queue) Pop() *Message {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+
+	if q.maxPriority > 0 {
+		return q.popPriorityUnlocked()
+	}
+	// else pop from FIFO
 	return q.popUnlocked()
 }
 
@@ -549,6 +554,30 @@ func (q *Queue) popUnlocked() *Message {
 		log.Debug().Str("queue", q.Name).Msg("Queue is empty")
 		return nil
 	}
+}
+
+func (q *Queue) popPriorityUnlocked() *Message {
+	for prio := q.maxPriority; ; prio-- {
+		if ch, exists := q.priorityMessages[prio]; exists {
+			select {
+			case msg := <-ch:
+				q.count--
+				log.Debug().
+					Str("queue", q.Name).
+					Str("id", msg.ID).
+					Uint8("priority", prio).
+					Msg("Popped message from priority queue")
+				return &msg
+			default:
+
+			}
+		}
+		if prio == 0 {
+			break
+		}
+	}
+	log.Debug().Str("queue", q.Name).Msg("Priority queue is empty")
+	return nil
 }
 
 func (q *Queue) Len() int {
