@@ -27,6 +27,7 @@ type VHost struct {
 	Users              map[string]*persistdb.User `json:"users"`
 	mu                 sync.Mutex                 `json:"-"`
 	queueBufferSize    int                        `json:"-"`
+	maxPriority        uint8                      `json:"-"`
 	persist            persistence.Persistence
 	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
 	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
@@ -65,6 +66,7 @@ type FrameSender interface {
 
 type VHostOptions struct {
 	QueueBufferSize int
+	MaxPriority     uint8
 	Persistence     persistence.Persistence
 	EnableDLX       bool
 	EnableTTL       bool
@@ -80,6 +82,7 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		Queues:              make(map[string]*Queue),
 		Users:               make(map[string]*persistdb.User),
 		queueBufferSize:     options.QueueBufferSize,
+		maxPriority:         options.MaxPriority,
 		persist:             options.Persistence,
 		Consumers:           make(map[ConsumerKey]*Consumer),
 		ConsumersByQueue:    make(map[string][]*Consumer),

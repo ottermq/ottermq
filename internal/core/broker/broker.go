@@ -77,6 +77,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
+		MaxPriority:     config.MaxPriority,
 		Persistence:     b.persist,
 		EnableDLX:       config.EnableDLX,
 		EnableTTL:       config.EnableTTL,
