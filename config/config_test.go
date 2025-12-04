@@ -75,6 +75,7 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	os.Setenv("OTTERMQ_FRAME_MAX", "262144")
 	os.Setenv("OTTERMQ_SSL", "true")
 	os.Setenv("OTTERMQ_QUEUE_BUFFER_SIZE", "50000")
+	os.Setenv("OTTERMQ_MAX_PRIORITY", "20")
 
 	os.Setenv("OTTERMQ_ENABLE_DLX", "false")
 	os.Setenv("OTTERMQ_ENABLE_WEB_API", "false")
@@ -120,6 +121,9 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	}
 	if config.QueueBufferSize != 50000 {
 		t.Errorf("Expected QueueBufferSize to be 50000, got %d", config.QueueBufferSize)
+	}
+	if config.MaxPriority != 20 {
+		t.Errorf("Expected MaxPriority to be 20, got %d", config.MaxPriority)
 	}
 	if config.WebPort != "8080" {
 		t.Errorf("Expected WebServerPort to be '8080', got '%s'", config.WebPort)
@@ -176,5 +180,34 @@ func TestLoadConfigWithInvalidEnvVars(t *testing.T) {
 	}
 	if config.QueueBufferSize != 100000 {
 		t.Errorf("Expected QueueBufferSize to fall back to 100000, got %d", config.QueueBufferSize)
+	}
+}
+
+func TestMaxPriorityConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected uint8
+	}{
+		{"default", "", 10},
+		{"valid low", "3", 3},
+		{"valid high", "10", 10},
+		{"max allowed", "255", 255},
+		{"exceeds max", "300", 255}, // Should clamp
+		{"invalid", "abc", 10},      // Should fallback
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Clearenv()
+			if tt.envValue != "" {
+				os.Setenv("OTTERMQ_MAX_PRIORITY", tt.envValue)
+			}
+
+			config := LoadConfig("test")
+			if config.MaxPriority != tt.expected {
+				t.Errorf("Expected MaxPriority=%d, got %d", tt.expected, config.MaxPriority)
+			}
+		})
 	}
 }

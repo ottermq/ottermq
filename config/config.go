@@ -22,6 +22,7 @@ type Config struct {
 	Version              string
 	Ssl                  bool
 	QueueBufferSize      int
+	MaxPriority          uint8
 
 	// Extensions
 	EnableDLX bool // Dead-Letter Exchange
@@ -63,6 +64,7 @@ func LoadConfig(version string) *Config {
 		FrameMax:             getEnvAsUint32("OTTERMQ_FRAME_MAX", 131072),
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
+		MaxPriority:          getEnvAsUint8("OTTERMQ_MAX_PRIORITY", 10), // 0-255 (default 10)
 
 		EnableDLX: getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
 		EnableTTL: getEnvAsBool("OTTERMQ_ENABLE_TTL", true),
@@ -115,6 +117,23 @@ func getEnvAsUint16(key string, defaultValue uint16) uint16 {
 		return defaultValue
 	}
 	return uint16(value)
+}
+
+func getEnvAsUint8(key string, defaultValue uint8) uint8 {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseUint(valueStr, 10, 16)
+	if err != nil {
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %d\n", key, valueStr, defaultValue)
+		return defaultValue
+	}
+	if value > uint64(^uint8(0)) {
+		fmt.Printf("Warning: Value for %s exceeds max (%d), clamping to max value\n", key, ^uint8(0))
+		return ^uint8(0)
+	}
+	return uint8(value)
 }
 
 func getEnvAsUint32(key string, defaultValue uint32) uint32 {
