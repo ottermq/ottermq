@@ -88,6 +88,9 @@ type QueueDTO struct {
 	// Queue Length Limit (QLL AKA Max Length)
 	MaxLength *int32 `json:"max_length,omitempty"`
 
+	// Priority queue configuration
+	MaxPriority *uint8 `json:"max_priority,omitempty"` // x-max-priority
+
 	// State
 	State string `json:"state"` // "running", "idle", "flow"
 
