@@ -676,13 +676,37 @@ func (q *Queue) StreamPurge(process func(*Message)) uint32 {
 	defer q.mu.Unlock()
 
 	var purged uint32 = 0
-	for {
-		msg := q.popUnlocked()
-		if msg == nil {
-			break
+	if q.maxPriority > 0 {
+		// Purge priority queues
+		for prio := q.maxPriority; ; prio-- {
+			if ch, exists := q.priorityMessages[prio]; exists {
+				for {
+					select {
+					case msg := <-ch:
+						q.count--
+						process(&msg)
+						purged++
+					default:
+						// Channel empty
+						goto nextPriority
+					}
+				}
+			}
+		nextPriority:
+			if prio == 0 {
+				break
+			}
 		}
-		process(msg)
-		purged++
+	} else {
+		// Purge FIFO queue
+		for {
+			msg := q.popUnlocked()
+			if msg == nil {
+				break
+			}
+			process(msg)
+			purged++
+		}
 	}
 	return purged
 }
