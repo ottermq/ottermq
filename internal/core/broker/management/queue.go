@@ -166,6 +166,9 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 		State:              "running",
 		PersistenceEnabled: queue.IsPersistenceEnabled(),
 	}
+	if queue.Props.Arguments == nil {
+		return dto
+	}
 
 	// Extract DLX configuration
 	if dlx, ok := queue.Props.Arguments["x-dead-letter-exchange"].(string); ok {
@@ -192,6 +195,14 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 			dto.MessageTTL = toInt64Pointer(val)
 		}
 	}
+
+	// Extract Max Priority
+	if val, ok := queue.Props.Arguments["x-max-priority"]; ok {
+		if val != nil && val != 0 {
+			dto.MaxPriority = toUint8Pointer(val)
+		}
+	}
+
 	return dto
 }
 
@@ -224,6 +235,26 @@ func toInt64Pointer(val any) *int64 {
 		return &val
 	case float64:
 		val := int64(v)
+		return &val
+	}
+	return nil
+}
+
+func toUint8Pointer(val any) *uint8 {
+	switch v := val.(type) {
+	case uint8:
+		return &v
+	case int:
+		val := uint8(v)
+		return &val
+	case int32:
+		val := uint8(v)
+		return &val
+	case int64:
+		val := uint8(v)
+		return &val
+	case float64:
+		val := uint8(v)
 		return &val
 	}
 	return nil
