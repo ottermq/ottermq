@@ -112,17 +112,19 @@ func (q *Queue) deliverFromPriorityQueue(vh *VHost) {
 		log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
 		return
 	case <-q.messageSignal:
-		// There is at least one message in the priority queue
-		msg := q.Pop()
-		if msg == nil {
-			return
-		}
-		q.deliverMessage(vh, *msg)
+		for q.Len() > 0 {
+			msg := q.Pop()
+			if msg == nil {
+				break
+			}
+			q.deliverMessage(vh, *msg)
 
-		isDone := requeueOnShutdown(q, *msg)
-		if isDone {
-			return
+			isDone := requeueOnShutdown(q, *msg)
+			if isDone {
+				return
+			}
 		}
+		return // Exit after processing all messages
 	}
 }
 
@@ -614,6 +616,7 @@ func (q *Queue) popPriorityUnlocked() *Message {
 					Str("queue", q.Name).
 					Str("id", msg.ID).
 					Uint8("priority", prio).
+					Str("body", string(msg.Body)).
 					Msg("Popped message from priority queue")
 				return &msg
 			default:
