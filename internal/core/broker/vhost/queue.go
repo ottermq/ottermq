@@ -112,10 +112,11 @@ func (q *Queue) deliverFromPriorityQueue(vh *VHost) {
 		log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
 		return
 	case <-q.messageSignal:
+		// There is at least one message in the priority queue
 		for q.Len() > 0 {
 			msg := q.Pop()
 			if msg == nil {
-				break
+				return
 			}
 			q.deliverMessage(vh, *msg)
 
@@ -124,7 +125,6 @@ func (q *Queue) deliverFromPriorityQueue(vh *VHost) {
 				return
 			}
 		}
-		return // Exit after processing all messages
 	}
 }
 

@@ -76,6 +76,7 @@ func setupBroker() error {
 		Password:        "guest",
 		LogLevel:        "warn",
 		QueueBufferSize: 100000,
+		MaxPriority:     10, // Enable priority queues (default: 10, max: 255)
 		JwtSecret:       "test-secret",
 		WebPort:         "3001", // Different port to avoid conflicts
 		DataDir:         testDataDir,
