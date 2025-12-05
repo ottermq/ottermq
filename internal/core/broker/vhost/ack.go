@@ -48,7 +48,7 @@ func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, delivery
 				removed = append(removed, record)
 
 				deleteUnackedDelivery(ch, tag, record.ConsumerTag)
-
+				vh.collector.RecordQueueNack(record.QueueName)
 				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
@@ -60,6 +60,7 @@ func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, delivery
 
 			// Remove from both maps
 			deleteUnackedDelivery(ch, deliveryTag, record.ConsumerTag)
+			vh.collector.RecordQueueAck(record.QueueName)
 
 			log.Debug().Uint64("tag", deliveryTag).Msg("Removed unacked tag for single ack")
 		}
