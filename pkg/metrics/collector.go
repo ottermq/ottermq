@@ -75,6 +75,7 @@ type QueueMetrics struct {
 	DeliveryRate  *RateTracker // Messages delivered per second
 	AckRate       *RateTracker // ACKs per second
 	MessageCount  atomic.Int64 // Current queue depth
+	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	ConsumerCount atomic.Int64 // Current consumer count
 	CreatedAt     time.Time
 
@@ -199,6 +200,7 @@ func (c *Collector) RemoveExchange(exchangeName string) {
 // ========================================
 
 // RecordQueuePublish records a message enqueued to a queue
+// Also shall be called when messages are requeued (NACK->requeue)
 func (c *Collector) RecordQueuePublish(queueName string) {
 	if !c.config.Enabled {
 		return
@@ -211,6 +213,12 @@ func (c *Collector) RecordQueuePublish(queueName string) {
 	qm.MessageRate.Record(count)
 }
 
+// RecordQueueRequeue records a message requeued to a queue
+// (alias for RecordQueuePublish for clarity)
+func (c *Collector) RecordQueueRequeue(queueName string) {
+	c.RecordQueuePublish(queueName)
+}
+
 // RecordQueueDelivery records a message delivered from a queue
 func (c *Collector) RecordQueueDelivery(queueName string) {
 	if !c.config.Enabled {
@@ -220,8 +228,13 @@ func (c *Collector) RecordQueueDelivery(queueName string) {
 	qm := c.getOrCreateQueueMetrics(queueName)
 
 	// Record delivery rate
-	count := qm.MessageCount.Load() // Current queue depth
-	qm.DeliveryRate.Record(count)
+	qm.DeliveryRate.Record(qm.MessageCount.Load())
+
+	// Decrease message count
+	qm.MessageCount.Add(-1)
+
+	// Increase unacked count
+	qm.UnackedCount.Add(1)
 
 	// Record at broker level
 	brokerCount := c.messageCount.Load()
@@ -235,9 +248,8 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-
-	// Decrease message count and record ack rate
-	count := qm.MessageCount.Add(-1)
+	// Decrease unacked count  and record ack rate
+	count := qm.UnackedCount.Add(-1)
 	qm.AckRate.Record(count)
 
 	// Record at broker level
@@ -250,6 +262,10 @@ func (c *Collector) RecordQueueNack(queueName string) {
 	if !c.config.Enabled {
 		return
 	}
+
+	qm := c.getOrCreateQueueMetrics(queueName)
+	// Decrease unacked count
+	qm.UnackedCount.Add(-1)
 
 	// Record at broker level
 	brokerNacks := c.messageCount.Load()
@@ -473,6 +489,7 @@ type QueueSnapshot struct {
 	MessageRate   float64   `json:"message_rate"`
 	DeliveryRate  float64   `json:"delivery_rate"`
 	AckRate       float64   `json:"ack_rate"`
+	UnackedCount  int64     `json:"unacked_count"`
 	MessageCount  int64     `json:"message_count"`
 	ConsumerCount int64     `json:"consumer_count"`
 	Uptime        float64   `json:"uptime_seconds"`
@@ -489,6 +506,7 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 		MessageRate:   qm.MessageRate.Rate(),
 		DeliveryRate:  qm.DeliveryRate.Rate(),
 		AckRate:       qm.AckRate.Rate(),
+		UnackedCount:  qm.UnackedCount.Load(),
 		MessageCount:  qm.MessageCount.Load(),
 		ConsumerCount: qm.ConsumerCount.Load(),
 		Uptime:        time.Since(qm.CreatedAt).Seconds(),
