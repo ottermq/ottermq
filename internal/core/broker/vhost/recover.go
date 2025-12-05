@@ -82,6 +82,7 @@ func (vh *VHost) requeueMessage(record *DeliveryRecord) {
 		vh.handleTTLExpiration(record.Message, queue)
 		vh.markAsRedelivered(record.Message.ID)
 		queue.Push(record.Message)
+		vh.collector.RecordQueueRequeue(queue.Name)
 	}
 }
 

@@ -296,6 +296,7 @@ func (vh *VHost) loadPersistedState() {
 		for _, msgData := range queue.Messages {
 			msg := FromPersistence(msgData)
 			vh.Queues[queue.Name].Push(msg)
+			vh.collector.RecordQueuePublish(queue.Name)
 		}
 	}
 

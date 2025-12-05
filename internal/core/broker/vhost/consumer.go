@@ -291,6 +291,7 @@ func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumer
 
 		// requeue to original queue
 		queue.Push(record.Message)
+		vh.collector.RecordQueueRequeue(queue.Name)
 	}
 }
 
@@ -334,6 +335,7 @@ func (vh *VHost) CleanupChannel(connID ConnectionID, channel uint16) {
 			queue, exists := vh.Queues[record.QueueName]
 			if exists {
 				queue.Push(record.Message)
+				vh.collector.RecordQueueRequeue(queue.Name)
 			}
 		}
 		delete(vh.ChannelDeliveries, channelKey)

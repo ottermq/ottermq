@@ -190,6 +190,7 @@ func (q *Queue) deliverMessage(vh *VHost, msg Message) {
 			return
 		default:
 			q.Push(msg)
+			vh.collector.RecordQueueRequeue(q.Name)
 			time.Sleep(100 * time.Millisecond)
 			return
 		}
@@ -228,6 +229,7 @@ func (q *Queue) deliverMessage(vh *VHost, msg Message) {
 						delivered = true // Exit loop without requeuing
 					default:
 						q.Push(msg)
+						vh.collector.RecordQueueRequeue(q.Name)
 						delivered = true // Exit loop
 					}
 				}
@@ -270,6 +272,7 @@ func (q *Queue) deliverMessage(vh *VHost, msg Message) {
 	if !delivered {
 		log.Warn().Str("queue", q.Name).Int("rounds", rounds).Msg("Could not deliver after max rounds, requeuing")
 		q.Push(msg)
+		vh.collector.RecordQueueRequeue(q.Name)
 	}
 }
 

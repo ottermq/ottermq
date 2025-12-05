@@ -241,6 +241,7 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		return nil
 	}
 	msg := queue.Pop()
+	vh.collector.RecordQueueDelivery(queue.Name)
 	if msg == nil {
 		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")
