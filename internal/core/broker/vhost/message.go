@@ -222,6 +222,7 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
 	for _, queue := range targetQueues {
 		queue.Push(*msg)
+		vh.collector.RecordQueuePublish(queue.Name)
 	}
 
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
