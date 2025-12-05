@@ -774,3 +774,7 @@ func (b *Broker) CloseConnection(name string, reason string) error {
 	b.setConnectionClosingState(targetConn)
 	return nil
 }
+
+func (b *Broker) GetCollector() *metrics.Collector {
+	return b.collector
+}
