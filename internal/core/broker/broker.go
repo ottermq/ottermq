@@ -15,6 +15,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/broker/management"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
@@ -49,6 +50,9 @@ type Broker struct {
 	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
 	connectionsMu sync.RWMutex
 	startedAt     time.Time
+
+	// Metrics collector
+	collector *metrics.Collector
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -83,14 +87,22 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
+	// Initialize metrics collector
+	collectorConfig := &metrics.Config{
+		Enabled:    true,
+		WindowSize: config.WindowSize,
+		MaxSamples: config.MaxSamples,
+	}
+	b.collector = metrics.NewCollector(collectorConfig)
+	log.Info().Msg("Metrics collection enabled")
 
 	defaultVHost := vhost.NewVhost("/", options)
+	defaultVHost.SetFramer(b.framer)
+	defaultVHost.SetFrameSender(b)
+	defaultVHost.SetMetricsCollector(b.collector)
 	b.VHosts["/"] = defaultVHost
 
 	b.framer = &amqp.DefaultFramer{}
-	b.VHosts["/"].SetFramer(b.framer)
-
-	defaultVHost.SetFrameSender(b)
 
 	b.Management = management.NewService(b)
 	return b
