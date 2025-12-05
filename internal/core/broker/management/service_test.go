@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -80,20 +81,9 @@ func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
 	return models.VHostDTO{Name: vh.Name}, nil
 }
 
-func (fb *fakeBroker) GetMetricsOverview() any {
-	return nil
-}
-
-func (fb *fakeBroker) GetMetricsExchangeStats() any {
-	return nil
-}
-
-func (fb *fakeBroker) GetMetricsQueueStats() any {
-	return nil
-}
-
-func (fb *fakeBroker) GetMetricsTimeSeries(params map[string]string) any {
-	return nil
+func (fb *fakeBroker) GetCollector() *metrics.Collector {
+	// For testing purposes, return a new Collector.
+	return metrics.NewCollector(nil)
 }
 
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
