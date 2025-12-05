@@ -4,6 +4,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
 // BrokerProvider defines the minimal interface that management operations need from the broker
@@ -25,8 +26,5 @@ type BrokerProvider interface {
 	CloseConnection(name string, reason string) error
 
 	// Metrics related methods
-	GetMetricsOverview() any
-	GetMetricsExchangeStats() any
-	GetMetricsQueueStats() any
-	GetMetricsTimeSeries(params map[string]string) any
+	GetCollector() *metrics.Collector
 }
