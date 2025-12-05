@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -45,6 +46,12 @@ type Config struct {
 
 	// Logging
 	LogLevel string
+
+	// Metrics
+
+	EnableMetrics bool          // Enable or disable metrics collection
+	WindowSize    time.Duration // Time window for rate calculations
+	MaxSamples    int           // Maximum number of samples to retain
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -83,6 +90,10 @@ func LoadConfig(version string) *Config {
 		Version:   version,
 
 		LogLevel: getEnv("LOG_LEVEL", "info"),
+
+		EnableMetrics: getEnvAsBool("OTTERMQ_ENABLE_METRICS", true),
+		WindowSize:    getEnvAsDuration("OTTERMQ_METRICS_WINDOW_SIZE", 5*time.Minute),
+		MaxSamples:    getEnvAsInt("OTTERMQ_METRICS_MAX_SAMPLES", 60),
 	}
 }
 
@@ -157,6 +168,19 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
 		fmt.Printf("Warning: Invalid value for %s: %s, using default: %t\n", key, valueStr, defaultValue)
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := time.ParseDuration(valueStr)
+	if err != nil {
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %s\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return value
