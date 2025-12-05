@@ -776,5 +776,7 @@ func (b *Broker) CloseConnection(name string, reason string) error {
 }
 
 func (b *Broker) GetCollector() *metrics.Collector {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return b.collector
 }
