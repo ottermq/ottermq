@@ -37,13 +37,33 @@ type Collector struct {
 	config *Config
 }
 
+type BrokerMetrics struct {
+	// Broker-wide rate metrics
+	totalPublishes  *RateTracker
+	totalDeliveries *RateTracker
+	totalAcks       *RateTracker
+	totalNacks      *RateTracker
+	connectionRate  *RateTracker
+	channelRate     *RateTracker
+
+	// Broker-wide gauges (current values)
+	messageCount    int64
+	consumerCount   int64
+	connectionCount int64
+	channelCount    int64
+	queueCount      int64
+	exchangeCount   int64
+}
+
 // ExchangeMetrics tracks statistics for a single exchange
 type ExchangeMetrics struct {
-	Name         string
-	Type         string // direct, fanout, topic, headers
-	PublishRate  *RateTracker
-	PublishCount atomic.Int64
-	CreatedAt    time.Time
+	Name          string
+	Type          string // direct, fanout, topic, headers
+	PublishRate   *RateTracker
+	PublishCount  atomic.Int64
+	DeliveryRate  *RateTracker // Messages delivered (routed) per second
+	DeliveryCount atomic.Int64 // Total messages delivered (routed)
+	CreatedAt     time.Time
 
 	mu sync.RWMutex
 }
@@ -114,6 +134,20 @@ func (c *Collector) RecordExchangePublish(exchangeName, exchangeType string) {
 	// Also record at broker level
 	brokerCount := c.messageCount.Add(1)
 	c.totalPublishes.Record(brokerCount)
+}
+
+// RecordExchangeDelivery records a message delivered (routed) from an exchange
+func (c *Collector) RecordExchangeDelivery(exchangeName string) {
+	if !c.config.Enabled {
+		return
+	}
+
+	em := c.getOrCreateExchangeMetrics(exchangeName, "")
+
+	// Record delivery rate
+	count := em.DeliveryCount.Add(1)
+	em.DeliveryRate.Record(count)
+	// the broker level is recorded in queue delivery
 }
 
 // GetExchangeMetrics retrieves metrics for a specific exchange
@@ -338,12 +372,30 @@ func (c *Collector) RecordChannelClose() {
 	c.channelCount.Add(-1)
 }
 
+// GetBrokerMetrics returns current broker-level metrics
+func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
+	return &BrokerMetrics{
+		totalPublishes:  c.totalPublishes,
+		totalDeliveries: c.totalDeliveries,
+		totalAcks:       c.totalAcks,
+		totalNacks:      c.totalNacks,
+		connectionRate:  c.connectionRate,
+		channelRate:     c.channelRate,
+		messageCount:    c.messageCount.Load(),
+		consumerCount:   c.consumerCount.Load(),
+		connectionCount: c.connectionCount.Load(),
+		channelCount:    c.channelCount.Load(),
+		queueCount:      c.queueCount.Load(),
+		exchangeCount:   c.exchangeCount.Load(),
+	}
+}
+
 // ========================================
 // Snapshot for API Responses
 // ========================================
 
-// Snapshot represents a point-in-time view of all broker metrics
-type Snapshot struct {
+// BrokerSnapshot represents a point-in-time view of all broker metrics
+type BrokerSnapshot struct {
 	Timestamp time.Time `json:"timestamp"`
 
 	// Broker-wide rates (current)
@@ -364,36 +416,38 @@ type Snapshot struct {
 }
 
 // Snapshot returns a point-in-time snapshot of all broker metrics
-func (c *Collector) Snapshot() *Snapshot {
-	return &Snapshot{
+func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
+	return &BrokerSnapshot{
 		Timestamp: time.Now(),
 
 		// Rates
-		PublishRate:    c.totalPublishes.Rate(),
-		DeliveryRate:   c.totalDeliveries.Rate(),
-		AckRate:        c.totalAcks.Rate(),
-		NackRate:       c.totalNacks.Rate(),
-		ConnectionRate: c.connectionRate.Rate(),
-		ChannelRate:    c.channelRate.Rate(),
+		PublishRate:    bm.totalPublishes.Rate(),
+		DeliveryRate:   bm.totalDeliveries.Rate(),
+		AckRate:        bm.totalAcks.Rate(),
+		NackRate:       bm.totalNacks.Rate(),
+		ConnectionRate: bm.connectionRate.Rate(),
+		ChannelRate:    bm.channelRate.Rate(),
 
 		// Gauges
-		MessageCount:    c.messageCount.Load(),
-		ConsumerCount:   c.consumerCount.Load(),
-		ConnectionCount: c.connectionCount.Load(),
-		ChannelCount:    c.channelCount.Load(),
-		QueueCount:      c.queueCount.Load(),
-		ExchangeCount:   c.exchangeCount.Load(),
+		MessageCount:    bm.messageCount,
+		ConsumerCount:   bm.consumerCount,
+		ConnectionCount: bm.connectionCount,
+		ChannelCount:    bm.channelCount,
+		QueueCount:      bm.queueCount,
+		ExchangeCount:   bm.exchangeCount,
 	}
 }
 
 // ExchangeSnapshot returns a snapshot of exchange metrics
 type ExchangeSnapshot struct {
-	Name         string    `json:"name"`
-	Type         string    `json:"type"`
-	PublishRate  float64   `json:"publish_rate"`
-	PublishCount int64     `json:"publish_count"`
-	Uptime       float64   `json:"uptime_seconds"`
-	CreatedAt    time.Time `json:"created_at"`
+	Name          string    `json:"name"`
+	Type          string    `json:"type"`
+	PublishRate   float64   `json:"publish_rate"`
+	PublishCount  int64     `json:"publish_count"`
+	DeliveryRate  float64   `json:"delivery_rate"`
+	DeliveryCount int64     `json:"delivery_count"`
+	Uptime        float64   `json:"uptime_seconds"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Snapshot returns a snapshot of this exchange's metrics
@@ -402,12 +456,14 @@ func (em *ExchangeMetrics) Snapshot() *ExchangeSnapshot {
 	defer em.mu.RUnlock()
 
 	return &ExchangeSnapshot{
-		Name:         em.Name,
-		Type:         em.Type,
-		PublishRate:  em.PublishRate.Rate(),
-		PublishCount: em.PublishCount.Load(),
-		Uptime:       time.Since(em.CreatedAt).Seconds(),
-		CreatedAt:    em.CreatedAt,
+		Name:          em.Name,
+		Type:          em.Type,
+		PublishRate:   em.PublishRate.Rate(),
+		PublishCount:  em.PublishCount.Load(),
+		DeliveryRate:  em.DeliveryRate.Rate(),
+		DeliveryCount: em.DeliveryCount.Load(),
+		Uptime:        time.Since(em.CreatedAt).Seconds(),
+		CreatedAt:     em.CreatedAt,
 	}
 }
 
