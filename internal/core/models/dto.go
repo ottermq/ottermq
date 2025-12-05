@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
 type ConnectionInfoDTO struct {
@@ -176,6 +177,7 @@ type OverviewDTO struct {
 	MessageStats    OverviewMessageStats    `json:"message_stats"`
 	ConnectionStats OverviewConnectionStats `json:"connection_stats"`
 	Configuration   BrokerConfigOverview    `json:"configuration"`
+	Metrics         metrics.BrokerSnapshot  `json:"metrics"`
 }
 
 type MessageDTO struct {

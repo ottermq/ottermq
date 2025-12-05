@@ -3,6 +3,7 @@ package management
 import "github.com/andrelcunha/ottermq/internal/core/models"
 
 func (s *Service) GetOverview() (*models.OverviewDTO, error) {
+	snapshot := *s.broker.GetCollector().GetBrokerMetrics().Snapshot()
 	return &models.OverviewDTO{
 		BrokerDetails:   s.broker.GetBrokerOverviewDetails(),
 		NodeDetails:     s.broker.GetOverviewNodeDetails(),
@@ -10,6 +11,7 @@ func (s *Service) GetOverview() (*models.OverviewDTO, error) {
 		MessageStats:    s.GetMessageStats(),
 		ConnectionStats: s.broker.GetOverviewConnStats(),
 		Configuration:   s.broker.GetBrokerOverviewConfig(),
+		Metrics:         snapshot,
 	}, nil
 }
 
