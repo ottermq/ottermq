@@ -517,7 +517,8 @@ func TestBrokerSnapshot(t *testing.T) {
 	c.RecordChannelOpen()
 
 	// Get snapshot
-	snap := c.Snapshot()
+	bm := c.GetBrokerMetrics()
+	snap := bm.Snapshot()
 
 	if snap.Timestamp.IsZero() {
 		t.Error("Snapshot.Timestamp should be set")
@@ -812,7 +813,7 @@ func BenchmarkSnapshot(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = c.Snapshot()
+		_ = c.GetBrokerMetrics().Snapshot()
 	}
 }
 
