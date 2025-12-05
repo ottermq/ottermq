@@ -92,6 +92,12 @@ type ManagementService interface {
 	GetOverview() (*models.OverviewDTO, error)
 	// GetBrokerInfo retrieves detailed broker information.
 	GetBrokerInfo() models.OverviewBrokerDetails
+
+	// Metrics related methods
+	GetMetricsOverview() any
+	GetMetricsExchangeStats() any
+	GetMetricsQueueStats() any
+	GetMetricsTimeSeries(params map[string]string) any
 }
 
 type Service struct {
