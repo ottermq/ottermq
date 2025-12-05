@@ -80,6 +80,22 @@ func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
 	return models.VHostDTO{Name: vh.Name}, nil
 }
 
+func (fb *fakeBroker) GetMetricsOverview() any {
+	return nil
+}
+
+func (fb *fakeBroker) GetMetricsExchangeStats() any {
+	return nil
+}
+
+func (fb *fakeBroker) GetMetricsQueueStats() any {
+	return nil
+}
+
+func (fb *fakeBroker) GetMetricsTimeSeries(params map[string]string) any {
+	return nil
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()
