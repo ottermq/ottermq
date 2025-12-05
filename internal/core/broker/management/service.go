@@ -94,10 +94,6 @@ type ManagementService interface {
 	GetBrokerInfo() models.OverviewBrokerDetails
 
 	// Metrics related methods
-	GetMetricsOverview() any
-	GetMetricsExchangeStats() any
-	GetMetricsQueueStats() any
-	GetMetricsTimeSeries(params map[string]string) any
 }
 
 type Service struct {
