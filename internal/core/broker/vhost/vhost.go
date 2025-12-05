@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -58,6 +59,9 @@ type VHost struct {
 
 	// injected by the broker to allow consumers to send frames
 	frameSender FrameSender
+
+	// Metrics collector
+	collector *metrics.Collector
 }
 
 type FrameSender interface {
@@ -101,6 +105,12 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	vh.setupExtensions(options)
 
 	return vh
+}
+
+func (vh *VHost) SetMetricsCollector(collector *metrics.Collector) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	vh.collector = collector
 }
 
 func (vh *VHost) SetFrameSender(sender FrameSender) {
