@@ -226,7 +226,7 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
 	vh.mu.Lock()
-
+	vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
 	return msg.ID, nil
 }
 
