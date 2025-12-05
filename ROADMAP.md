@@ -60,6 +60,25 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Priority Queues** - Full AMQP 0.9.1 priority queue implementation (v0.16.0)
+  - [x] Queue-level priority support via `x-max-priority` argument (1-255 range, default limit: 10)
+  - [x] Message priority field (0-255) with higher priority delivered first
+  - [x] FIFO ordering maintained within same priority level
+  - [x] Map-of-channels architecture with lazy allocation
+  - [x] Configurable via `OTTERMQ_MAX_PRIORITY` environment variable
+  - [x] Zero overhead for non-priority queues (backward compatible)
+  - [x] Integration with DLX (priority preserved in dead letters)
+  - [x] Integration with TTL (expiration works with priority)
+  - [x] Integration with QLL (max-length works with priority)
+  - [x] O(P) priority scan where P = max_priority (negligible for P ≤ 10)
+  - [x] Lazy channel allocation for memory efficiency
+  - [x] Comprehensive test coverage (5+ e2e tests)
+- [x] **Queue Length Limits (QLL)** - Max-length enforcement with dead lettering
+  - [x] `x-max-length` queue argument configuration
+  - [x] Drop-head strategy (evicts oldest messages when limit exceeded)
+  - [x] Dead letter integration with `REASON_MAX_LENGTH`
+  - [x] Proper lock management to prevent deadlocks
+  - [x] Integration with queue Push operations
 - [x] **Management API Refactoring** - Professional service layer architecture (v0.15.0)
   - [x] Complete separation of HTTP handlers from broker logic
   - [x] Service layer in `internal/core/broker/management/` with 11 service modules
@@ -129,14 +148,7 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ❌ **Missing Features**
 
-#### **Phase 1: Advanced Features (High Priority)**
-
-- [ ] **Queue length limits**
-  - [ ] Max-length configuration
-  - [ ] Max-length dead lettering (maxlen reason)
-- [ ] **Priority queues**
-
-#### **Phase 2: Clustering (Lower Priority)**
+#### **Phase 1: Clustering & Federation (Lower Priority)**
 
 - [ ] **Cluster support**
 - [ ] **Queue mirroring**
@@ -311,13 +323,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 9: Queue Length Limits**. Contributors should focus on:
+The highest priority is **Persistence Layer Improvements** and **Performance Optimization**. Contributors should focus on:
 
-1. Max-length configuration via `x-max-length` argument
-2. Message drop strategy (drop-head vs reject-publish)
-3. Max-length dead lettering with `maxlen` reason
-4. Integration with existing message routing
-5. Testing with RabbitMQ client compatibility
+1. Swappable persistence architecture refactoring
+2. Durable queue and exchange recovery
+3. Performance benchmarking and optimization
+4. Memory management for high-throughput scenarios
+5. Metrics and monitoring integration
 
 ### **Getting Started**
 
@@ -338,10 +350,10 @@ The highest priority is **Phase 9: Queue Length Limits**. Contributors should fo
 
 ## Progress Tracking
 
-**Last Updated**: November 16, 2025  
-**Current Focus**: Phase 9 - Queue Length Limits  
-**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE, BASIC, TX class methods, Dead Letter Exchanges, and Message TTL  
-**Latest Release**: v0.13.0 - Message TTL and Expiration Support  
-**Next Milestone**: Queue length limits with max-length dead lettering
+**Last Updated**: December 4, 2025  
+**Current Focus**: Persistence Layer Improvements and Performance Optimization  
+**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE (including priority queues and length limits), BASIC, TX class methods, Dead Letter Exchanges, Message TTL, Priority Queues, and Queue Length Limits  
+**Latest Release**: v0.16.0 - Priority Queues Support  
+**Next Milestone**: Swappable persistence architecture and durable message recovery
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.
