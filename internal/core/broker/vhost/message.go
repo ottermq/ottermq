@@ -223,8 +223,8 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 	for _, queue := range targetQueues {
 		queue.Push(*msg)
 		vh.collector.RecordQueuePublish(queue.Name)
+		vh.collector.RecordExchangeDelivery(exchange.Name) // Messages delivered (routed)
 	}
-
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
 	vh.mu.Lock()
 	vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
