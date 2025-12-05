@@ -107,6 +107,12 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	return vh
 }
 
+func (vh *VHost) GetCollector() *metrics.Collector {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.collector
+}
+
 func (vh *VHost) SetMetricsCollector(collector *metrics.Collector) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
