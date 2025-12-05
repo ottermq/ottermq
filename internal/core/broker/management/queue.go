@@ -13,16 +13,12 @@ func (s *Service) ListQueues() []models.QueueDTO {
 	var dtos []models.QueueDTO
 	vhosts := s.broker.ListVHosts()
 	queues := []*vhost.Queue{}
-	unackedCounts := map[string]int{}
-	consumerCounts := map[string]int{}
 	for _, vh := range vhosts {
-		unackedCounts = vh.GetUnackedMessageCountsAllQueues()
-		consumerCounts = vh.GetConsumerCountsAllQueues()
 		queues = append(queues, vh.GetAllQueues()...)
 
 		// Map to DTOs
 		for _, queue := range queues {
-			dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], consumerCounts[queue.Name])
+			dto := s.queueToDTO(vh, queue)
 			dtos = append(dtos, dto)
 		}
 	}
@@ -41,10 +37,7 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 	}
 
 	// Get statistics from vhost (these methods handle locking internally)
-	unackedCounts := vh.GetUnackedMessageCountsAllQueues()
-	consumerCounts := vh.GetConsumersByQueue(queueName)
-
-	dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], len(consumerCounts))
+	dto := s.queueToDTO(vh, queue)
 	return &dto, nil
 }
 
@@ -72,7 +65,7 @@ func (s *Service) CreateQueue(vhostName, queueName string, req models.CreateQueu
 		return nil, err
 	}
 
-	dto := s.queueToDTO(vh, queue, 0, 0)
+	dto := s.queueToDTO(vh, queue)
 	return &dto, nil
 }
 
@@ -146,9 +139,13 @@ func (s *Service) PurgeQueue(vhostName, queueName string) (int, error) {
 	return int(count), err
 }
 
-func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, consumerCount int) models.QueueDTO {
-	messagesReady := queue.Len()
-	total := messagesReady + unackedCount
+func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue) models.QueueDTO {
+	snapshot := vh.GetCollector().GetQueueMetrics(queue.Name).Snapshot()
+	messages := int(snapshot.MessageCount)
+	unackedCount := int(snapshot.UnackedCount)
+	messagesReady := messages
+	total := messages + unackedCount
+	consumerCount := int(snapshot.ConsumerCount)
 
 	dto := models.QueueDTO{
 		VHost:              vh.Name,
