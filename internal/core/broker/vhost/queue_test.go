@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -44,6 +45,7 @@ func TestDeleteQueue_AutoDeleteDirectExchange(t *testing.T) {
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
 		persist:   &dummy.DummyPersistence{},
+		collector: metrics.NewMockCollector(nil),
 	}
 	// Create auto-delete direct exchange
 	ex := &Exchange{
@@ -74,6 +76,7 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
 		persist:   &dummy.DummyPersistence{},
+		collector: metrics.NewMockCollector(nil),
 	}
 	// Create auto-delete fanout exchange
 	ex := &Exchange{
@@ -105,6 +108,7 @@ func TestExclusiveQueueDeletedOnConnectionClose(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	// Create exclusive queue

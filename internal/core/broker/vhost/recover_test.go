@@ -32,11 +32,7 @@ func (m *mockFrameSender) SendFrame(connID ConnectionID, channel uint16, frame [
 }
 
 func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create queue
@@ -113,11 +109,7 @@ func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create queue
@@ -201,11 +193,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create queue
@@ -263,11 +251,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerGone(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create queue
@@ -349,11 +333,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 }
 
 func TestHandleBasicRecover_NoChannelState(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Call recover without setting up channel state
@@ -388,14 +368,7 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 }
 
 func TestHandleBasicRecover_RequeueFalse_BasicGetSentinel(t *testing.T) {
-	// Test that Basic.Get deliveries (with BASIC_GET_SENTINEL) are requeued
-	// when Basic.Recover(requeue=false) is called, since they have no consumer
-	// to redeliver to.
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("test-vhost", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create queue

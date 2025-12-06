@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
 // TestMaxLengthIntegration tests the full flow of enforcing max-length before pushing
@@ -17,6 +18,7 @@ func TestMaxLengthIntegration(t *testing.T) {
 		ActiveExtensions: map[string]bool{
 			"qll": true,
 		},
+		collector: metrics.NewMockCollector(nil),
 	}
 	vh.QueueLengthLimiter = &DefaultQueueLengthLimiter{}
 	vh.QueueLengthLimiter.(*DefaultQueueLengthLimiter).vh = vh
@@ -74,6 +76,7 @@ func TestMaxLengthWithDLX(t *testing.T) {
 			"qll": true,
 			"dlx": true,
 		},
+		collector: metrics.NewMockCollector(nil),
 	}
 	vh.QueueLengthLimiter = &DefaultQueueLengthLimiter{vh: vh}
 	vh.DeadLetterer = &DeadLetter{vh: vh}
