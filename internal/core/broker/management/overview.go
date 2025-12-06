@@ -6,7 +6,7 @@ import (
 
 func (s *Service) GetOverview() (*models.OverviewDTO, error) {
 	collector := s.broker.GetCollector()
-	snapshot := *collector.GetBrokerMetrics().Snapshot()
+	snapshot := *collector.GetBrokerSnapshot()
 
 	// Compress the Prometheus metrics using Snappy
 	return &models.OverviewDTO{
