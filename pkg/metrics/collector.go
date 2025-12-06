@@ -464,6 +464,13 @@ type BrokerSnapshot struct {
 	ExchangeCount   int64 `json:"exchange_count"`
 }
 
+// GetBrokerSnapshot returns a snapshot of the current broker metrics
+// For convenience, this method provides a direct way to get a snapshot without manually calling GetBrokerMetrics and then Snapshot.
+// It is to make easier to mock the Collector in tests.
+func (c *Collector) GetBrokerSnapshot() *BrokerSnapshot {
+	return c.GetBrokerMetrics().Snapshot()
+}
+
 // Snapshot returns a point-in-time snapshot of all broker metrics
 func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 	return &BrokerSnapshot{
@@ -499,6 +506,13 @@ type ExchangeSnapshot struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+func (c *Collector) GetExchangeSnapshot(exchangeName string) *ExchangeSnapshot {
+	if em := c.GetExchangeMetrics(exchangeName); em != nil {
+		return em.Snapshot()
+	}
+	return nil
+}
+
 // Snapshot returns a snapshot of this exchange's metrics
 func (em *ExchangeMetrics) Snapshot() *ExchangeSnapshot {
 	em.mu.RLock()
@@ -522,11 +536,19 @@ type QueueSnapshot struct {
 	MessageRate   float64   `json:"message_rate"`
 	DeliveryRate  float64   `json:"delivery_rate"`
 	AckRate       float64   `json:"ack_rate"`
+	AckCount      int64     `json:"ack_count"`
 	UnackedCount  int64     `json:"unacked_count"`
 	MessageCount  int64     `json:"message_count"`
 	ConsumerCount int64     `json:"consumer_count"`
 	Uptime        float64   `json:"uptime_seconds"`
 	CreatedAt     time.Time `json:"created_at"`
+}
+
+func (c *Collector) GetQueueSnapshot(queueName string) *QueueSnapshot {
+	if qm := c.GetQueueMetrics(queueName); qm != nil {
+		return qm.Snapshot()
+	}
+	return nil
 }
 
 // Snapshot returns a snapshot of this queue's metrics
@@ -539,6 +561,7 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 		MessageRate:   qm.MessageRate.Rate(),
 		DeliveryRate:  qm.DeliveryRate.Rate(),
 		AckRate:       qm.AckRate.Rate(),
+		AckCount:      qm.AckCount.Load(),
 		UnackedCount:  qm.UnackedCount.Load(),
 		MessageCount:  qm.MessageCount.Load(),
 		ConsumerCount: qm.ConsumerCount.Load(),
