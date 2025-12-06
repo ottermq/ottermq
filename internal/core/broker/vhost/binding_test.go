@@ -5,6 +5,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -15,6 +16,7 @@ func TestUnbindQueue_Success(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	// Create exchange and queue
 	exchangeName := "test-exchange"
@@ -60,6 +62,7 @@ func TestUnbindQueue_ExchangeNotFound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	queueName := "test-queue"
@@ -92,6 +95,7 @@ func TestUnbindQueue_QueueNotFound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	exchangeName := "test-exchange"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -122,6 +126,7 @@ func TestUnbindQueue_BindingNotFound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -157,6 +162,7 @@ func TestUnbindQueue_MultipleBindings(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	routingKey := "shared.key"
@@ -218,6 +224,7 @@ func TestUnbindQueue_RemovesRoutingKeyWhenEmpty(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -251,6 +258,7 @@ func TestUnbindQueue_FanoutExchange(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-fanout"
 	queueName := "test-queue"
@@ -303,6 +311,7 @@ func TestUnbindQueue_AutoDeleteExchange(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -340,6 +349,7 @@ func TestUnbindQueue_NoAutoDeleteWhenOtherBindingsExist(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	routingKey := "test.key"
@@ -374,6 +384,7 @@ func TestDeleteBindingUnlocked_QueueNotInBindingList(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchange := &Exchange{
 		Name:     "test-exchange",
@@ -421,6 +432,7 @@ func TestUnbindQueue_AlreadyUnbound(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
