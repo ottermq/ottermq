@@ -34,8 +34,9 @@ type QueueStats struct {
 
 func (*Service) fetchQueueStatistics(vh *vhost.VHost, queue *vhost.Queue) *QueueStats {
 	var messages, unackedCount, consumerCount int
-	if vh != nil && vh.GetCollector() != nil {
-		snapshot := vh.GetCollector().GetQueueMetrics(queue.Name).Snapshot()
+	collector := vh.GetCollector()
+	if collector != nil && collector.GetQueueSnapshot(queue.Name) != nil {
+		snapshot := collector.GetQueueSnapshot(queue.Name)
 		messages = int(snapshot.MessageCount)
 		unackedCount = int(snapshot.UnackedCount)
 		consumerCount = int(snapshot.ConsumerCount)
