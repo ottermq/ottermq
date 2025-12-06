@@ -32,6 +32,10 @@ type MetricsCollector interface {
 	RecordChannelClose()
 	GetBrokerMetrics() *BrokerMetrics
 
+	GetBrokerSnapshot() *BrokerSnapshot
+	GetExchangeSnapshot(exchangeName string) *ExchangeSnapshot
+	GetQueueSnapshot(queueName string) *QueueSnapshot
+
 	// Time series
 	GetPublishRateTimeSeries(duration time.Duration) []Sample
 	GetDeliveryRateTimeSeries(duration time.Duration) []Sample
