@@ -70,8 +70,7 @@ type QueueDTO struct {
 	MessagesTotal      int `json:"messages_total"` // Ready + Unacked
 
 	// Consumers stats
-	Consumers       int `json:"consumers"`
-	ConsumersActive int `json:"consumers_active"`
+	Consumers int `json:"consumers"`
 
 	// Properties/flags
 	Durable    bool           `json:"durable"`
