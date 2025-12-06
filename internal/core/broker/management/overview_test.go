@@ -6,6 +6,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,6 +115,27 @@ func setupTestBrokerForOverview(t *testing.T) *overviewFakeBroker {
 
 func TestGetOverview_Success(t *testing.T) {
 	broker := setupTestBrokerForOverview(t)
+	mockData := &metrics.MockMetricsData{
+		QueueMetrics: map[string]metrics.QueueSnapshot{
+			"queue1": {
+				Name:          "queue1",
+				MessageCount:  15,
+				UnackedCount:  3,
+				ConsumerCount: 2,
+				AckCount:      10,
+			},
+			"queue2": {
+				Name:          "queue2",
+				MessageCount:  0,
+				UnackedCount:  0,
+				ConsumerCount: 0,
+				AckCount:      0,
+			},
+		},
+	}
+	mockCollector := metrics.NewMockCollector(mockData)
+	broker.collector = mockCollector
+	broker.vhosts["/"].SetMetricsCollector(mockCollector)
 	service := NewService(broker)
 
 	overview, err := service.GetOverview()
@@ -156,6 +178,27 @@ func TestGetOverview_Success(t *testing.T) {
 
 func TestGetMessageStats_MultipleQueues(t *testing.T) {
 	broker := setupTestBrokerForOverview(t)
+	mockData := &metrics.MockMetricsData{
+		QueueMetrics: map[string]metrics.QueueSnapshot{
+			"queue1": {
+				Name:          "queue1",
+				MessageCount:  10,
+				UnackedCount:  3,
+				ConsumerCount: 2,
+				AckCount:      10,
+			},
+			"queue2": {
+				Name:          "queue2",
+				MessageCount:  5,
+				UnackedCount:  0,
+				ConsumerCount: 0,
+				AckCount:      0,
+			},
+		},
+	}
+	mockCollector := metrics.NewMockCollector(mockData)
+	broker.collector = mockCollector
+	broker.vhosts["/"].SetMetricsCollector(mockCollector)
 	service := NewService(broker)
 
 	stats := service.GetMessageStats()
@@ -205,6 +248,27 @@ func TestGetBrokerInfo(t *testing.T) {
 
 func TestGetOverview_AllFieldsPopulated(t *testing.T) {
 	broker := setupTestBrokerForOverview(t)
+	mockData := &metrics.MockMetricsData{
+		QueueMetrics: map[string]metrics.QueueSnapshot{
+			"queue1": {
+				Name:          "queue1",
+				MessageCount:  10,
+				UnackedCount:  3,
+				ConsumerCount: 2,
+				AckCount:      10,
+			},
+			"queue2": {
+				Name:          "queue2",
+				MessageCount:  5,
+				UnackedCount:  0,
+				ConsumerCount: 0,
+				AckCount:      0,
+			},
+		},
+	}
+	mockCollector := metrics.NewMockCollector(mockData)
+	broker.collector = mockCollector
+	broker.vhosts["/"].SetMetricsCollector(mockCollector)
 	service := NewService(broker)
 
 	overview, err := service.GetOverview()
@@ -221,6 +285,34 @@ func TestGetOverview_AllFieldsPopulated(t *testing.T) {
 
 func TestGetMessageStats_VerifyAggregation(t *testing.T) {
 	broker := setupTestBroker(t).(*fakeBroker)
+	mockDate := &metrics.MockMetricsData{
+		QueueMetrics: map[string]metrics.QueueSnapshot{
+			"q1": {
+				Name:          "q1",
+				MessageCount:  10,
+				UnackedCount:  2,
+				ConsumerCount: 1,
+				AckCount:      5,
+			},
+			"q2": {
+				Name:          "q2",
+				MessageCount:  20,
+				UnackedCount:  5,
+				ConsumerCount: 2,
+				AckCount:      10,
+			},
+			"q3": {
+				Name:          "q3",
+				MessageCount:  30,
+				UnackedCount:  8,
+				ConsumerCount: 3,
+				AckCount:      15,
+			},
+		},
+	}
+	mockCollector := metrics.NewMockCollector(mockDate)
+	broker.collector = mockCollector
+	broker.vhosts["/"].SetMetricsCollector(mockCollector)
 	vh := broker.vhosts["/"]
 
 	// Create 3 queues with different message counts

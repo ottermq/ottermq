@@ -101,7 +101,7 @@ func setupTestBroker(t *testing.T) BrokerProvider {
 	vh := vhost.NewVhost("/", options)
 	fakeBroker := &fakeBroker{
 		vhosts:    map[string]*vhost.VHost{"/": vh},
-		collector: metrics.NewMockCollector(),
+		collector: metrics.NewMockCollector(nil),
 	}
 	vh.SetFramer(&amqp.DefaultFramer{})
 	vh.SetMetricsCollector(fakeBroker.collector)
