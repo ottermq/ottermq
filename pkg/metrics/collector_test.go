@@ -255,16 +255,29 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	if qm.MessageCount.Load() != 3 {
 		t.Fatalf("MessageCount = %d, want 3", qm.MessageCount.Load())
 	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Fatalf("UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
 
-	// Deliver 1 message
+	// Deliver 1 message (moves from ready to unacked)
 	c.RecordQueueDelivery("testq")
 	time.Sleep(5 * time.Millisecond)
 
-	// Ack it (should decrease count)
+	if qm.MessageCount.Load() != 2 {
+		t.Errorf("MessageCount after delivery = %d, want 2", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// Ack it (removes from unacked)
 	c.RecordQueueAck("testq")
 
 	if qm.MessageCount.Load() != 2 {
 		t.Errorf("MessageCount after ack = %d, want 2", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("UnackedCount after ack = %d, want 0", qm.UnackedCount.Load())
 	}
 
 	// Deliver and ack remaining
@@ -276,20 +289,101 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("MessageCount after all acks = %d, want 0", qm.MessageCount.Load())
 	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("UnackedCount after all acks = %d, want 0", qm.UnackedCount.Load())
+	}
 }
 
-func TestQueueNack(t *testing.T) {
+func TestQueueNackWithRequeue(t *testing.T) {
 	c := NewCollector(nil)
 
+	// Publish 2 messages
 	c.RecordQueuePublish("testq")
 	c.RecordQueuePublish("testq")
-
-	// Nack doesn't decrease message count (message stays in queue)
-	c.RecordQueueNack("testq")
 
 	qm := c.GetQueueMetrics("testq")
 	if qm.MessageCount.Load() != 2 {
-		t.Errorf("MessageCount after nack = %d, want 2 (nack doesn't remove)", qm.MessageCount.Load())
+		t.Fatalf("MessageCount = %d, want 2", qm.MessageCount.Load())
+	}
+
+	// Deliver 1 message (moves from ready to unacked)
+	c.RecordQueueDelivery("testq")
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// NACK with requeue (moves from unacked back to ready)
+	c.RecordQueueNack("testq")    // Remove from unacked
+	c.RecordQueueRequeue("testq") // Add back to ready
+
+	if qm.MessageCount.Load() != 2 {
+		t.Errorf("MessageCount after nack+requeue = %d, want 2", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("UnackedCount after nack+requeue = %d, want 0", qm.UnackedCount.Load())
+	}
+}
+
+func TestQueueNackWithoutRequeue(t *testing.T) {
+	c := NewCollector(nil)
+
+	// Publish 2 messages
+	c.RecordQueuePublish("testq")
+	c.RecordQueuePublish("testq")
+
+	qm := c.GetQueueMetrics("testq")
+
+	// Deliver 1 message
+	c.RecordQueueDelivery("testq")
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// NACK without requeue (message is dead-lettered or discarded)
+	c.RecordQueueNack("testq")
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("MessageCount after nack = %d, want 1 (only ready messages)", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("UnackedCount after nack = %d, want 0 (removed from unacked)", qm.UnackedCount.Load())
+	}
+}
+
+func TestQueueRequeue(t *testing.T) {
+	c := NewCollector(nil)
+
+	// Simulate consumer cancel scenario
+	c.RecordQueuePublish("testq")
+	c.RecordQueueDelivery("testq") // Message delivered to consumer
+
+	qm := c.GetQueueMetrics("testq")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("MessageCount after delivery = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// Consumer cancels - message needs to be requeued
+	// In real code: RecordQueueNack + RecordQueueRequeue
+	c.RecordQueueNack("testq")    // Remove from unacked
+	c.RecordQueueRequeue("testq") // Add back to ready
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("MessageCount after requeue = %d, want 1", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("UnackedCount after requeue = %d, want 0", qm.UnackedCount.Load())
 	}
 }
 
@@ -312,8 +406,10 @@ func TestSetQueueConsumers(t *testing.T) {
 
 	c.RecordQueuePublish("testq")
 
-	// Set consumer count
-	c.SetQueueConsumers("testq", 3)
+	// Add 3 consumers
+	c.RecordConsumerAdded("testq")
+	c.RecordConsumerAdded("testq")
+	c.RecordConsumerAdded("testq")
 
 	qm := c.GetQueueMetrics("testq")
 	if qm.ConsumerCount.Load() != 3 {
@@ -325,8 +421,9 @@ func TestSetQueueConsumers(t *testing.T) {
 		t.Errorf("broker consumerCount = %d, want 3", c.consumerCount.Load())
 	}
 
-	// Update consumer count
-	c.SetQueueConsumers("testq", 5)
+	// Add 2 more consumers
+	c.RecordConsumerAdded("testq")
+	c.RecordConsumerAdded("testq")
 
 	if qm.ConsumerCount.Load() != 5 {
 		t.Errorf("ConsumerCount = %d, want 5", qm.ConsumerCount.Load())
@@ -334,6 +431,17 @@ func TestSetQueueConsumers(t *testing.T) {
 
 	if c.consumerCount.Load() != 5 {
 		t.Errorf("broker consumerCount = %d, want 5", c.consumerCount.Load())
+	}
+
+	// Add 2 more consumers
+	c.RecordConsumerRemoved("testq")
+
+	if qm.ConsumerCount.Load() != 4 {
+		t.Errorf("ConsumerCount = %d, want 4", qm.ConsumerCount.Load())
+	}
+
+	if c.consumerCount.Load() != 4 {
+		t.Errorf("broker consumerCount = %d, want 4", c.consumerCount.Load())
 	}
 }
 
@@ -347,7 +455,8 @@ func TestQueueMetricsSnapshot(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	c.RecordQueuePublish("testq")
 
-	c.SetQueueConsumers("testq", 2)
+	c.RecordConsumerAdded("testq")
+	c.RecordConsumerAdded("testq")
 
 	qm := c.GetQueueMetrics("testq")
 	snapshot := qm.Snapshot()
@@ -404,7 +513,8 @@ func TestRemoveQueue(t *testing.T) {
 
 	c.RecordQueuePublish("tempq")
 	c.RecordQueuePublish("tempq")
-	c.SetQueueConsumers("tempq", 2)
+	c.RecordConsumerAdded("tempq")
+	c.RecordConsumerAdded("tempq")
 
 	// Verify state before removal
 	if c.GetQueueMetrics("tempq") == nil {
@@ -769,6 +879,265 @@ func TestEmptyQueueName(t *testing.T) {
 
 	if qm.MessageCount.Load() != 1 {
 		t.Errorf("MessageCount = %d, want 1", qm.MessageCount.Load())
+	}
+}
+
+// ========================================
+// Full Message Lifecycle Tests
+// ========================================
+
+func TestFullMessageLifecycle_Success(t *testing.T) {
+	c := NewCollector(nil)
+
+	// 1. Publish message to exchange
+	c.RecordExchangePublish("my.exchange", "direct")
+
+	// 2. Message routed to queue
+	c.RecordQueuePublish("my.queue")
+
+	qm := c.GetQueueMetrics("my.queue")
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("After publish: MessageCount = %d, want 1", qm.MessageCount.Load())
+	}
+
+	// 3. Consumer receives message
+	c.RecordQueueDelivery("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// 4. Consumer acknowledges
+	c.RecordQueueAck("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After ack: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("After ack: UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+
+	// Verify broker-level metrics
+	if c.messageCount.Load() != 0 {
+		t.Errorf("Broker messageCount = %d, want 0 (all consumed)", c.messageCount.Load())
+	}
+}
+
+func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
+	c := NewCollector(nil)
+
+	// 1. Publish and route
+	c.RecordExchangePublish("my.exchange", "direct")
+	c.RecordQueuePublish("my.queue")
+
+	qm := c.GetQueueMetrics("my.queue")
+
+	// 2. Deliver to consumer
+	c.RecordQueueDelivery("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// 3. Consumer NACKs with requeue=true
+	c.RecordQueueNack("my.queue")
+	c.RecordQueueRequeue("my.queue")
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("After nack+requeue: MessageCount = %d, want 1", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("After nack+requeue: UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+
+	// 4. Deliver again
+	c.RecordQueueDelivery("my.queue")
+
+	// 5. ACK this time
+	c.RecordQueueAck("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("Final: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("Final: UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+}
+
+func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
+	c := NewCollector(nil)
+
+	// 1. Publish to exchange and route to queue
+	c.RecordExchangePublish("my.exchange", "direct")
+	c.RecordQueuePublish("my.queue")
+
+	qm := c.GetQueueMetrics("my.queue")
+
+	// 2. Deliver to consumer
+	c.RecordQueueDelivery("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// 3. Consumer NACKs with requeue=false (dead-letter or discard)
+	c.RecordQueueNack("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After nack (no requeue): MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("After nack (no requeue): UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+
+	// Message is gone (dead-lettered to DLX or discarded)
+}
+
+func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
+	c := NewCollector(nil)
+
+	// Setup queue with consumer
+	c.RecordQueuePublish("my.queue")
+	c.RecordConsumerAdded("my.queue")
+
+	qm := c.GetQueueMetrics("my.queue")
+
+	// Deliver message
+	c.RecordQueueDelivery("my.queue")
+
+	if qm.MessageCount.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 1 {
+		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
+	}
+
+	// Consumer cancels - unacked messages requeued
+	c.RecordConsumerRemoved("my.queue")
+	c.RecordQueueNack("my.queue")    // Remove from unacked
+	c.RecordQueueRequeue("my.queue") // Back to ready
+
+	if qm.MessageCount.Load() != 1 {
+		t.Errorf("After consumer cancel: MessageCount = %d, want 1", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("After consumer cancel: UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+	if qm.ConsumerCount.Load() != 0 {
+		t.Errorf("After consumer cancel: ConsumerCount = %d, want 0", qm.ConsumerCount.Load())
+	}
+}
+
+func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
+	c := NewCollector(nil)
+
+	// Publish 10 messages
+	for i := 0; i < 10; i++ {
+		c.RecordExchangePublish("my.exchange", "direct")
+		c.RecordQueuePublish("my.queue")
+	}
+
+	qm := c.GetQueueMetrics("my.queue")
+	if qm.MessageCount.Load() != 10 {
+		t.Fatalf("After publish: MessageCount = %d, want 10", qm.MessageCount.Load())
+	}
+
+	// Deliver 5 messages
+	for i := 0; i < 5; i++ {
+		c.RecordQueueDelivery("my.queue")
+	}
+
+	if qm.MessageCount.Load() != 5 {
+		t.Errorf("After 5 deliveries: MessageCount = %d, want 5", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 5 {
+		t.Errorf("After 5 deliveries: UnackedCount = %d, want 5", qm.UnackedCount.Load())
+	}
+
+	// ACK 3 messages
+	for i := 0; i < 3; i++ {
+		c.RecordQueueAck("my.queue")
+	}
+
+	if qm.MessageCount.Load() != 5 {
+		t.Errorf("After 3 acks: MessageCount = %d, want 5", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 2 {
+		t.Errorf("After 3 acks: UnackedCount = %d, want 2", qm.UnackedCount.Load())
+	}
+
+	// NACK 2 with requeue
+	for i := 0; i < 2; i++ {
+		c.RecordQueueNack("my.queue")
+		c.RecordQueueRequeue("my.queue")
+	}
+
+	if qm.MessageCount.Load() != 7 {
+		t.Errorf("After 2 nack+requeue: MessageCount = %d, want 7", qm.MessageCount.Load())
+	}
+	if qm.UnackedCount.Load() != 0 {
+		t.Errorf("After 2 nack+requeue: UnackedCount = %d, want 0", qm.UnackedCount.Load())
+	}
+
+	// Total messages in system: 7 ready + 0 unacked = 7
+}
+
+func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
+	c := NewCollector(nil)
+
+	// Publish to multiple queues
+	c.RecordExchangePublish("ex1", "direct")
+	c.RecordQueuePublish("q1")
+
+	c.RecordExchangePublish("ex1", "direct")
+	c.RecordQueuePublish("q2")
+
+	c.RecordExchangePublish("ex2", "fanout")
+	c.RecordQueuePublish("q3")
+
+	// Broker should track total messages
+	if c.messageCount.Load() != 3 {
+		t.Errorf("Broker messageCount = %d, want 3", c.messageCount.Load())
+	}
+
+	// Deliver all
+	c.RecordQueueDelivery("q1")
+	c.RecordQueueDelivery("q2")
+	c.RecordQueueDelivery("q3")
+
+	// ACK all
+	c.RecordQueueAck("q1")
+	c.RecordQueueAck("q2")
+	c.RecordQueueAck("q3")
+
+	// Small delay for rate calculation
+	time.Sleep(10 * time.Millisecond)
+
+	// Broker messageCount should be 0 (all consumed)
+	if c.messageCount.Load() != 0 {
+		t.Errorf("Broker messageCount after all acks = %d, want 0", c.messageCount.Load())
+	}
+
+	// Verify rates tracked (should be >= 0, may be 0 if calculations haven't completed)
+	bm := c.GetBrokerMetrics()
+	if bm.TotalPublishes().Rate() < 0 {
+		t.Error("TotalPublishes rate should be >= 0")
+	}
+	if bm.TotalDeliveries().Rate() < 0 {
+		t.Error("TotalDeliveries rate should be >= 0")
+	}
+	// Note: TotalAcks may be 0 if rate calculation hasn't had time to complete
+	if rate := bm.TotalAcks().Rate(); rate < 0 {
+		t.Errorf("TotalAcks rate should be >= 0, got %f", rate)
 	}
 }
 

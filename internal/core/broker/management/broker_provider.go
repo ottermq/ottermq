@@ -26,5 +26,5 @@ type BrokerProvider interface {
 	CloseConnection(name string, reason string) error
 
 	// Metrics related methods
-	GetCollector() *metrics.Collector
+	GetCollector() metrics.MetricsCollector
 }

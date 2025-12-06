@@ -1,0 +1,46 @@
+package metrics
+
+import "time"
+
+// MetricsCollector is the interface for metrics collection in OtterMQ.
+// This interface allows for easy mocking in tests.
+type MetricsCollector interface {
+	// Exchange metrics
+	RecordExchangePublish(exchangeName, exchangeType string)
+	RecordExchangeDelivery(exchangeName string)
+	GetExchangeMetrics(exchangeName string) *ExchangeMetrics
+	GetAllExchangeMetrics() []*ExchangeMetrics
+	RemoveExchange(exchangeName string)
+
+	// Queue metrics
+	RecordQueuePublish(queueName string)
+	RecordQueueRequeue(queueName string)
+	RecordQueueDelivery(queueName string)
+	RecordQueueAck(queueName string)
+	RecordQueueNack(queueName string)
+	SetQueueDepth(queueName string, depth int64)
+	RecordConsumerAdded(queueName string)
+	RecordConsumerRemoved(queueName string)
+	GetQueueMetrics(queueName string) *QueueMetrics
+	GetAllQueueMetrics() []*QueueMetrics
+	RemoveQueue(queueName string)
+
+	// Broker-level metrics
+	RecordConnection()
+	RecordConnectionClose()
+	RecordChannelOpen()
+	RecordChannelClose()
+	GetBrokerMetrics() *BrokerMetrics
+
+	// Time series
+	GetPublishRateTimeSeries(duration time.Duration) []Sample
+	GetDeliveryRateTimeSeries(duration time.Duration) []Sample
+	GetConnectionRateTimeSeries(duration time.Duration) []Sample
+
+	// Utility
+	Clear()
+	IsEnabled() bool
+}
+
+// Ensure Collector implements MetricsCollector
+var _ MetricsCollector = (*Collector)(nil)

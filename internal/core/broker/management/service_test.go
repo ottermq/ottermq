@@ -13,7 +13,8 @@ import (
 
 // fakeBroker is a lightweight test implementation of BrokerProvider avoiding circular imports.
 type fakeBroker struct {
-	vhosts map[string]*vhost.VHost
+	vhosts    map[string]*vhost.VHost
+	collector metrics.MetricsCollector
 }
 
 func (fb *fakeBroker) GetVHost(name string) *vhost.VHost { return fb.vhosts[name] }
@@ -81,9 +82,9 @@ func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
 	return models.VHostDTO{Name: vh.Name}, nil
 }
 
-func (fb *fakeBroker) GetCollector() *metrics.Collector {
+func (fb *fakeBroker) GetCollector() metrics.MetricsCollector {
 	// For testing purposes, return a new Collector.
-	return metrics.NewCollector(nil)
+	return fb.collector
 }
 
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
@@ -98,7 +99,13 @@ func setupTestBroker(t *testing.T) BrokerProvider {
 		EnableQLL:       false,
 	}
 	vh := vhost.NewVhost("/", options)
+	fakeBroker := &fakeBroker{
+		vhosts:    map[string]*vhost.VHost{"/": vh},
+		collector: metrics.NewMockCollector(),
+	}
+	vh.SetFramer(&amqp.DefaultFramer{})
+	vh.SetMetricsCollector(fakeBroker.collector)
 	// Some tests may rely on time-based logic later; ensure deterministic start (placeholder).
 	_ = time.Now()
-	return &fakeBroker{vhosts: map[string]*vhost.VHost{"/": vh}}
+	return fakeBroker
 }

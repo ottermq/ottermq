@@ -1,9 +1,14 @@
 package management
 
-import "github.com/andrelcunha/ottermq/internal/core/models"
+import (
+	"github.com/andrelcunha/ottermq/internal/core/models"
+)
 
 func (s *Service) GetOverview() (*models.OverviewDTO, error) {
-	snapshot := *s.broker.GetCollector().GetBrokerMetrics().Snapshot()
+	collector := s.broker.GetCollector()
+	snapshot := *collector.GetBrokerMetrics().Snapshot()
+
+	// Compress the Prometheus metrics using Snappy
 	return &models.OverviewDTO{
 		BrokerDetails:   s.broker.GetBrokerOverviewDetails(),
 		NodeDetails:     s.broker.GetOverviewNodeDetails(),

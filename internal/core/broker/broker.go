@@ -53,7 +53,7 @@ type Broker struct {
 	startedAt     time.Time
 
 	// Metrics collector
-	collector *metrics.Collector
+	collector metrics.MetricsCollector
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -778,7 +778,7 @@ func (b *Broker) CloseConnection(name string, reason string) error {
 	return nil
 }
 
-func (b *Broker) GetCollector() *metrics.Collector {
+func (b *Broker) GetCollector() metrics.MetricsCollector {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.collector

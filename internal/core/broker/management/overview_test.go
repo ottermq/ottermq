@@ -42,9 +42,9 @@ func (ofb *overviewFakeBroker) GetBrokerOverviewConfig() models.BrokerConfigOver
 func setupTestBrokerForOverview(t *testing.T) *overviewFakeBroker {
 	t.Helper()
 	base := setupTestBroker(t).(*fakeBroker)
+	vh := base.vhosts["/"]
 
 	// Create some test queues with messages
-	vh := base.vhosts["/"]
 	props := &vhost.QueueProperties{
 		Durable:    false,
 		AutoDelete: false,

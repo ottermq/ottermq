@@ -61,7 +61,7 @@ type VHost struct {
 	frameSender FrameSender
 
 	// Metrics collector
-	collector *metrics.Collector
+	collector metrics.MetricsCollector
 }
 
 type FrameSender interface {
@@ -107,13 +107,13 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	return vh
 }
 
-func (vh *VHost) GetCollector() *metrics.Collector {
+func (vh *VHost) GetCollector() metrics.MetricsCollector {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	return vh.collector
 }
 
-func (vh *VHost) SetMetricsCollector(collector *metrics.Collector) {
+func (vh *VHost) SetMetricsCollector(collector metrics.MetricsCollector) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	vh.collector = collector

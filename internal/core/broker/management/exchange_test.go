@@ -53,20 +53,8 @@ func TestDeleteExchange_IfUnused(t *testing.T) {
 	_, err = service.CreateQueue("/", qName, models.CreateQueueRequest{})
 	require.NoError(t, err)
 
-	// Bind queue to exchange to make it "used"
-	// Since management service bindings are Phase 3, we use the vhost directly
 	vh := broker.GetVHost("/")
-	// We need to use vhost package to access BindQueue if we were using types,
-	// but here we just call the method on the interface/struct.
-	// The error "imported and not used" suggests we didn't use `vhost.` anywhere.
-	// We can remove the import if we don't use types from it,
-	// OR we can use a type from it to silence the error.
-	// Let's use vhost.VHost type assertion or similar if needed,
-	// but actually we just need to call BindQueue.
-	// Wait, BindQueue is a method of *vhost.VHost.
-	// broker.GetVHost returns *vhost.VHost.
-	// So we are using the package implicitly but not explicitly referring to `vhost` symbol.
-	// Let's remove the import if it's not used.
+
 	err = vh.BindQueue(exName, qName, "key", nil, vhost.MANAGEMENT_CONNECTION_ID)
 	require.NoError(t, err)
 

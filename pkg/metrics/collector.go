@@ -33,6 +33,10 @@ type Collector struct {
 	queueCount      atomic.Int64
 	exchangeCount   atomic.Int64
 
+	// Cumulative counters for rate calculation
+	totalAckCount  atomic.Int64
+	totalNackCount atomic.Int64
+
 	// Configuration
 	config *Config
 }
@@ -54,6 +58,21 @@ type BrokerMetrics struct {
 	queueCount      int64
 	exchangeCount   int64
 }
+
+// Getters for BrokerMetrics (public API)
+func (bm *BrokerMetrics) TotalPublishes() *RateTracker  { return bm.totalPublishes }
+func (bm *BrokerMetrics) TotalDeliveries() *RateTracker { return bm.totalDeliveries }
+func (bm *BrokerMetrics) TotalAcks() *RateTracker       { return bm.totalAcks }
+func (bm *BrokerMetrics) TotalNacks() *RateTracker      { return bm.totalNacks }
+func (bm *BrokerMetrics) ConnectionRate() *RateTracker  { return bm.connectionRate }
+func (bm *BrokerMetrics) ChannelRate() *RateTracker     { return bm.channelRate }
+
+func (bm *BrokerMetrics) MessageCount() int64    { return bm.messageCount }
+func (bm *BrokerMetrics) ConsumerCount() int64   { return bm.consumerCount }
+func (bm *BrokerMetrics) ConnectionCount() int64 { return bm.connectionCount }
+func (bm *BrokerMetrics) ChannelCount() int64    { return bm.channelCount }
+func (bm *BrokerMetrics) QueueCount() int64      { return bm.queueCount }
+func (bm *BrokerMetrics) ExchangeCount() int64   { return bm.exchangeCount }
 
 // ExchangeMetrics tracks statistics for a single exchange
 type ExchangeMetrics struct {
@@ -77,6 +96,7 @@ type QueueMetrics struct {
 	MessageCount  atomic.Int64 // Current queue depth
 	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	ConsumerCount atomic.Int64 // Current consumer count
+	AckCount      atomic.Int64 // Cumulative ACK count (for rate calculation)
 	CreatedAt     time.Time
 
 	mu sync.RWMutex
@@ -178,10 +198,11 @@ func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *Excha
 
 	// Create new
 	em := &ExchangeMetrics{
-		Name:        name,
-		Type:        exchangeType,
-		PublishRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
-		CreatedAt:   time.Now(),
+		Name:         name,
+		Type:         exchangeType,
+		PublishRate:  NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		DeliveryRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		CreatedAt:    time.Now(),
 	}
 
 	// Store and return (LoadOrStore handles race)
@@ -248,13 +269,17 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	// Decrease unacked count  and record ack rate
-	count := qm.UnackedCount.Add(-1)
-	qm.AckRate.Record(count)
+	// Decrease unacked count
+	qm.UnackedCount.Add(-1)
 
-	// Record at broker level
-	brokerAcks := c.messageCount.Add(-1)
-	c.totalAcks.Record(brokerAcks)
+	// Increment cumulative ACK count for rate tracking
+	ackCount := qm.AckCount.Add(1)
+	qm.AckRate.Record(ackCount)
+
+	// Record at broker level (also cumulative)
+	c.messageCount.Add(-1)
+	brokerAckCount := c.totalAckCount.Add(1)
+	c.totalAcks.Record(brokerAckCount)
 }
 
 // RecordQueueNack records a message negative acknowledgment
@@ -268,8 +293,8 @@ func (c *Collector) RecordQueueNack(queueName string) {
 	qm.UnackedCount.Add(-1)
 
 	// Record at broker level
-	brokerNacks := c.messageCount.Load()
-	c.totalNacks.Record(brokerNacks)
+	brokerNackCount := c.totalNackCount.Add(1)
+	c.totalNacks.Record(brokerNackCount)
 }
 
 // SetQueueDepth explicitly sets the queue depth (for periodic updates)
@@ -282,18 +307,26 @@ func (c *Collector) SetQueueDepth(queueName string, depth int64) {
 	qm.MessageCount.Store(depth)
 }
 
-// SetQueueConsumers sets the consumer count for a queue
-func (c *Collector) SetQueueConsumers(queueName string, count int64) {
+// RecordConsumerAdded records a new consumer on the queue
+func (c *Collector) RecordConsumerAdded(queueName string) {
 	if !c.config.Enabled {
 		return
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	oldCount := qm.ConsumerCount.Swap(count)
+	qm.ConsumerCount.Add(1)
+	c.consumerCount.Add(1)
+}
 
-	// Update broker-level consumer count
-	delta := count - oldCount
-	c.consumerCount.Add(delta)
+// RecordConsumerRemoved records a consumer removal from the queue
+func (c *Collector) RecordConsumerRemoved(queueName string) {
+	if !c.config.Enabled {
+		return
+	}
+
+	qm := c.getOrCreateQueueMetrics(queueName)
+	qm.ConsumerCount.Add(-1)
+	c.consumerCount.Add(-1)
 }
 
 // GetQueueMetrics retrieves metrics for a specific queue
