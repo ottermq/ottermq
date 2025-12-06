@@ -29,6 +29,7 @@ const (
 	PLATFORM         = "golang"
 	PRODUCT          = "OtterMQ"
 	DEFAULT_PROTOCOL = "AMQP 0-9-1"
+	DEFAULT_VHOST    = "/"
 )
 
 type Broker struct {
@@ -93,19 +94,22 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		WindowSize: config.WindowSize,
 		MaxSamples: config.MaxSamples,
 	}
+	b.framer = &amqp.DefaultFramer{}
 	b.collector = metrics.NewCollector(collectorConfig)
 	log.Info().Msg("Metrics collection enabled")
 
-	defaultVHost := vhost.NewVhost("/", options)
-	defaultVHost.SetFramer(b.framer)
-	defaultVHost.SetFrameSender(b)
-	defaultVHost.SetMetricsCollector(b.collector)
-	b.VHosts["/"] = defaultVHost
-
-	b.framer = &amqp.DefaultFramer{}
+	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
 	b.Management = management.NewService(b)
 	return b
+}
+
+func initializeVHost(vhostName string, options vhost.VHostOptions, b *Broker) *vhost.VHost {
+	vh := vhost.NewVhost(vhostName, options)
+	vh.SetFrameSender(b)
+	vh.SetFramer(b.framer)
+	vh.SetMetricsCollector(b.collector)
+	return vh
 }
 
 func (b *Broker) Start() error {
