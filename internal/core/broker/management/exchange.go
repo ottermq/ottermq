@@ -86,8 +86,7 @@ func (s *Service) DeleteExchange(vhostName, exchangeName string, ifUnused bool) 
 func (s *Service) exchangeToDTO(vh *vhost.VHost, exchange *vhost.Exchange) *models.ExchangeDTO {
 	// Get metrics if they exist
 	var messageStatsIn, messageStatsOut *models.MessageStats
-	if em := s.broker.GetCollector().GetExchangeMetrics(exchange.NameOrAlias()); em != nil {
-		snapshot := em.Snapshot()
+	if snapshot := s.broker.GetCollector().GetExchangeSnapshot(exchange.NameOrAlias()); snapshot != nil {
 		messageStatsIn = &models.MessageStats{
 			PublishCount: int(snapshot.PublishCount),
 			PublishRate:  snapshot.PublishRate,
