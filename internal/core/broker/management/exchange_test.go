@@ -3,11 +3,95 @@ package management
 import (
 	"testing"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type exchangeFakeBroker struct {
+	*fakeBroker
+	brokerDetails   models.OverviewBrokerDetails
+	nodeDetails     models.OverviewNodeDetails
+	objectTotals    models.OverviewObjectTotals
+	connectionStats models.OverviewConnectionStats
+	config          models.BrokerConfigOverview
+}
+
+func setupTestBrokerForExchange(t *testing.T) *exchangeFakeBroker {
+	t.Helper()
+	base := setupTestBroker(t).(*fakeBroker)
+	vh := base.vhosts["/"]
+
+	// Create some test queues with messages
+	props := &vhost.QueueProperties{
+		Durable:    false,
+		AutoDelete: false,
+		Exclusive:  false,
+	}
+	_, err := vh.CreateQueue("queue1", props, vhost.MANAGEMENT_CONNECTION_ID)
+	require.NoError(t, err)
+	_, err = vh.CreateQueue("queue2", props, vhost.MANAGEMENT_CONNECTION_ID)
+	require.NoError(t, err)
+
+	// Bind queues to default exchange
+	_ = vh.BindQueue("", "queue1", "queue1", nil, vhost.MANAGEMENT_CONNECTION_ID)
+	_ = vh.BindQueue("", "queue2", "queue2", nil, vhost.MANAGEMENT_CONNECTION_ID)
+
+	// Add messages to queues
+	for i := 0; i < 10; i++ {
+		msg := vhost.NewMessage(amqp.Message{
+			Body: []byte("test"),
+		}, vhost.GenerateMessageId())
+		_, _ = vh.Publish("", "queue1", &msg)
+	}
+
+	for i := 0; i < 5; i++ {
+		msg := vhost.NewMessage(amqp.Message{
+			Body: []byte("test"),
+		}, vhost.GenerateMessageId())
+		_, _ = vh.Publish("", "queue2", &msg)
+	}
+
+	// Add unacked messages to queue1
+	addUnackedMessages(vh, "queue1", 3)
+
+	return &exchangeFakeBroker{
+		fakeBroker: base,
+		brokerDetails: models.OverviewBrokerDetails{
+			Product:  "OtterMQ",
+			Version:  "0.15.0",
+			Platform: "golang",
+		},
+		nodeDetails: models.OverviewNodeDetails{
+			Name:        "ottermq@localhost",
+			MemoryUsage: 134217728,
+			Goroutines:  42,
+			FDUsed:      10,
+			FDLimit:     1024,
+		},
+		objectTotals: models.OverviewObjectTotals{
+			Connections: 3,
+			Channels:    5,
+			Exchanges:   8,
+			Queues:      2,
+			Consumers:   4,
+		},
+		connectionStats: models.OverviewConnectionStats{
+			Total:             3,
+			ClientConnections: 3,
+			Running:           3,
+		},
+		config: models.BrokerConfigOverview{
+			AMQPPort:           "5672",
+			HTTPPort:           "3000",
+			QueueBufferSize:    100000,
+			PersistenceBackend: "json",
+		},
+	}
+}
 
 func TestCreateExchange_AllTypes(t *testing.T) {
 	broker := setupTestBroker(t)
@@ -38,7 +122,29 @@ func TestCreateExchange_AllTypes(t *testing.T) {
 }
 
 func TestDeleteExchange_IfUnused(t *testing.T) {
-	broker := setupTestBroker(t)
+	broker := setupTestBrokerForExchange(t)
+	mockData := &metrics.MockMetricsData{
+		QueueMetrics: map[string]metrics.QueueSnapshot{
+			"test-queue": {
+				Name:          "test-queue",
+				MessageCount:  10,
+				UnackedCount:  3,
+				ConsumerCount: 2,
+				AckCount:      10,
+			},
+		},
+		ExchangeMetrics: map[string]metrics.ExchangeSnapshot{
+			"test-exchange": {
+				Name:          "test-exchange",
+				Type:          "direct",
+				PublishCount:  100,
+				DeliveryCount: 95,
+			},
+		},
+	}
+	mockCollector := metrics.NewMockCollector(mockData)
+	broker.collector = mockCollector
+	broker.vhosts["/"].SetMetricsCollector(mockCollector)
 	service := NewService(broker)
 
 	// Create exchange
@@ -53,20 +159,8 @@ func TestDeleteExchange_IfUnused(t *testing.T) {
 	_, err = service.CreateQueue("/", qName, models.CreateQueueRequest{})
 	require.NoError(t, err)
 
-	// Bind queue to exchange to make it "used"
-	// Since management service bindings are Phase 3, we use the vhost directly
 	vh := broker.GetVHost("/")
-	// We need to use vhost package to access BindQueue if we were using types,
-	// but here we just call the method on the interface/struct.
-	// The error "imported and not used" suggests we didn't use `vhost.` anywhere.
-	// We can remove the import if we don't use types from it,
-	// OR we can use a type from it to silence the error.
-	// Let's use vhost.VHost type assertion or similar if needed,
-	// but actually we just need to call BindQueue.
-	// Wait, BindQueue is a method of *vhost.VHost.
-	// broker.GetVHost returns *vhost.VHost.
-	// So we are using the package implicitly but not explicitly referring to `vhost` symbol.
-	// Let's remove the import if it's not used.
+
 	err = vh.BindQueue(exName, qName, "key", nil, vhost.MANAGEMENT_CONNECTION_ID)
 	require.NoError(t, err)
 

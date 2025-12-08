@@ -145,6 +145,8 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 		return err
 	}
 
+	vh.collector.RecordQueueDelivery(consumer.QueueName)
+
 	// Persistence
 	if consumer.Props.NoAck && vh.persist != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
 		if err := vh.persist.DeleteMessage(vh.Name, consumer.QueueName, msg.ID); err != nil {

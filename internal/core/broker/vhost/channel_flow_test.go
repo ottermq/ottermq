@@ -3,6 +3,7 @@ package vhost
 import (
 	"testing"
 
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -31,6 +32,7 @@ func TestHandleChannelFlow_ClientInitiated(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel := uint16(1)
 	// Test 1: Client pauses flow (active=false)
@@ -69,6 +71,7 @@ func TestHandleChannelFlow_ServerInitiated(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	channel := uint16(1)
 	connID := newTestConsumerConnID()
 	// Test: Server pauses flow (active=false, initiated by broker)
@@ -104,6 +107,7 @@ func TestGetChannelFlowState_NonExistentChannel(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel := uint16(99)
 	// Should return default state (active=true, not broker-initiated)
@@ -123,6 +127,7 @@ func TestGetOrCreateChannelDelivery_DefaultFlowState(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	channel := uint16(1)
 	connID := newTestConsumerConnID()
 
@@ -144,6 +149,7 @@ func TestShouldThrottle_FlowPaused(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
@@ -186,6 +192,7 @@ func TestShouldThrottle_FlowAndQoS(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
@@ -249,6 +256,7 @@ func TestHandleChannelFlow_MultipleChannels(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel1 := uint16(1)
 	channel2 := uint16(2)
@@ -305,6 +313,7 @@ func TestHandleChannelFlow_OverrideInitiator(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	channel := uint16(1)
 
@@ -341,6 +350,7 @@ func TestShouldThrottle_NilChannelState(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	consumer := &Consumer{

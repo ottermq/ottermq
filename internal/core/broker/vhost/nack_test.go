@@ -3,16 +3,13 @@ package vhost
 import (
 	"testing"
 
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
 func TestHandleBasicNack_Single_RequeueTrue(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
-	vh := NewVhost("/", options)
 	// create queue
 	q, err := vh.CreateQueue("q1", nil, connID)
 	if err != nil {
@@ -83,6 +80,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 	}
 
 	vh := NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	// ensure queue exists (name referenced in records)
 	if _, err := vh.CreateQueue("q1", nil, connID); err != nil {
@@ -161,12 +159,7 @@ func TestHandleBasicNack_Multiple_Boundary_DiscardPersistent(t *testing.T) {
 }
 
 func TestHandleBasicNack_NoChannelState(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-
-	vh := NewVhost("/", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 	err := vh.HandleBasicNack(connID, 1, 1, false, true)
 	if err == nil {
@@ -175,11 +168,7 @@ func TestHandleBasicNack_NoChannelState(t *testing.T) {
 }
 
 func TestHandleBasicNack_Multiple_AboveBoundaryUnaffected(t *testing.T) {
-	var options = VHostOptions{
-		QueueBufferSize: 1000,
-		Persistence:     nil,
-	}
-	vh := NewVhost("/", options)
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 	if _, err := vh.CreateQueue("q1", nil, connID); err != nil {
 		t.Fatalf("CreateQueue failed: %v", err)

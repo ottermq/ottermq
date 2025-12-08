@@ -222,11 +222,12 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
 	for _, queue := range targetQueues {
 		queue.Push(*msg)
+		vh.collector.RecordQueuePublish(queue.Name)
+		vh.collector.RecordExchangeDelivery(exchange.Name) // Messages delivered (routed)
 	}
-
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
 	vh.mu.Lock()
-
+	vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
 	return msg.ID, nil
 }
 
@@ -240,6 +241,7 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		return nil
 	}
 	msg := queue.Pop()
+	vh.collector.RecordQueueDelivery(queue.Name)
 	if msg == nil {
 		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")

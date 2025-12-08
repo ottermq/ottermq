@@ -163,7 +163,7 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) (string, error) {
 		vh.ConsumersByChannel[channelKey],
 		consumer,
 	)
-
+	vh.collector.RecordConsumerAdded(consumer.QueueName)
 	// Check if we need to start delivery routine
 	queue := vh.Queues[consumer.QueueName]
 	shouldStartDelivery := len(vh.ConsumersByQueue[queue.Name]) == 1
@@ -208,6 +208,7 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	for i, c := range consumersForQueue {
 		if c.Tag == tag && c.Channel == channel {
 			vh.ConsumersByQueue[consumer.QueueName] = append(consumersForQueue[:i], consumersForQueue[i+1:]...)
+			vh.collector.RecordConsumerRemoved(consumer.QueueName)
 			break
 		}
 	}
@@ -291,6 +292,7 @@ func (vh *VHost) requeueUnackedForConsumer(state *ChannelDeliveryState, consumer
 
 		// requeue to original queue
 		queue.Push(record.Message)
+		vh.collector.RecordQueueRequeue(queue.Name)
 	}
 }
 
@@ -334,6 +336,7 @@ func (vh *VHost) CleanupChannel(connID ConnectionID, channel uint16) {
 			queue, exists := vh.Queues[record.QueueName]
 			if exists {
 				queue.Push(record.Message)
+				vh.collector.RecordQueueRequeue(queue.Name)
 			}
 		}
 		delete(vh.ChannelDeliveries, channelKey)

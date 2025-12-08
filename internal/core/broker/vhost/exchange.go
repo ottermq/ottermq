@@ -217,6 +217,7 @@ func (vh *VHost) deleteExchangeUnlocked(name string) error {
 	durable := exchange.Props.Durable
 
 	delete(vh.Exchanges, name)
+	vh.collector.RemoveExchange(name)
 	// Verify if exchange is durable
 	if durable {
 		// Handle durable property

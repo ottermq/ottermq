@@ -83,8 +83,23 @@ func (s *Service) DeleteExchange(vhostName, exchangeName string, ifUnused bool) 
 	return vh.DeleteExchange(exchangeName)
 }
 
-func (*Service) exchangeToDTO(vh *vhost.VHost, exchange *vhost.Exchange) *models.ExchangeDTO {
-
+func (s *Service) exchangeToDTO(vh *vhost.VHost, exchange *vhost.Exchange) *models.ExchangeDTO {
+	// Get metrics if they exist
+	var messageStatsIn, messageStatsOut *models.MessageStats
+	if snapshot := s.broker.GetCollector().GetExchangeSnapshot(exchange.NameOrAlias()); snapshot != nil {
+		messageStatsIn = &models.MessageStats{
+			PublishCount: int(snapshot.PublishCount),
+			PublishRate:  snapshot.PublishRate,
+		}
+		messageStatsOut = &models.MessageStats{
+			DeliverCount: snapshot.DeliveryCount,
+			DeliverRate:  snapshot.DeliveryRate,
+		}
+	} else {
+		// No metrics yet, return zero values
+		messageStatsIn = &models.MessageStats{}
+		messageStatsOut = &models.MessageStats{}
+	}
 	dto := &models.ExchangeDTO{
 		VHost:           vh.Name,
 		Name:            exchange.NameOrAlias(),
@@ -93,10 +108,9 @@ func (*Service) exchangeToDTO(vh *vhost.VHost, exchange *vhost.Exchange) *models
 		AutoDelete:      exchange.Props.AutoDelete,
 		Internal:        exchange.Props.Internal,
 		Arguments:       exchange.Props.Arguments,
-		MessageStatsIn:  &models.MessageStats{},
-		MessageStatsOut: &models.MessageStats{},
+		MessageStatsIn:  messageStatsIn,
+		MessageStatsOut: messageStatsOut,
 	}
-	// TODO: add message stats
 
 	return dto
 }

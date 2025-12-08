@@ -121,6 +121,8 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 	b.connections[connID] = conn
 	b.connToID[conn] = connID
 	b.connectionsMu.Unlock()
+
+	b.collector.RecordConnection()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
@@ -148,6 +150,8 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 		vh.CleanupConnection(connID)
 		log.Debug().Str("vhost", vhName).Str("conn_id", string(connID)).Msg("Cleaned up connection consumers and channels from vhost")
 	}
+
+	b.collector.RecordConnectionClose()
 }
 
 // closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame

@@ -4,10 +4,21 @@ import (
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func setupTestVHost() *VHost {
+	vh := NewVhost("test-vhost", VHostOptions{
+		Persistence:     &dummy.DummyPersistence{},
+		QueueBufferSize: 100,
+		EnableDLX:       true,
+	})
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
+	return vh
+}
 
 func TestNoOpDeadLetterer(t *testing.T) {
 	dl := &NoOpDeadLetterer{}
@@ -30,11 +41,7 @@ func TestNoOpDeadLetterer(t *testing.T) {
 }
 
 func TestDeadLetter_BasicRejection(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create DLX exchange and queue
@@ -109,11 +116,7 @@ func TestDeadLetter_BasicRejection(t *testing.T) {
 }
 
 func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create DLX exchange and queue
@@ -158,11 +161,7 @@ func TestDeadLetter_NoRoutingKeyOverride(t *testing.T) {
 }
 
 func TestDeadLetter_MultipleDeaths(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create DLX chain: queue1 -> dlx1 -> queue2 -> dlx2 -> queue3
@@ -264,12 +263,7 @@ func TestDeadLetter_MultipleDeaths(t *testing.T) {
 }
 
 func TestDeadLetter_CCBCCHeaders(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
-
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	err := vh.CreateExchange("dlx", "direct", nil)
@@ -321,12 +315,7 @@ func TestDeadLetter_CCBCCHeaders(t *testing.T) {
 }
 
 func TestDeadLetter_ExpirationCleared(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
-
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	err := vh.CreateExchange("dlx", "direct", nil)
@@ -379,7 +368,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       true,
 	})
-
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	err := vh.CreateExchange("dlx", "direct", nil)
@@ -441,11 +430,7 @@ func TestDeadLetter_DifferentReasons(t *testing.T) {
 }
 
 func TestDeadLetter_NilHeaders(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	err := vh.CreateExchange("dlx", "direct", nil)
@@ -494,6 +479,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 		QueueBufferSize: 100,
 		EnableDLX:       false, // DLX disabled
 	})
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	// DeadLetterer should be NoOpDeadLetterer
@@ -519,11 +505,7 @@ func TestDeadLetter_DisabledFeature(t *testing.T) {
 }
 
 func TestDeadLetter_TopicExchange(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 
 	// Create DLX as topic exchange
@@ -575,11 +557,7 @@ func TestDeadLetter_TopicExchange(t *testing.T) {
 }
 
 func TestDeadLetter_PersistentMessage(t *testing.T) {
-	vh := NewVhost("test-vhost", VHostOptions{
-		Persistence:     &dummy.DummyPersistence{},
-		QueueBufferSize: 100,
-		EnableDLX:       true,
-	})
+	vh := setupTestVHost()
 	connID := newTestConsumerConnID()
 	err := vh.CreateExchange("dlx", "direct", nil)
 	require.NoError(t, err)

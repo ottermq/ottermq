@@ -15,6 +15,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/broker/management"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
@@ -28,6 +29,7 @@ const (
 	PLATFORM         = "golang"
 	PRODUCT          = "OtterMQ"
 	DEFAULT_PROTOCOL = "AMQP 0-9-1"
+	DEFAULT_VHOST    = "/"
 )
 
 type Broker struct {
@@ -49,6 +51,9 @@ type Broker struct {
 	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
 	connectionsMu sync.RWMutex
 	startedAt     time.Time
+
+	// Metrics collector
+	collector metrics.MetricsCollector
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -83,17 +88,27 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-
-	defaultVHost := vhost.NewVhost("/", options)
-	b.VHosts["/"] = defaultVHost
-
+	// Initialize metrics collector
 	b.framer = &amqp.DefaultFramer{}
-	b.VHosts["/"].SetFramer(b.framer)
+	b.collector = metrics.NewCollector(&metrics.Config{
+		Enabled:    config.EnableMetrics,
+		WindowSize: config.WindowSize,
+		MaxSamples: config.MaxSamples,
+	})
+	log.Info().Msg("Metrics collection enabled")
 
-	defaultVHost.SetFrameSender(b)
+	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
 	b.Management = management.NewService(b)
 	return b
+}
+
+func initializeVHost(vhostName string, options vhost.VHostOptions, b *Broker) *vhost.VHost {
+	vh := vhost.NewVhost(vhostName, options)
+	vh.SetFrameSender(b)
+	vh.SetFramer(b.framer)
+	vh.SetMetricsCollector(b.collector)
+	return vh
 }
 
 func (b *Broker) Start() error {
@@ -761,4 +776,10 @@ func (b *Broker) CloseConnection(name string, reason string) error {
 	)
 	b.setConnectionClosingState(targetConn)
 	return nil
+}
+
+func (b *Broker) GetCollector() metrics.MetricsCollector {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.collector
 }

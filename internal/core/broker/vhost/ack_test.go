@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/google/uuid"
 )
 
@@ -31,6 +32,7 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(metrics.NewCollector(nil))
 
 	// Fake connection (nil is sufficient for HandleBasicAck)
 	// var conn net.Conn = nil
@@ -98,6 +100,7 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}))
 	connID := newTestConsumerConnID()
 	key := ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	ch := &ChannelDeliveryState{
@@ -206,6 +209,7 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}))
 	connID := newTestConsumerConnID()
 	// Create a queue
 	q, err := vh.CreateQueue("q-clean", nil, connID)

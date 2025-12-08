@@ -48,7 +48,7 @@ func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, delivery
 				removed = append(removed, record)
 
 				deleteUnackedDelivery(ch, tag, record.ConsumerTag)
-
+				vh.collector.RecordQueueAck(record.QueueName)
 				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
@@ -60,6 +60,7 @@ func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, delivery
 
 			// Remove from both maps
 			deleteUnackedDelivery(ch, deliveryTag, record.ConsumerTag)
+			vh.collector.RecordQueueAck(record.QueueName)
 
 			log.Debug().Uint64("tag", deliveryTag).Msg("Removed unacked tag for single ack")
 		}
@@ -105,12 +106,14 @@ func (vh *VHost) HandleBasicNack(connID ConnectionID, channel uint16, deliveryTa
 			queue := vh.Queues[record.QueueName]
 			vh.mu.Unlock()
 			if queue != nil {
+				vh.collector.RecordQueueNack(queue.Name) // Record Nack before requeue
 				if vh.handleTTLExpiration(record.Message, queue) {
 					continue
 				}
 				log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
 				vh.markAsRedelivered(record.Message.ID)
 				queue.Push(record.Message)
+				vh.collector.RecordQueueRequeue(record.QueueName)
 			}
 		}
 		return nil
@@ -125,6 +128,8 @@ func (vh *VHost) HandleBasicNack(connID ConnectionID, channel uint16, deliveryTa
 		if !exists {
 			continue
 		}
+		vh.collector.RecordQueueNack(queue.Name) // Record Nack before DLX/discard
+
 		ok := vh.handleDeadLetter(queue, record.Message, REASON_REJECTED)
 		if ok {
 			continue

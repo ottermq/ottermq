@@ -7,12 +7,14 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // fakeBroker is a lightweight test implementation of BrokerProvider avoiding circular imports.
 type fakeBroker struct {
-	vhosts map[string]*vhost.VHost
+	vhosts    map[string]*vhost.VHost
+	collector metrics.MetricsCollector
 }
 
 func (fb *fakeBroker) GetVHost(name string) *vhost.VHost { return fb.vhosts[name] }
@@ -80,6 +82,11 @@ func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
 	return models.VHostDTO{Name: vh.Name}, nil
 }
 
+func (fb *fakeBroker) GetCollector() metrics.MetricsCollector {
+	// For testing purposes, return a new Collector.
+	return fb.collector
+}
+
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
 func setupTestBroker(t *testing.T) BrokerProvider {
 	t.Helper()
@@ -92,7 +99,13 @@ func setupTestBroker(t *testing.T) BrokerProvider {
 		EnableQLL:       false,
 	}
 	vh := vhost.NewVhost("/", options)
+	fakeBroker := &fakeBroker{
+		vhosts:    map[string]*vhost.VHost{"/": vh},
+		collector: metrics.NewMockCollector(nil),
+	}
+	vh.SetFramer(&amqp.DefaultFramer{})
+	vh.SetMetricsCollector(fakeBroker.collector)
 	// Some tests may rely on time-based logic later; ensure deterministic start (placeholder).
 	_ = time.Now()
-	return &fakeBroker{vhosts: map[string]*vhost.VHost{"/": vh}}
+	return fakeBroker
 }

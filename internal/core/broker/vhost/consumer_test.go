@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
 // MockConnection implements net.Conn for testing
@@ -47,6 +49,7 @@ func createTestVHost() *VHost {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	// Add test queue
 	vh.Queues["test-queue"] = &Queue{
