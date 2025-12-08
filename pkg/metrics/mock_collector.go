@@ -116,7 +116,7 @@ func (m *MockCollector) RecordQueuePublish(queueName string) {}
 
 func (m *MockCollector) RecordQueueRequeue(queueName string) {}
 
-func (m *MockCollector) RecordQueueDelivery(queueName string) {}
+func (m *MockCollector) RecordQueueDelivery(queueName string, autoAck bool) {}
 
 func (m *MockCollector) RecordQueueAck(queueName string) {}
 

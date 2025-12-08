@@ -15,7 +15,7 @@ type MetricsCollector interface {
 	// Queue metrics
 	RecordQueuePublish(queueName string)
 	RecordQueueRequeue(queueName string)
-	RecordQueueDelivery(queueName string)
+	RecordQueueDelivery(queueName string, autoAck bool)
 	RecordQueueAck(queueName string)
 	RecordQueueNack(queueName string)
 	SetQueueDepth(queueName string, depth int64)

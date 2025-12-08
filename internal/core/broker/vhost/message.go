@@ -232,7 +232,7 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) GetMessage(queueName string) *Message {
+func (vh *VHost) GetMessage(queueName string, autoAck bool) *Message {
 	vh.mu.Lock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
@@ -241,7 +241,7 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		return nil
 	}
 	msg := queue.Pop()
-	vh.collector.RecordQueueDelivery(queue.Name)
+	vh.collector.RecordQueueDelivery(queue.Name, autoAck)
 	if msg == nil {
 		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")

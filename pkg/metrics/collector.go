@@ -241,7 +241,7 @@ func (c *Collector) RecordQueueRequeue(queueName string) {
 }
 
 // RecordQueueDelivery records a message delivered from a queue
-func (c *Collector) RecordQueueDelivery(queueName string) {
+func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	if !c.config.Enabled {
 		return
 	}
@@ -254,8 +254,19 @@ func (c *Collector) RecordQueueDelivery(queueName string) {
 	// Decrease message count
 	qm.MessageCount.Add(-1)
 
-	// Increase unacked count
-	qm.UnackedCount.Add(1)
+	// Increment unacked count if not auto-acknowledge
+	if !autoAck {
+		qm.UnackedCount.Add(1)
+	} else {
+		// For auto-acknowledge, also increment ACK count directly
+		ackCount := qm.AckCount.Add(1)
+		qm.AckRate.Record(ackCount)
+
+		// Record at broker level (also cumulative)
+		c.messageCount.Add(-1)
+		brokerAckCount := c.totalAckCount.Add(1)
+		c.totalAcks.Record(brokerAckCount)
+	}
 
 	// Record at broker level
 	brokerCount := c.messageCount.Load()

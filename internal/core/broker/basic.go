@@ -63,7 +63,7 @@ func (b *Broker) basicGetHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 	// Get the message from the queue
 	var msg *vhost.Message
 	if msgCount > 0 {
-		msg = vh.GetMessage(queue)
+		msg = vh.GetMessage(queue, noAck)
 	}
 
 	if msgCount == 0 || msg == nil {

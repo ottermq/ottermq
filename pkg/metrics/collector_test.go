@@ -260,7 +260,7 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	}
 
 	// Deliver 1 message (moves from ready to unacked)
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	time.Sleep(5 * time.Millisecond)
 
 	if qm.MessageCount.Load() != 2 {
@@ -281,9 +281,9 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	}
 
 	// Deliver and ack remaining
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	c.RecordQueueAck("testq")
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	c.RecordQueueAck("testq")
 
 	if qm.MessageCount.Load() != 0 {
@@ -307,7 +307,7 @@ func TestQueueNackWithRequeue(t *testing.T) {
 	}
 
 	// Deliver 1 message (moves from ready to unacked)
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 
 	if qm.MessageCount.Load() != 1 {
 		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
@@ -338,7 +338,7 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 	qm := c.GetQueueMetrics("testq")
 
 	// Deliver 1 message
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 
 	if qm.MessageCount.Load() != 1 {
 		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
@@ -363,7 +363,7 @@ func TestQueueRequeue(t *testing.T) {
 
 	// Simulate consumer cancel scenario
 	c.RecordQueuePublish("testq")
-	c.RecordQueueDelivery("testq") // Message delivered to consumer
+	c.RecordQueueDelivery("testq", false) // Message delivered to consumer
 
 	qm := c.GetQueueMetrics("testq")
 
@@ -619,7 +619,7 @@ func TestBrokerSnapshot(t *testing.T) {
 	c.RecordExchangePublish("ex1", "direct")
 
 	c.RecordQueuePublish("q1")
-	c.RecordQueueDelivery("q1")
+	c.RecordQueueDelivery("q1", false)
 	time.Sleep(10 * time.Millisecond)
 	c.RecordQueueAck("q1")
 
@@ -661,7 +661,7 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	c.RecordExchangePublish("ex1", "direct")
 
-	c.RecordQueueDelivery("q1")
+	c.RecordQueueDelivery("q1", false)
 	c.RecordConnection()
 
 	// Get time series
@@ -745,7 +745,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < opsPerGoroutine; j++ {
-				c.RecordQueueDelivery("testq")
+				c.RecordQueueDelivery("testq", false)
 				c.RecordQueueAck("testq")
 			}
 		}()
@@ -901,7 +901,7 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 	}
 
 	// 3. Consumer receives message
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -936,7 +936,7 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// 2. Deliver to consumer
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -957,7 +957,7 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	}
 
 	// 4. Deliver again
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	// 5. ACK this time
 	c.RecordQueueAck("my.queue")
@@ -980,7 +980,7 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// 2. Deliver to consumer
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -1012,7 +1012,7 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// Deliver message
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -1053,7 +1053,7 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 
 	// Deliver 5 messages
 	for i := 0; i < 5; i++ {
-		c.RecordQueueDelivery("my.queue")
+		c.RecordQueueDelivery("my.queue", false)
 	}
 
 	if qm.MessageCount.Load() != 5 {
@@ -1110,9 +1110,9 @@ func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
 	}
 
 	// Deliver all
-	c.RecordQueueDelivery("q1")
-	c.RecordQueueDelivery("q2")
-	c.RecordQueueDelivery("q3")
+	c.RecordQueueDelivery("q1", false)
+	c.RecordQueueDelivery("q2", false)
+	c.RecordQueueDelivery("q3", false)
 
 	// ACK all
 	c.RecordQueueAck("q1")
