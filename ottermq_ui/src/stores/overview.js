@@ -4,6 +4,7 @@ import api from 'src/services/api'
 export const useOverviewStore = defineStore('overview', {
   state: () => ({
     data: null,
+    chartsData: null,
     loading: false,
     error: null,
     lastUpdate: null
@@ -38,6 +39,15 @@ export const useOverviewStore = defineStore('overview', {
         this.data = null
       } finally {
         this.loading = false
+      }
+    },
+
+    async fetchCharts() {
+      try {
+        const { data } = await api.get('/overview/charts')
+        this.chartsData = data
+      } catch (e) {
+        console.error('Failed to fetch chart data:', e)
       }
     }
   }
