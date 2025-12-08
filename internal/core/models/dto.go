@@ -7,6 +7,32 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
+// TimeSeriesDTO represents time-series data for charting
+type TimeSeriesDTO struct {
+	Timestamp time.Time `json:"timestamp"`
+	Value     float64   `json:"value"`
+}
+
+// MessageStatsTimeSeriesDTO contains historical message statistics for charting
+type MessageStatsTimeSeriesDTO struct {
+	Ready   []TimeSeriesDTO `json:"ready"`
+	Unacked []TimeSeriesDTO `json:"unacked"`
+	Total   []TimeSeriesDTO `json:"total"`
+}
+
+// MessageRatesTimeSeriesDTO contains historical message rate data for charting
+type MessageRatesTimeSeriesDTO struct {
+	Publish []TimeSeriesDTO `json:"publish"`
+	Deliver []TimeSeriesDTO `json:"deliver"`
+	Ack     []TimeSeriesDTO `json:"ack"`
+}
+
+// OverviewChartsDTO combines all chart data for the overview page
+type OverviewChartsDTO struct {
+	MessageStats MessageStatsTimeSeriesDTO `json:"message_stats"`
+	MessageRates MessageRatesTimeSeriesDTO `json:"message_rates"`
+}
+
 type ConnectionInfoDTO struct {
 	VHostName     string    `json:"vhost"`
 	Name          string    `json:"name"` // ip

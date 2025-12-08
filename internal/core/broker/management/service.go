@@ -94,6 +94,8 @@ type ManagementService interface {
 	GetBrokerInfo() models.OverviewBrokerDetails
 
 	// Metrics related methods
+	// GetOverviewCharts retrieves time-series data for overview charts
+	GetOverviewCharts() (*models.OverviewChartsDTO, error)
 }
 
 type Service struct {

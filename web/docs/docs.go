@@ -1198,6 +1198,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/overview/charts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve time-series data for overview page charts (message stats and rates)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "overview"
+                ],
+                "summary": "Get overview charts data",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OverviewChartsDTO"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get chart data",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/queues": {
             "get": {
                 "security": [
@@ -2275,6 +2309,29 @@ const docTemplate = `{
                 }
             }
         },
+        "models.MessageRatesTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "publish": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                }
+            }
+        },
         "models.MessageStats": {
             "type": "object",
             "properties": {
@@ -2289,6 +2346,29 @@ const docTemplate = `{
                 },
                 "publish_details.rate": {
                     "type": "number"
+                }
+            }
+        },
+        "models.MessageStatsTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ready": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "total": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "unacked": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
                 }
             }
         },
@@ -2336,6 +2416,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "models.OverviewChartsDTO": {
+            "type": "object",
+            "properties": {
+                "message_rates": {
+                    "$ref": "#/definitions/models.MessageRatesTimeSeriesDTO"
+                },
+                "message_stats": {
+                    "$ref": "#/definitions/models.MessageStatsTimeSeriesDTO"
                 }
             }
         },
@@ -2644,6 +2735,17 @@ const docTemplate = `{
             "properties": {
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "models.TimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
                 }
             }
         },
