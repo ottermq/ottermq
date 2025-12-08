@@ -2,7 +2,7 @@
   <q-card flat bordered>
     <q-card-section>
       <div class="text-h6">Queued Messages</div>
-      <div class="text-caption text-grey-7">Ready / Unacked / Total</div>
+      <div class="text-caption text-grey-7">Ready • Unacked • Total</div>
     </q-card-section>
     <q-card-section class="q-pt-none">
       <apexchart
@@ -24,6 +24,19 @@ import { computed } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 
 const apexchart = VueApexCharts
+const windowFilter = (points) => {
+    if (!points || points.length === 0) return [];
+
+    const now = Date.now();
+    let selectedWindow = 1; // TODO: make this dynamic (1min, 10min, 1hr)
+    const window = now - selectedWindow * 60 * 1000;
+    return points
+        .filter(d => new Date(d.timestamp).getTime() >= window)
+        .map(d => ({ 
+            x: new Date(d.timestamp).getTime(),
+            y: Math.round(d.value)
+        }))
+}
 
 const props = defineProps({
   chartData: {
@@ -38,24 +51,15 @@ const series = computed(() => {
   return [
     {
       name: 'Ready',
-      data: props.chartData.ready?.map(d => ({
-        x: new Date(d.timestamp).getTime(),
-        y: Math.round(d.value)
-      })) || []
+      data: windowFilter(props.chartData.ready)
     },
     {
       name: 'Unacked',
-      data: props.chartData.unacked?.map(d => ({
-        x: new Date(d.timestamp).getTime(),
-        y: Math.round(d.value)
-      })) || []
+      data: windowFilter(props.chartData.unacked)
     },
     {
       name: 'Total',
-      data: props.chartData.total?.map(d => ({
-        x: new Date(d.timestamp).getTime(),
-        y: Math.round(d.value)
-      })) || []
+      data: windowFilter(props.chartData.total)
     }
   ]
 })
