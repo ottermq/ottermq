@@ -1764,6 +1764,52 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "metrics.BrokerSnapshot": {
+            "type": "object",
+            "properties": {
+                "ack_rate": {
+                    "type": "number"
+                },
+                "channel_count": {
+                    "type": "integer"
+                },
+                "channel_rate": {
+                    "type": "number"
+                },
+                "connection_count": {
+                    "type": "integer"
+                },
+                "connection_rate": {
+                    "type": "number"
+                },
+                "consumer_count": {
+                    "type": "integer"
+                },
+                "delivery_rate": {
+                    "type": "number"
+                },
+                "exchange_count": {
+                    "type": "integer"
+                },
+                "message_count": {
+                    "description": "Broker-wide gauges",
+                    "type": "integer"
+                },
+                "nack_rate": {
+                    "type": "number"
+                },
+                "publish_rate": {
+                    "description": "Broker-wide rates (current)",
+                    "type": "number"
+                },
+                "queue_count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "models.AuthRequest": {
             "type": "object",
             "properties": {
@@ -2331,6 +2377,9 @@ const docTemplate = `{
                 "message_stats": {
                     "$ref": "#/definitions/models.OverviewMessageStats"
                 },
+                "metrics": {
+                    "$ref": "#/definitions/metrics.BrokerSnapshot"
+                },
                 "node": {
                     "$ref": "#/definitions/models.OverviewNodeDetails"
                 },
@@ -2498,9 +2547,6 @@ const docTemplate = `{
                     "description": "Consumers stats",
                     "type": "integer"
                 },
-                "consumers_active": {
-                    "type": "integer"
-                },
                 "dead_letter_exchange": {
                     "description": "DLX Configuration (extracted for convenience)",
                     "type": "string"
@@ -2517,6 +2563,10 @@ const docTemplate = `{
                 },
                 "max_length": {
                     "description": "Queue Length Limit (QLL AKA Max Length)",
+                    "type": "integer"
+                },
+                "max_priority": {
+                    "description": "Priority queue configuration",
                     "type": "integer"
                 },
                 "message_ttl": {
