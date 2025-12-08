@@ -4,11 +4,9 @@
 
       <div class="text-h6 q-mb-md">Exchanges</div>
 
-        <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="create">
-          <q-input v-model="newExchange" label="Exchange name" dense outlined />
-          <q-select v-model="type" :options="types" label="Type" dense outlined style="width: 160px" />
-          <q-btn label="Add" color="primary" type="submit" />
-        </q-form>
+        <div class="row q-gutter-sm q-mb-md">
+          <q-btn label="Add Exchange" color="primary" icon="add" @click="showCreateDialog = true" />
+        </div>
 
         <q-table
           :rows="store.items"
@@ -56,6 +54,60 @@
             <q-btn label="Publish" color="primary" type="submit" />
           </q-form>
         </div>
+
+        <!-- Create Exchange Dialog -->
+        <q-dialog v-model="showCreateDialog" persistent>
+          <q-card style="min-width: 500px">
+            <q-card-section>
+              <div class="text-h6">Create Exchange</div>
+            </q-card-section>
+
+            <q-card-section class="q-pt-none">
+              <q-form @submit.prevent="createExchange">
+                <q-input
+                  v-model="newExchange.name"
+                  label="Exchange Name *"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                  :rules="[val => !!val || 'Name is required']"
+                />
+
+                <q-select
+                  v-model="newExchange.vhost"
+                  label="Virtual Host"
+                  :options="['/']"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                />
+
+                <q-select
+                  v-model="newExchange.type"
+                  label="Exchange Type *"
+                  :options="types"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                />
+
+                <div class="row q-col-gutter-md q-mb-md">
+                  <div class="col-6">
+                    <q-checkbox v-model="newExchange.durable" label="Durable" />
+                  </div>
+                  <div class="col-6">
+                    <q-checkbox v-model="newExchange.auto_delete" label="Auto Delete" />
+                  </div>
+                </div>
+
+                <q-card-actions align="right">
+                  <q-btn flat label="Cancel" color="primary" v-close-popup @click="resetForm" />
+                  <q-btn label="Create" type="submit" color="primary" :loading="creating" />
+                </q-card-actions>
+              </q-form>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
     </div>
   </q-page>
 </template>
@@ -66,6 +118,16 @@ import { useExchangesStore } from 'src/stores/exchanges'
 import { Notify } from 'quasar'
 
 const store = useExchangesStore()
+
+const showCreateDialog = ref(false)
+const creating = ref(false)
+const newExchange = ref({
+  name: '',
+  vhost: '/',
+  type: 'direct',
+  durable: false,
+  auto_delete: false
+})
 
 const columns = [
   { name: 'vhost', label: 'VHost', field: 'vhost' },
@@ -80,8 +142,6 @@ const bindingCols = [
   { name: 'actions', label: 'Actions', field: 'actions' }
 ]
 
-const newExchange = ref('')
-const type = ref('direct')
 const types = ['direct', 'fanout', 'topic', 'headers']
 
 const routingKey = ref('')
@@ -95,10 +155,27 @@ function select(name) {
   store.fetchBindings(name)
 }
 
-async function create() {
-  if (!newExchange.value) return
-  await store.addExchange(newExchange.value, type.value)
-  newExchange.value = ''
+function resetForm() {
+  newExchange.value = {
+    name: '',
+    vhost: '/',
+    type: 'direct',
+    durable: false,
+    auto_delete: false
+  }
+}
+
+async function createExchange() {
+  if (!newExchange.value.name) return
+  
+  creating.value = true
+  try {
+    await store.addExchange(newExchange.value)
+    showCreateDialog.value = false
+    resetForm()
+  } finally {
+    creating.value = false
+  }
 }
 
 async function del(name) {

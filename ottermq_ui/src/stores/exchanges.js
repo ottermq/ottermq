@@ -38,16 +38,35 @@ export const useExchangesStore = defineStore('exchanges', {
         this.loading = false 
       }
     },
-    async addExchange(name, type = 'direct') {
-      await api.post('/exchanges', {exchange_name: name, exchange_type: type})
+    async addExchange(exchangeData) {
+      const payload = {
+        type: exchangeData.type || 'direct',
+        passive: false,
+        durable: exchangeData.durable || false,
+        auto_delete: exchangeData.auto_delete || false,
+        no_wait: false,
+        arguments: {}
+      }
+      
+      const vhost = exchangeData.vhost || '/'
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedName = encodeURIComponent(exchangeData.name)
+      
+      await api.post(`/api/exchanges/${encodedVhost}/${encodedName}`, payload)
       await this.fetch()
     },
     async deleteExchange(name) {
-      await api.delete(`/exchanges/${encodeURIComponent(name)}`)
+      const vhost = '/'
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedName = encodeURIComponent(name)
+      await api.delete(`/exchanges/${encodedVhost}/${encodedName}`)
       await this.fetch()
     },
     async fetchBindings(exchange) {
-        const {data} = await api.get(`/bindings/${encodeURIComponent(exchange)}`)
+        const vhost = '/'
+        const encodedVhost = encodeURIComponent(vhost)
+        const encodedExchange = encodeURIComponent(exchange)
+        const {data} = await api.get(`/bindings/${encodedVhost}/${encodedExchange}`)
         const list = Array.isArray(data?.bindings) 
         ? data.bindings.map(b => ({
             source: b.source,
@@ -61,7 +80,11 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        source: exchange, routing_key: routingKey, destination: queue
+        vhost: '/',
+        source: exchange, 
+        routing_key: routingKey, 
+        destination: queue,
+        arguments: {}
       })
       await this.fetchBindings(exchange)
     },
@@ -76,9 +99,11 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
-      await api.post(`/messages`, {
-        vhost: "/",
-        exchange: exchange, 
+      const vhost = '/'
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedExchange = encodeURIComponent(exchange)
+      
+      await api.post(`/messages/${encodedVhost}/${encodedExchange}`, {
         routing_key: routingKey, 
         payload: message,
         content_type: "text/plain",

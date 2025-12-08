@@ -23,20 +23,44 @@ lastMessage: null,
         this.loading = false
       }
     },
-    async addQueue (name) {
-        await api.post('/queues', {
-          name: name,
-          vhost: "/",
-          Durable: false,
-          AutoDelete: false,
-          Exclusive: false,
-          NoWait: false,
-          Arguments: {}
-        })
+    async addQueue (queueData) {
+        // Build the request payload matching CreateQueueRequest structure
+        const payload = {
+          passive: false,
+          durable: queueData.durable || false,
+          auto_delete: queueData.auto_delete || false,
+          arguments: {}
+        }
+
+        // Add optional fields only if they have values
+        if (queueData.max_length != null && queueData.max_length > 0) {
+          payload.max_length = queueData.max_length
+        }
+
+        if (queueData.message_ttl != null && queueData.message_ttl > 0) {
+          payload.message_ttl = queueData.message_ttl
+        }
+
+        if (queueData.x_dead_letter_exchange) {
+          payload['x-dead-letter-exchange'] = queueData.x_dead_letter_exchange
+        }
+
+        if (queueData.x_dead_letter_routing_key) {
+          payload['x-dead-letter-routing-key'] = queueData.x_dead_letter_routing_key
+        }
+
+        const vhost = queueData.vhost || '/'
+        const encodedVhost = encodeURIComponent(vhost)
+        const encodedName = encodeURIComponent(queueData.name)
+        
+        await api.post(`/queues/${encodedVhost}/${encodedName}`, payload)
         await this.fetch()
     },
     async deleteQueue (name) {
-        await api.delete(`/queues/${encodeURIComponent(name)}`)
+        const vhost = '/'
+        const encodedVhost = encodeURIComponent(vhost)
+        const encodedName = encodeURIComponent(name)
+        await api.delete(`/queues/${encodedVhost}/${encodedName}`)
         await this.fetch()
     },
     async get(queue) {
