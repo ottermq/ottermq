@@ -59,40 +59,32 @@ func (s *Service) GetOverviewCharts() (*models.OverviewChartsDTO, error) {
 	// Convert to time-series DTOs with rates
 	return &models.OverviewChartsDTO{
 		MessageStats: models.MessageStatsTimeSeriesDTO{
-			Ready:   convertToTimeSeries(snapshot.TotalReadyDepth.GetSamples()),
-			Unacked: convertToTimeSeries(snapshot.TotalUnackedDepth.GetSamples()),
-			Total:   convertToTimeSeries(snapshot.TotalDepth.GetSamples()),
+			Ready:   samplesToTimeSeries(snapshot.TotalReadyDepth.GetSamples()),
+			Unacked: samplesToTimeSeries(snapshot.TotalUnackedDepth.GetSamples()),
+			Total:   samplesToTimeSeries(snapshot.TotalDepth.GetSamples()),
 		},
 		MessageRates: models.MessageRatesTimeSeriesDTO{
-			Publish: convertSamplesToRates(collector.GetPublishRateTimeSeries(duration)),
-			Deliver: convertSamplesToRates(collector.GetDeliveryRateTimeSeries(duration)),
-			Ack:     convertSamplesToRates(collector.GetAckRateTimeSeries(duration)),
+			Publish: samplesToRates(collector.GetPublishRateTimeSeries(duration)),
+			Deliver: samplesToRates(collector.GetDeliveryRateTimeSeries(duration)),
+			Ack:     samplesToRates(collector.GetAckRateTimeSeries(duration)),
 		},
 	}, nil
 }
 
-// convertToTimeSeries creates a simple time series using the latest value
-// This is a simplified approach - for accurate historical queue depths,
-// we'd need to track them over time in the metrics collector
-func convertToTimeSeries(samples []metrics.Sample) []models.TimeSeriesDTO {
-	if len(samples) == 0 {
-		return []models.TimeSeriesDTO{}
-	}
-
+// samplesToTimeSeries converts raw samples to TimeSeriesDTO
+func samplesToTimeSeries(samples []metrics.Sample) []models.TimeSeriesDTO {
 	result := make([]models.TimeSeriesDTO, len(samples))
-	for i, sample := range samples {
-		// Use current value as approximation for now
-		// In a future enhancement, we could track actual queue depths over time
+	for i, s := range samples {
 		result[i] = models.TimeSeriesDTO{
-			Timestamp: sample.Timestamp,
-			Value:     float64(sample.Count),
+			Timestamp: s.Timestamp,
+			Value:     float64(s.Count),
 		}
 	}
 	return result
 }
 
-// convertSamplesToRates converts cumulative count samples to rate-per-second values
-func convertSamplesToRates(samples []metrics.Sample) []models.TimeSeriesDTO {
+// samplesToRates converts cumulative count samples to rate-per-second values
+func samplesToRates(samples []metrics.Sample) []models.TimeSeriesDTO {
 	if len(samples) < 2 {
 		return []models.TimeSeriesDTO{}
 	}

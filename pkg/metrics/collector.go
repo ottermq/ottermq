@@ -9,85 +9,33 @@ import (
 // Collector is the central metrics aggregation point for the broker.
 // It tracks exchange, queue, and broker-level metrics using RateTrackers.
 type Collector struct {
-	// Exchange metrics (map[exchangeName]*ExchangeMetrics)
 	exchangeMetrics sync.Map
-	exchangeMu      sync.RWMutex
-
-	// Queue metrics (map[queueName]*QueueMetrics)
-	queueMetrics sync.Map
-	queueMu      sync.RWMutex
+	queueMetrics    sync.Map
 
 	// Broker-wide rate metrics
-	totalPublishes  *RateTracker
-	totalDeliveries *RateTracker
-	totalAcks       *RateTracker
-	totalNacks      *RateTracker
-	connectionRate  *RateTracker
-	channelRate     *RateTracker
+	totalPublishes    *RateTracker
+	totalDeliveries   *RateTracker
+	totalAcks         *RateTracker
+	totalNacks        *RateTracker
+	connectionRate    *RateTracker
+	channelRate       *RateTracker
+	totalReadyDepth   *RateTracker
+	totalUnackedDepth *RateTracker
+	totalDepth        *RateTracker
 
-	totalReadyDepth   *RateTracker // Tracks MessagesReady over time
-	totalUnackedDepth *RateTracker // Tracks MessagesUnacked over time
-	totalDepth        *RateTracker // Tracks MessagesTotal depth over time
-
-	// Broker-wide gauges (current values)
 	messageCount    atomic.Int64
 	consumerCount   atomic.Int64
 	connectionCount atomic.Int64
 	channelCount    atomic.Int64
 	queueCount      atomic.Int64
 	exchangeCount   atomic.Int64
+	readyCount      atomic.Int64
+	unackedCount    atomic.Int64
+	totalAckCount   atomic.Int64
+	totalNackCount  atomic.Int64
 
-	// Cumulative counters for rate calculation
-	totalAckCount  atomic.Int64
-	totalNackCount atomic.Int64
-
-	readyCount   atomic.Int64
-	unackedCount atomic.Int64
-
-	// Configuration
 	config *Config
 }
-
-type BrokerMetrics struct {
-	// Broker-wide rate metrics
-	totalPublishes  *RateTracker
-	totalDeliveries *RateTracker
-	totalAcks       *RateTracker
-	totalNacks      *RateTracker
-	connectionRate  *RateTracker
-	channelRate     *RateTracker
-
-	// Depths
-	totalReadyDepth   *RateTracker // Uses messageCount
-	totalUnackedDepth *RateTracker // Uses unackedCount
-	totalDepth        *RateTracker // Uses ready + unacked counts
-
-	// Broker-wide gauges (current values)
-	messageCount    int64
-	consumerCount   int64
-	connectionCount int64
-	channelCount    int64
-	queueCount      int64
-	exchangeCount   int64
-
-	readyCount   int64
-	unackedCount int64
-}
-
-// Getters for BrokerMetrics (public API)
-func (bm *BrokerMetrics) TotalPublishes() *RateTracker  { return bm.totalPublishes }
-func (bm *BrokerMetrics) TotalDeliveries() *RateTracker { return bm.totalDeliveries }
-func (bm *BrokerMetrics) TotalAcks() *RateTracker       { return bm.totalAcks }
-func (bm *BrokerMetrics) TotalNacks() *RateTracker      { return bm.totalNacks }
-func (bm *BrokerMetrics) ConnectionRate() *RateTracker  { return bm.connectionRate }
-func (bm *BrokerMetrics) ChannelRate() *RateTracker     { return bm.channelRate }
-
-func (bm *BrokerMetrics) MessageCount() int64    { return bm.messageCount }
-func (bm *BrokerMetrics) ConsumerCount() int64   { return bm.consumerCount }
-func (bm *BrokerMetrics) ConnectionCount() int64 { return bm.connectionCount }
-func (bm *BrokerMetrics) ChannelCount() int64    { return bm.channelCount }
-func (bm *BrokerMetrics) QueueCount() int64      { return bm.queueCount }
-func (bm *BrokerMetrics) ExchangeCount() int64   { return bm.exchangeCount }
 
 // ExchangeMetrics tracks statistics for a single exchange
 type ExchangeMetrics struct {
@@ -167,31 +115,19 @@ func (c *Collector) RecordExchangePublish(exchangeName, exchangeType string) {
 		return
 	}
 
-	// Get or create exchange metrics
 	em := c.getOrCreateExchangeMetrics(exchangeName, exchangeType)
-
-	// Record publish
 	em.PublishCount.Add(1)
-	// em.PublishRate.Record(count)
-
-	// Also record at broker level
-	// brokerCount := c.messageCount.Add(1)
-	// c.totalPublishes.Record(brokerCount)
 	c.messageCount.Add(1)
 }
 
-// RecordExchangeDelivery records a message delivered (routed) from an exchange
+// RecordExchangeDelivery records a message routed from an exchange
 func (c *Collector) RecordExchangeDelivery(exchangeName string) {
 	if !c.config.Enabled {
 		return
 	}
 
 	em := c.getOrCreateExchangeMetrics(exchangeName, "")
-
-	// Record delivery rate
 	em.DeliveryCount.Add(1)
-	// em.DeliveryRate.Record(count)
-	// the broker level is recorded in queue delivery
 }
 
 // GetExchangeMetrics retrieves metrics for a specific exchange
@@ -214,12 +150,10 @@ func (c *Collector) GetAllExchangeMetrics() []*ExchangeMetrics {
 
 // getOrCreateExchangeMetrics gets existing or creates new exchange metrics
 func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *ExchangeMetrics {
-	// Try to load existing
 	if value, ok := c.exchangeMetrics.Load(name); ok {
 		return value.(*ExchangeMetrics)
 	}
 
-	// Create new
 	em := &ExchangeMetrics{
 		Name:         name,
 		Type:         exchangeType,
@@ -228,7 +162,6 @@ func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *Excha
 		CreatedAt:    time.Now(),
 	}
 
-	// Store and return (LoadOrStore handles race)
 	actual, _ := c.exchangeMetrics.LoadOrStore(name, em)
 	return actual.(*ExchangeMetrics)
 }
@@ -239,6 +172,7 @@ func (c *Collector) RemoveExchange(exchangeName string) {
 	c.exchangeCount.Add(-1)
 }
 
+// sampleExchangeMetrics records periodic samples for an exchange
 func (c *Collector) sampleExchangeMetrics(exchangeName string) {
 	em := c.GetExchangeMetrics(exchangeName)
 	if em == nil {
@@ -255,19 +189,14 @@ func (c *Collector) sampleExchangeMetrics(exchangeName string) {
 // ========================================
 
 // RecordQueuePublish records a message enqueued to a queue
-// Also shall be called when messages are requeued (NACK->requeue)
+// Called on EVERY enqueue
 func (c *Collector) RecordQueuePublish(queueName string) {
 	if !c.config.Enabled {
 		return
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-
-	// Record message rate and update count
 	qm.MessageCount.Add(1)
-	// qm.MessageRate.Record(count)
-
-	// c.incrementReadyCount()
 	c.readyCount.Add(1)
 }
 
@@ -284,35 +213,16 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-
-	// Record delivery rate
-	// qm.DeliveryRate.Record(qm.MessageCount.Load())
-
-	// Decrease message count
 	qm.MessageCount.Add(-1)
+	c.readyCount.Add(-1)
 
-	// Increment unacked count if not auto-acknowledge
 	if !autoAck {
 		qm.UnackedCount.Add(1)
+		c.unackedCount.Add(1)
 	} else {
-		// For auto-acknowledge, also increment ACK count directly
 		qm.AckCount.Add(1)
-		// qm.AckRate.Record(ackCount)
-
-		// Record at broker level (also cumulative)
 		c.messageCount.Add(-1)
 		c.totalAckCount.Add(1)
-		// c.totalAcks.Record(brokerAckCount)
-	}
-
-	// Record at broker level
-	c.messageCount.Load()
-	// c.totalDeliveries.Record(brokerCount)
-
-	// Decrement global ready count and increment unacked if applicable
-	c.readyCount.Add(-1)
-	if !autoAck {
-		c.unackedCount.Add(1)
 	}
 }
 
@@ -323,20 +233,10 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	// Decrease unacked count
 	qm.UnackedCount.Add(-1)
-
-	// Increment cumulative ACK count for rate tracking
 	qm.AckCount.Add(1)
-	// qm.AckRate.Record(ackCount)
-
-	// Record at broker level (also cumulative)
 	c.messageCount.Add(-1)
 	c.totalAckCount.Add(1)
-	// c.totalAcks.Record(brokerAckCount)
-
-	// Decrease global unacked count
-	// c.decrementUnackedCount()
 	c.unackedCount.Add(-1)
 
 }
@@ -348,12 +248,8 @@ func (c *Collector) RecordQueueNack(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	// Decrease unacked count
 	qm.UnackedCount.Add(-1)
-
-	// Record at broker level
 	c.totalNackCount.Add(1)
-	// c.totalNacks.Record(brokerNackCount)
 }
 
 // SetQueueDepth explicitly sets the queue depth (for periodic updates)
@@ -408,12 +304,10 @@ func (c *Collector) GetAllQueueMetrics() []*QueueMetrics {
 
 // getOrCreateQueueMetrics gets existing or creates new queue metrics
 func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
-	// Try to load existing
 	if value, ok := c.queueMetrics.Load(name); ok {
 		return value.(*QueueMetrics)
 	}
 
-	// Create new
 	qm := &QueueMetrics{
 		Name:         name,
 		MessageRate:  NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
@@ -422,7 +316,6 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 		CreatedAt:    time.Now(),
 	}
 
-	// Store and return (LoadOrStore handles race)
 	actual, _ := c.queueMetrics.LoadOrStore(name, qm)
 	return actual.(*QueueMetrics)
 }
@@ -430,7 +323,6 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 // RemoveQueue removes metrics tracking for a queue
 func (c *Collector) RemoveQueue(queueName string) {
 	if qm := c.GetQueueMetrics(queueName); qm != nil {
-		// Update broker-level counts
 		c.messageCount.Add(-qm.MessageCount.Load())
 		c.consumerCount.Add(-qm.ConsumerCount.Load())
 	}
@@ -461,7 +353,6 @@ func (c *Collector) RecordConnection() {
 	}
 
 	c.connectionCount.Add(1)
-	// c.connectionRate.Record(count)
 }
 
 // RecordConnectionClose records a connection closing
@@ -480,7 +371,6 @@ func (c *Collector) RecordChannelOpen() {
 	}
 
 	c.channelCount.Add(1)
-	// c.channelRate.Record(count)
 }
 
 // RecordChannelClose records a channel closing
@@ -495,36 +385,120 @@ func (c *Collector) RecordChannelClose() {
 // GetBrokerMetrics returns current broker-level metrics
 func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
 	return &BrokerMetrics{
-		totalPublishes:  c.totalPublishes,
-		totalDeliveries: c.totalDeliveries,
-		totalAcks:       c.totalAcks,
-		totalNacks:      c.totalNacks,
-		connectionRate:  c.connectionRate,
-		channelRate:     c.channelRate,
-
-		// Depths
+		totalPublishes:    c.totalPublishes,
+		totalDeliveries:   c.totalDeliveries,
+		totalAcks:         c.totalAcks,
+		totalNacks:        c.totalNacks,
+		connectionRate:    c.connectionRate,
+		channelRate:       c.channelRate,
 		totalReadyDepth:   c.totalReadyDepth,
 		totalUnackedDepth: c.totalUnackedDepth,
 		totalDepth:        c.totalDepth,
-
-		messageCount:    c.messageCount.Load(),
-		consumerCount:   c.consumerCount.Load(),
-		connectionCount: c.connectionCount.Load(),
-		channelCount:    c.channelCount.Load(),
-		queueCount:      c.queueCount.Load(),
-		exchangeCount:   c.exchangeCount.Load(),
+		messageCount:      c.messageCount.Load(),
+		consumerCount:     c.consumerCount.Load(),
+		connectionCount:   c.connectionCount.Load(),
+		channelCount:      c.channelCount.Load(),
+		queueCount:        c.queueCount.Load(),
+		exchangeCount:     c.exchangeCount.Load(),
+		readyCount:        c.readyCount.Load(),
+		unackedCount:      c.unackedCount.Load(),
 	}
 }
 
+// StartPeriodicSampling starts a background ticker that samples metrics
+// This should be called ONCE when the broker starts
+// Recommended interval: 5 seconds (gives 60 samples over 5 minutes)
+func (c *Collector) StartPeriodicSampling() {
+	interval := time.Duration(c.config.SamplesInterval) * time.Second
+	if !c.config.Enabled {
+		return
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		for range ticker.C {
+			c.sampleBrokerMetrics()
+		}
+	}()
+}
+
+// sampleBrokerMetrics samples all current counters and records to time-series
+func (c *Collector) sampleBrokerMetrics() {
+	// Sample broker-wide depths
+	ready := c.readyCount.Load()
+	unacked := c.unackedCount.Load()
+	c.totalReadyDepth.Record(ready)
+	c.totalUnackedDepth.Record(unacked)
+	c.totalDepth.Record(ready + unacked)
+
+	// Sample broker-wide cumulative counters
+	c.totalPublishes.Record(c.messageCount.Load())
+	c.totalDeliveries.Record(c.messageCount.Load())
+	c.totalAcks.Record(c.totalAckCount.Load())
+	c.totalNacks.Record(c.totalNackCount.Load())
+	c.connectionRate.Record(c.connectionCount.Load())
+	c.channelRate.Record(c.channelCount.Load())
+
+	// Sample each queue (for per-queue charts)
+	c.queueMetrics.Range(func(key, value interface{}) bool {
+		queueName := key.(string)
+		c.sampleQueueMetrics(queueName)
+		return true
+	})
+
+	// Sample each exchange (for per-exchange charts)
+	c.exchangeMetrics.Range(func(key, value interface{}) bool {
+		exchangeName := key.(string)
+		c.sampleExchangeMetrics(exchangeName)
+		return true
+	})
+
+}
+
 // ========================================
-// Snapshot for API Responses
+// SNAPSHOTS & TIME-SERIES ACCESS
 // ========================================
 
-// BrokerSnapshot represents a point-in-time view of all broker metrics
+type BrokerMetrics struct {
+	totalPublishes    *RateTracker
+	totalDeliveries   *RateTracker
+	totalAcks         *RateTracker
+	totalNacks        *RateTracker
+	connectionRate    *RateTracker
+	channelRate       *RateTracker
+	totalReadyDepth   *RateTracker
+	totalUnackedDepth *RateTracker
+	totalDepth        *RateTracker
+
+	messageCount    int64
+	consumerCount   int64
+	connectionCount int64
+	channelCount    int64
+	queueCount      int64
+	exchangeCount   int64
+	readyCount      int64
+	unackedCount    int64
+}
+
+// Getters for BrokerMetrics
+func (bm *BrokerMetrics) TotalPublishes() *RateTracker  { return bm.totalPublishes }
+func (bm *BrokerMetrics) TotalDeliveries() *RateTracker { return bm.totalDeliveries }
+func (bm *BrokerMetrics) TotalAcks() *RateTracker       { return bm.totalAcks }
+func (bm *BrokerMetrics) TotalNacks() *RateTracker      { return bm.totalNacks }
+func (bm *BrokerMetrics) ConnectionRate() *RateTracker  { return bm.connectionRate }
+func (bm *BrokerMetrics) ChannelRate() *RateTracker     { return bm.channelRate }
+func (bm *BrokerMetrics) MessageCount() int64           { return bm.messageCount }
+func (bm *BrokerMetrics) ConsumerCount() int64          { return bm.consumerCount }
+func (bm *BrokerMetrics) ConnectionCount() int64        { return bm.connectionCount }
+func (bm *BrokerMetrics) ChannelCount() int64           { return bm.channelCount }
+func (bm *BrokerMetrics) QueueCount() int64             { return bm.queueCount }
+func (bm *BrokerMetrics) ExchangeCount() int64          { return bm.exchangeCount }
+
+// BrokerSnapshot represents current broker state (for Overview page)
 type BrokerSnapshot struct {
 	Timestamp time.Time `json:"timestamp"`
 
-	// Broker-wide rates (current)
+	// Current rates (single values for display cards)
 	PublishRate    float64 `json:"publish_rate"`
 	DeliveryRate   float64 `json:"delivery_rate"`
 	AckRate        float64 `json:"ack_rate"`
@@ -532,12 +506,14 @@ type BrokerSnapshot struct {
 	ConnectionRate float64 `json:"connection_rate"`
 	ChannelRate    float64 `json:"channel_rate"`
 
-	// Depths
+	// RateTrackers (for accessing time-series samples)
+	// NOTE: These are pointers, not copies (useful for charts endpoint)
+
 	TotalReadyDepth   *RateTracker `json:"total_ready_depth"`
 	TotalUnackedDepth *RateTracker `json:"total_unacked_depth"`
 	TotalDepth        *RateTracker `json:"total_depth"`
 
-	// Broker-wide gauges
+	// Current gauges
 	MessageCount    int64 `json:"message_count"`
 	ConsumerCount   int64 `json:"consumer_count"`
 	ConnectionCount int64 `json:"connection_count"`
@@ -546,39 +522,60 @@ type BrokerSnapshot struct {
 	ExchangeCount   int64 `json:"exchange_count"`
 }
 
-// GetBrokerSnapshot returns a snapshot of the current broker metrics
-// For convenience, this method provides a direct way to get a snapshot without manually calling GetBrokerMetrics and then Snapshot.
-// It is to make easier to mock the Collector in tests.
+// GetBrokerSnapshot returns a snapshot of current broker metrics
 func (c *Collector) GetBrokerSnapshot() *BrokerSnapshot {
 	return c.GetBrokerMetrics().Snapshot()
 }
 
-// Snapshot returns a point-in-time snapshot of all broker metrics
+// Snapshot creates a BrokerSnapshot from the current BrokerMetrics
 func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 	return &BrokerSnapshot{
-		Timestamp: time.Now(),
-
-		// Rates
-		PublishRate:    bm.totalPublishes.Rate(),
-		DeliveryRate:   bm.totalDeliveries.Rate(),
-		AckRate:        bm.totalAcks.Rate(),
-		NackRate:       bm.totalNacks.Rate(),
-		ConnectionRate: bm.connectionRate.Rate(),
-		ChannelRate:    bm.channelRate.Rate(),
-
-		// Depths
+		Timestamp:         time.Now(),
+		PublishRate:       bm.totalPublishes.Rate(),
+		DeliveryRate:      bm.totalDeliveries.Rate(),
+		AckRate:           bm.totalAcks.Rate(),
+		NackRate:          bm.totalNacks.Rate(),
+		ConnectionRate:    bm.connectionRate.Rate(),
+		ChannelRate:       bm.channelRate.Rate(),
 		TotalReadyDepth:   bm.totalReadyDepth,
 		TotalUnackedDepth: bm.totalUnackedDepth,
 		TotalDepth:        bm.totalDepth,
-
-		// Gauges
-		MessageCount:    bm.messageCount,
-		ConsumerCount:   bm.consumerCount,
-		ConnectionCount: bm.connectionCount,
-		ChannelCount:    bm.channelCount,
-		QueueCount:      bm.queueCount,
-		ExchangeCount:   bm.exchangeCount,
+		MessageCount:      bm.messageCount,
+		ConsumerCount:     bm.consumerCount,
+		ConnectionCount:   bm.connectionCount,
+		ChannelCount:      bm.channelCount,
+		QueueCount:        bm.queueCount,
+		ExchangeCount:     bm.exchangeCount,
 	}
+}
+
+// GetTimeSeries returns historical samples for a specific metric
+func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalPublishes.GetSamples()
+}
+
+func (c *Collector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalDeliveries.GetSamples()
+}
+
+func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalAcks.GetSamples()
+}
+
+func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
+	return c.connectionRate.GetSamples()
+}
+
+func (c *Collector) GetPublishRate() float64 {
+	return c.totalPublishes.Rate()
+}
+
+func (c *Collector) GetDeliveryRate() float64 {
+	return c.totalDeliveries.Rate()
+}
+
+func (c *Collector) GetTotalAcksRate() float64 {
+	return c.totalAcks.Rate()
 }
 
 // ExchangeSnapshot returns a snapshot of exchange metrics
@@ -657,35 +654,6 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 	}
 }
 
-// GetTimeSeries returns historical samples for a specific metric
-func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalPublishes.GetSamples()
-}
-
-func (c *Collector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalDeliveries.GetSamples()
-}
-
-func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalAcks.GetSamples()
-}
-
-func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
-	return c.connectionRate.GetSamples()
-}
-
-func (c *Collector) GetPublishRate() float64 {
-	return c.totalPublishes.Rate()
-}
-
-func (c *Collector) GetDeliveryRate() float64 {
-	return c.totalDeliveries.Rate()
-}
-
-func (c *Collector) GetTotalAcksRate() float64 {
-	return c.totalAcks.Rate()
-}
-
 // ========================================
 // Utility Methods
 // ========================================
@@ -700,6 +668,9 @@ func (c *Collector) Clear() {
 	c.totalNacks.Clear()
 	c.connectionRate.Clear()
 	c.channelRate.Clear()
+	c.totalReadyDepth.Clear()
+	c.totalUnackedDepth.Clear()
+	c.totalDepth.Clear()
 
 	c.messageCount.Store(0)
 	c.consumerCount.Store(0)
@@ -712,50 +683,4 @@ func (c *Collector) Clear() {
 // IsEnabled returns whether metrics collection is enabled
 func (c *Collector) IsEnabled() bool {
 	return c.config.Enabled
-}
-
-// StartPeriodicSampling starts a goroutine to periodically sample broker metrics
-func (c *Collector) StartPeriodicSampling(interval time.Duration) {
-	if !c.config.Enabled {
-		return
-	}
-
-	ticker := time.NewTicker(interval)
-	go func() {
-		for range ticker.C {
-			c.sampleBrokerMetrics()
-		}
-	}()
-}
-
-// sampleBrokerMetrics samples current broker metrics and records them
-func (c *Collector) sampleBrokerMetrics() {
-	ready := c.readyCount.Load()
-	unacked := c.unackedCount.Load()
-
-	c.totalPublishes.Record(c.messageCount.Load())
-	c.totalDeliveries.Record(c.messageCount.Load())
-	c.totalAcks.Record(c.totalAckCount.Load())
-	c.totalNacks.Record(c.totalNackCount.Load())
-	c.connectionRate.Record(c.connectionCount.Load())
-	c.channelRate.Record(c.channelCount.Load())
-
-	c.totalReadyDepth.Record(ready)
-	c.totalUnackedDepth.Record(unacked)
-	c.totalDepth.Record(ready + unacked)
-
-	// Sample each queue's metrics
-	c.queueMetrics.Range(func(key, value interface{}) bool {
-		queueName := key.(string)
-		c.sampleQueueMetrics(queueName)
-		return true
-	})
-
-	// Sample each exchange's metrics
-	c.exchangeMetrics.Range(func(key, value interface{}) bool {
-		exchangeName := key.(string)
-		c.sampleExchangeMetrics(exchangeName)
-		return true
-	})
-
 }
