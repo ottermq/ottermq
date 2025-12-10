@@ -88,13 +88,18 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-	// Initialize metrics collector
 	b.framer = &amqp.DefaultFramer{}
-	b.collector = metrics.NewCollector(&metrics.Config{
-		Enabled:    config.EnableMetrics,
-		WindowSize: config.WindowSize,
-		MaxSamples: config.MaxSamples,
-	})
+	// Initialize metrics collector
+	if !config.EnableMetrics {
+		b.collector = metrics.NewMockCollector(nil)
+	} else {
+		b.collector = metrics.NewCollector(&metrics.Config{
+			Enabled:    config.EnableMetrics,
+			WindowSize: config.WindowSize,
+			MaxSamples: config.MaxSamples,
+		})
+		b.collector.StartPeriodicSampling(time.Duration(config.SamplesInterval) * time.Second)
+	}
 	log.Info().Msg("Metrics collection enabled")
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
