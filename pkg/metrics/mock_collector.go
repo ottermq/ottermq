@@ -245,6 +245,8 @@ func (m *MockCollector) GetConnectionRateTimeSeries(duration time.Duration) []Sa
 	return []Sample{}
 }
 
+func (m *MockCollector) StartPeriodicSampling(interval time.Duration) {}
+
 // Utility
 func (m *MockCollector) Clear() {
 	m.mu.Lock()
