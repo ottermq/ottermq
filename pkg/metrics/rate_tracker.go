@@ -120,3 +120,25 @@ func (rt *RateTracker) Clear() {
 
 	rt.samples = rt.samples[:0]
 }
+
+func (rt *RateTracker) GetSamplesForDuration(duration time.Duration) []Sample {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+
+	if duration <= 0 {
+		result := make([]Sample, len(rt.samples))
+		copy(result, rt.samples)
+		return result
+	}
+
+	cutoff := time.Now().Add(-duration)
+	result := []Sample{}
+
+	for _, sample := range rt.samples {
+		if sample.Timestamp.After(cutoff) {
+			result = append(result, sample)
+		}
+	}
+
+	return result
+}
