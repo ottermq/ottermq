@@ -45,6 +45,8 @@ type MetricsCollector interface {
 	// Utility
 	Clear()
 	IsEnabled() bool
+	// StartPeriodicSampling starts the periodic sampling of metrics at the given interval
+	StartPeriodicSampling(interval time.Duration)
 }
 
 // Ensure Collector implements MetricsCollector
