@@ -551,19 +551,19 @@ func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 
 // GetTimeSeries returns historical samples for a specific metric
 func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalPublishes.GetSamples()
+	return c.totalPublishes.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalDeliveries.GetSamples()
+	return c.totalDeliveries.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalAcks.GetSamples()
+	return c.totalAcks.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
-	return c.connectionRate.GetSamples()
+	return c.connectionRate.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetPublishRate() float64 {
