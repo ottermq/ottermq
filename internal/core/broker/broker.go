@@ -94,11 +94,12 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		b.collector = metrics.NewMockCollector(nil)
 	} else {
 		b.collector = metrics.NewCollector(&metrics.Config{
-			Enabled:    config.EnableMetrics,
-			WindowSize: config.WindowSize,
-			MaxSamples: config.MaxSamples,
+			Enabled:         config.EnableMetrics,
+			WindowSize:      config.WindowSize,
+			MaxSamples:      config.MaxSamples,
+			SamplesInterval: config.SamplesInterval,
 		})
-		b.collector.StartPeriodicSampling(time.Duration(config.SamplesInterval) * time.Second)
+		b.collector.StartPeriodicSampling()
 	}
 	log.Info().Msg("Metrics collection enabled")
 

@@ -119,17 +119,19 @@ type QueueMetrics struct {
 
 // Config holds configuration for metrics collection
 type Config struct {
-	Enabled    bool          // Enable/disable metrics collection
-	WindowSize time.Duration // Time window for rate calculations (e.g., 5 minutes)
-	MaxSamples int           // Maximum samples to keep in ring buffer (e.g., 60)
+	Enabled         bool          // Enable/disable metrics collection
+	WindowSize      time.Duration // Time window for rate calculations (e.g., 5 minutes)
+	MaxSamples      int           // Maximum samples to keep in ring buffer (e.g., 60)
+	SamplesInterval uint8         // Interval between samples (e.g., 5 seconds)
 }
 
 // DefaultConfig returns sensible defaults for metrics collection
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:    true,
-		WindowSize: 5 * time.Minute,
-		MaxSamples: 60, // One sample per 5 seconds for 5 minutes
+		Enabled:         true,
+		WindowSize:      5 * time.Minute,
+		MaxSamples:      60, // One sample per 5 seconds for 5 minutes
+		SamplesInterval: 5,
 	}
 }
 
