@@ -169,12 +169,13 @@ func (c *Collector) RecordExchangePublish(exchangeName, exchangeType string) {
 	em := c.getOrCreateExchangeMetrics(exchangeName, exchangeType)
 
 	// Record publish
-	count := em.PublishCount.Add(1)
-	em.PublishRate.Record(count)
+	em.PublishCount.Add(1)
+	// em.PublishRate.Record(count)
 
 	// Also record at broker level
-	brokerCount := c.messageCount.Add(1)
-	c.totalPublishes.Record(brokerCount)
+	// brokerCount := c.messageCount.Add(1)
+	// c.totalPublishes.Record(brokerCount)
+	c.messageCount.Add(1)
 }
 
 // RecordExchangeDelivery records a message delivered (routed) from an exchange
@@ -186,8 +187,8 @@ func (c *Collector) RecordExchangeDelivery(exchangeName string) {
 	em := c.getOrCreateExchangeMetrics(exchangeName, "")
 
 	// Record delivery rate
-	count := em.DeliveryCount.Add(1)
-	em.DeliveryRate.Record(count)
+	em.DeliveryCount.Add(1)
+	// em.DeliveryRate.Record(count)
 	// the broker level is recorded in queue delivery
 }
 
@@ -236,6 +237,17 @@ func (c *Collector) RemoveExchange(exchangeName string) {
 	c.exchangeCount.Add(-1)
 }
 
+func (c *Collector) sampleExchangeMetrics(exchangeName string) {
+	em := c.GetExchangeMetrics(exchangeName)
+	if em == nil {
+		return
+	}
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	em.PublishRate.Record(em.PublishCount.Load())
+	em.DeliveryRate.Record(em.DeliveryCount.Load())
+}
+
 // ========================================
 // Queue Metrics
 // ========================================
@@ -250,10 +262,11 @@ func (c *Collector) RecordQueuePublish(queueName string) {
 	qm := c.getOrCreateQueueMetrics(queueName)
 
 	// Record message rate and update count
-	count := qm.MessageCount.Add(1)
-	qm.MessageRate.Record(count)
+	qm.MessageCount.Add(1)
+	// qm.MessageRate.Record(count)
 
-	c.incrementReadyCount()
+	// c.incrementReadyCount()
+	c.readyCount.Add(1)
 }
 
 // RecordQueueRequeue records a message requeued to a queue
@@ -271,7 +284,7 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	qm := c.getOrCreateQueueMetrics(queueName)
 
 	// Record delivery rate
-	qm.DeliveryRate.Record(qm.MessageCount.Load())
+	// qm.DeliveryRate.Record(qm.MessageCount.Load())
 
 	// Decrease message count
 	qm.MessageCount.Add(-1)
@@ -281,21 +294,24 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 		qm.UnackedCount.Add(1)
 	} else {
 		// For auto-acknowledge, also increment ACK count directly
-		ackCount := qm.AckCount.Add(1)
-		qm.AckRate.Record(ackCount)
+		qm.AckCount.Add(1)
+		// qm.AckRate.Record(ackCount)
 
 		// Record at broker level (also cumulative)
 		c.messageCount.Add(-1)
-		brokerAckCount := c.totalAckCount.Add(1)
-		c.totalAcks.Record(brokerAckCount)
+		c.totalAckCount.Add(1)
+		// c.totalAcks.Record(brokerAckCount)
 	}
 
 	// Record at broker level
-	brokerCount := c.messageCount.Load()
-	c.totalDeliveries.Record(brokerCount)
+	c.messageCount.Load()
+	// c.totalDeliveries.Record(brokerCount)
 
 	// Decrement global ready count and increment unacked if applicable
-	c.updateReadyAndUnacked(autoAck)
+	c.readyCount.Add(-1)
+	if !autoAck {
+		c.unackedCount.Add(1)
+	}
 }
 
 // RecordQueueAck records a message acknowledgment
@@ -309,16 +325,18 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	qm.UnackedCount.Add(-1)
 
 	// Increment cumulative ACK count for rate tracking
-	ackCount := qm.AckCount.Add(1)
-	qm.AckRate.Record(ackCount)
+	qm.AckCount.Add(1)
+	// qm.AckRate.Record(ackCount)
 
 	// Record at broker level (also cumulative)
 	c.messageCount.Add(-1)
-	brokerAckCount := c.totalAckCount.Add(1)
-	c.totalAcks.Record(brokerAckCount)
+	c.totalAckCount.Add(1)
+	// c.totalAcks.Record(brokerAckCount)
 
 	// Decrease global unacked count
-	c.decrementUnackedCount()
+	// c.decrementUnackedCount()
+	c.unackedCount.Add(-1)
+
 }
 
 // RecordQueueNack records a message negative acknowledgment
@@ -332,8 +350,8 @@ func (c *Collector) RecordQueueNack(queueName string) {
 	qm.UnackedCount.Add(-1)
 
 	// Record at broker level
-	brokerNackCount := c.totalNackCount.Add(1)
-	c.totalNacks.Record(brokerNackCount)
+	c.totalNackCount.Add(1)
+	// c.totalNacks.Record(brokerNackCount)
 }
 
 // SetQueueDepth explicitly sets the queue depth (for periodic updates)
@@ -418,38 +436,21 @@ func (c *Collector) RemoveQueue(queueName string) {
 	c.queueCount.Add(-1)
 }
 
+func (c *Collector) sampleQueueMetrics(queueName string) {
+	qm := c.GetQueueMetrics(queueName)
+	if qm == nil {
+		return
+	}
+	qm.mu.RLock()
+	defer qm.mu.RUnlock()
+	qm.MessageRate.Record(qm.MessageCount.Load())
+	qm.DeliveryRate.Record(qm.MessageCount.Load())
+	qm.AckRate.Record(qm.MessageCount.Load())
+}
+
 // ========================================
 // Broker-Level Metrics
 // ========================================
-
-// incrementReadyCount increments the ready message count and updates depths
-// Should be called whenever a message is added to the ready state
-func (c *Collector) incrementReadyCount() {
-	ready := c.readyCount.Add(1)
-	c.totalReadyDepth.Record(ready)
-	// no change to unacked here
-	c.totalDepth.Record(ready + c.unackedCount.Load())
-}
-
-// updateReadyAndUnacked updates the ready and unacked counts and records depths
-// Should be called whenever a message is removed from ready state (delivered)
-func (c *Collector) updateReadyAndUnacked(autoAck bool) {
-	ready := c.readyCount.Add(-1)
-	c.totalReadyDepth.Record(ready)
-	totalUnaks := c.unackedCount.Load()
-	if !autoAck {
-		totalUnaks := c.unackedCount.Add(1)
-		c.totalUnackedDepth.Record(totalUnaks)
-	}
-	c.totalDepth.Record(ready + totalUnaks)
-}
-
-// decrementUnackedCount decrements the unacked message count and updates depths
-// Should be called whenever a message is acknowledged
-func (c *Collector) decrementUnackedCount() {
-	c.unackedCount.Add(-1)
-	c.totalDepth.Record(c.readyCount.Load() + c.unackedCount.Load())
-}
 
 // RecordConnection records a new connection
 func (c *Collector) RecordConnection() {
@@ -457,8 +458,8 @@ func (c *Collector) RecordConnection() {
 		return
 	}
 
-	count := c.connectionCount.Add(1)
-	c.connectionRate.Record(count)
+	c.connectionCount.Add(1)
+	// c.connectionRate.Record(count)
 }
 
 // RecordConnectionClose records a connection closing
@@ -476,8 +477,8 @@ func (c *Collector) RecordChannelOpen() {
 		return
 	}
 
-	count := c.channelCount.Add(1)
-	c.channelRate.Record(count)
+	c.channelCount.Add(1)
+	// c.channelRate.Record(count)
 }
 
 // RecordChannelClose records a channel closing
@@ -709,4 +710,50 @@ func (c *Collector) Clear() {
 // IsEnabled returns whether metrics collection is enabled
 func (c *Collector) IsEnabled() bool {
 	return c.config.Enabled
+}
+
+// StartPeriodicSampling starts a goroutine to periodically sample broker metrics
+func (c *Collector) StartPeriodicSampling(interval time.Duration) {
+	if !c.config.Enabled {
+		return
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		for range ticker.C {
+			c.sampleBrokerMetrics()
+		}
+	}()
+}
+
+// sampleBrokerMetrics samples current broker metrics and records them
+func (c *Collector) sampleBrokerMetrics() {
+	ready := c.readyCount.Load()
+	unacked := c.unackedCount.Load()
+
+	c.totalPublishes.Record(c.messageCount.Load())
+	c.totalDeliveries.Record(c.messageCount.Load())
+	c.totalAcks.Record(c.totalAckCount.Load())
+	c.totalNacks.Record(c.totalNackCount.Load())
+	c.connectionRate.Record(c.connectionCount.Load())
+	c.channelRate.Record(c.channelCount.Load())
+
+	c.totalReadyDepth.Record(ready)
+	c.totalUnackedDepth.Record(unacked)
+	c.totalDepth.Record(ready + unacked)
+
+	// Sample each queue's metrics
+	c.queueMetrics.Range(func(key, value interface{}) bool {
+		queueName := key.(string)
+		c.sampleQueueMetrics(queueName)
+		return true
+	})
+
+	// Sample each exchange's metrics
+	c.exchangeMetrics.Range(func(key, value interface{}) bool {
+		exchangeName := key.(string)
+		c.sampleExchangeMetrics(exchangeName)
+		return true
+	})
+
 }
