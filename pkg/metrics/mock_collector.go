@@ -237,6 +237,10 @@ func (m *MockCollector) GetDeliveryRateTimeSeries(duration time.Duration) []Samp
 	return []Sample{}
 }
 
+func (m *MockCollector) GetAckRateTimeSeries(duration time.Duration) []Sample {
+	return []Sample{}
+}
+
 func (m *MockCollector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
 	return []Sample{}
 }

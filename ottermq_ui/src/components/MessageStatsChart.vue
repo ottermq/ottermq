@@ -28,7 +28,7 @@ const windowFilter = (points) => {
     if (!points || points.length === 0) return [];
 
     const now = Date.now();
-    let selectedWindow = 1; // TODO: make this dynamic (1min, 10min, 1hr)
+    let selectedWindow = 1; // currently, 1min -- TODO: make this dynamic (1min, 10min, 1hr)
     const window = now - selectedWindow * 60 * 1000;
     return points
         .filter(d => new Date(d.timestamp).getTime() >= window)
@@ -74,16 +74,15 @@ const chartOptions = {
     animations: {
       enabled: true,
       easing: 'linear',
-      dynamicAnimation: {
-        speed: 1000
-      }
-    }
+      dynamicAnimation: { speed: 1000 }
+    },
+    zoom: { enabled: false }
   },
   stroke: {
     curve: 'smooth',
     width: 2
   },
-  colors: ['#21BA45', '#F2C037', '#1976D2'],
+  colors: ['#EDC240', '#AFD8F8', '#CB4B4B'],
   xaxis: {
     type: 'datetime',
     labels: {

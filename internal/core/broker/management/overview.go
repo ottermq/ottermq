@@ -5,6 +5,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/rs/zerolog/log"
 )
 
 func (s *Service) GetOverview() (*models.OverviewDTO, error) {
@@ -52,29 +53,20 @@ func (s *Service) GetBrokerInfo() models.OverviewBrokerDetails {
 // GetOverviewCharts returns time-series data for overview page charts
 func (s *Service) GetOverviewCharts() (*models.OverviewChartsDTO, error) {
 	collector := s.broker.GetCollector()
-
-	// Get current message stats for calculating time-series
-	messageStats := s.GetMessageStats()
-
-	// Get rate time-series from collector (these are cumulative counts)
-	publishSamples := collector.GetPublishRateTimeSeries(5 * time.Minute)
-	deliverySamples := collector.GetDeliveryRateTimeSeries(5 * time.Minute)
-
-	// Get ACK samples from broker metrics
-	brokerMetrics := collector.GetBrokerMetrics()
-	ackSamples := brokerMetrics.TotalAcks().GetSamples()
+	snapshot := *collector.GetBrokerSnapshot()
+	duration := time.Duration(60 * time.Second) // last 60 seconds
 
 	// Convert to time-series DTOs with rates
 	return &models.OverviewChartsDTO{
 		MessageStats: models.MessageStatsTimeSeriesDTO{
-			Ready:   convertToTimeSeries(publishSamples, float64(messageStats.MessagesReady)),
-			Unacked: convertToTimeSeries(publishSamples, float64(messageStats.MessagesUnacked)),
-			Total:   convertToTimeSeries(publishSamples, float64(messageStats.MessagesTotal)),
+			Ready:   convertToTimeSeries(snapshot.TotalReadyDepth.GetSamples()),
+			Unacked: convertToTimeSeries(snapshot.TotalUnackedDepth.GetSamples()),
+			Total:   convertToTimeSeries(snapshot.TotalDepth.GetSamples()),
 		},
 		MessageRates: models.MessageRatesTimeSeriesDTO{
-			Publish: convertSamplesToRates(publishSamples),
-			Deliver: convertSamplesToRates(deliverySamples),
-			Ack:     convertSamplesToRates(ackSamples),
+			Publish: convertSamplesToRates(collector.GetPublishRateTimeSeries(duration)),
+			Deliver: convertSamplesToRates(collector.GetDeliveryRateTimeSeries(duration)),
+			Ack:     convertSamplesToRates(collector.GetAckRateTimeSeries(duration)),
 		},
 	}, nil
 }
@@ -82,7 +74,7 @@ func (s *Service) GetOverviewCharts() (*models.OverviewChartsDTO, error) {
 // convertToTimeSeries creates a simple time series using the latest value
 // This is a simplified approach - for accurate historical queue depths,
 // we'd need to track them over time in the metrics collector
-func convertToTimeSeries(samples []metrics.Sample, currentValue float64) []models.TimeSeriesDTO {
+func convertToTimeSeries(samples []metrics.Sample) []models.TimeSeriesDTO {
 	if len(samples) == 0 {
 		return []models.TimeSeriesDTO{}
 	}
@@ -93,7 +85,7 @@ func convertToTimeSeries(samples []metrics.Sample, currentValue float64) []model
 		// In a future enhancement, we could track actual queue depths over time
 		result[i] = models.TimeSeriesDTO{
 			Timestamp: sample.Timestamp,
-			Value:     currentValue,
+			Value:     float64(sample.Count),
 		}
 	}
 	return result
@@ -112,7 +104,10 @@ func convertSamplesToRates(samples []metrics.Sample) []models.TimeSeriesDTO {
 		curr := samples[i]
 
 		elapsed := curr.Timestamp.Sub(prev.Timestamp).Seconds()
+		log.Debug().Str("current", curr.Timestamp.String()).Str("previous", prev.Timestamp.String()).Msg("Getting timestamps")
+		log.Debug().Float64("elapsed", elapsed).Msg("Calculating rate")
 		if elapsed > 0 {
+			log.Debug().Int64("prevCount", prev.Count).Int64("currCount", curr.Count).Msg("Calculating rate counts")
 			rate := float64(curr.Count-prev.Count) / elapsed
 			result = append(result, models.TimeSeriesDTO{
 				Timestamp: curr.Timestamp,

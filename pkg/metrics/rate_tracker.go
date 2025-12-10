@@ -81,6 +81,7 @@ func (rt *RateTracker) Rate() float64 {
 	return float64(countDelta) / elapsed
 }
 
+// GetStats returns the latest count and computed rate.
 func (rt *RateTracker) GetStats() (count int64, rate float64) {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()
@@ -103,6 +104,7 @@ func (rt *RateTracker) GetStats() (count int64, rate float64) {
 	return count, rate
 }
 
+// GetSamples returns a copy of the current samples.
 func (rt *RateTracker) GetSamples() []Sample {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()

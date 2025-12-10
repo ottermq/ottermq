@@ -39,6 +39,7 @@ type MetricsCollector interface {
 	// Time series
 	GetPublishRateTimeSeries(duration time.Duration) []Sample
 	GetDeliveryRateTimeSeries(duration time.Duration) []Sample
+	GetAckRateTimeSeries(duration time.Duration) []Sample
 	GetConnectionRateTimeSeries(duration time.Duration) []Sample
 
 	// Utility

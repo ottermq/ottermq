@@ -25,6 +25,10 @@ type Collector struct {
 	connectionRate  *RateTracker
 	channelRate     *RateTracker
 
+	totalReadyDepth   *RateTracker // Tracks MessagesReady over time
+	totalUnackedDepth *RateTracker // Tracks MessagesUnacked over time
+	totalDepth        *RateTracker // Tracks MessagesTotal depth over time
+
 	// Broker-wide gauges (current values)
 	messageCount    atomic.Int64
 	consumerCount   atomic.Int64
@@ -36,6 +40,9 @@ type Collector struct {
 	// Cumulative counters for rate calculation
 	totalAckCount  atomic.Int64
 	totalNackCount atomic.Int64
+
+	readyCount   atomic.Int64
+	unackedCount atomic.Int64
 
 	// Configuration
 	config *Config
@@ -50,6 +57,11 @@ type BrokerMetrics struct {
 	connectionRate  *RateTracker
 	channelRate     *RateTracker
 
+	// Depths
+	totalReadyDepth   *RateTracker // Uses messageCount
+	totalUnackedDepth *RateTracker // Uses unackedCount
+	totalDepth        *RateTracker // Uses ready + unacked counts
+
 	// Broker-wide gauges (current values)
 	messageCount    int64
 	consumerCount   int64
@@ -57,6 +69,9 @@ type BrokerMetrics struct {
 	channelCount    int64
 	queueCount      int64
 	exchangeCount   int64
+
+	readyCount   int64
+	unackedCount int64
 }
 
 // Getters for BrokerMetrics (public API)
@@ -131,7 +146,12 @@ func NewCollector(config *Config) *Collector {
 		totalNacks:      NewRateTracker(config.WindowSize, config.MaxSamples),
 		connectionRate:  NewRateTracker(config.WindowSize, config.MaxSamples),
 		channelRate:     NewRateTracker(config.WindowSize, config.MaxSamples),
-		config:          config,
+
+		totalReadyDepth:   NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalUnackedDepth: NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalDepth:        NewRateTracker(config.WindowSize, config.MaxSamples),
+
+		config: config,
 	}
 }
 
@@ -232,6 +252,8 @@ func (c *Collector) RecordQueuePublish(queueName string) {
 	// Record message rate and update count
 	count := qm.MessageCount.Add(1)
 	qm.MessageRate.Record(count)
+
+	c.incrementReadyCount()
 }
 
 // RecordQueueRequeue records a message requeued to a queue
@@ -271,6 +293,9 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	// Record at broker level
 	brokerCount := c.messageCount.Load()
 	c.totalDeliveries.Record(brokerCount)
+
+	// Decrement global ready count and increment unacked if applicable
+	c.updateReadyAndUnacked(autoAck)
 }
 
 // RecordQueueAck records a message acknowledgment
@@ -291,6 +316,9 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	c.messageCount.Add(-1)
 	brokerAckCount := c.totalAckCount.Add(1)
 	c.totalAcks.Record(brokerAckCount)
+
+	// Decrease global unacked count
+	c.decrementUnackedCount()
 }
 
 // RecordQueueNack records a message negative acknowledgment
@@ -394,6 +422,35 @@ func (c *Collector) RemoveQueue(queueName string) {
 // Broker-Level Metrics
 // ========================================
 
+// incrementReadyCount increments the ready message count and updates depths
+// Should be called whenever a message is added to the ready state
+func (c *Collector) incrementReadyCount() {
+	ready := c.readyCount.Add(1)
+	c.totalReadyDepth.Record(ready)
+	// no change to unacked here
+	c.totalDepth.Record(ready + c.unackedCount.Load())
+}
+
+// updateReadyAndUnacked updates the ready and unacked counts and records depths
+// Should be called whenever a message is removed from ready state (delivered)
+func (c *Collector) updateReadyAndUnacked(autoAck bool) {
+	ready := c.readyCount.Add(-1)
+	c.totalReadyDepth.Record(ready)
+	totalUnaks := c.unackedCount.Load()
+	if !autoAck {
+		totalUnaks := c.unackedCount.Add(1)
+		c.totalUnackedDepth.Record(totalUnaks)
+	}
+	c.totalDepth.Record(ready + totalUnaks)
+}
+
+// decrementUnackedCount decrements the unacked message count and updates depths
+// Should be called whenever a message is acknowledged
+func (c *Collector) decrementUnackedCount() {
+	c.unackedCount.Add(-1)
+	c.totalDepth.Record(c.readyCount.Load() + c.unackedCount.Load())
+}
+
 // RecordConnection records a new connection
 func (c *Collector) RecordConnection() {
 	if !c.config.Enabled {
@@ -441,6 +498,12 @@ func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
 		totalNacks:      c.totalNacks,
 		connectionRate:  c.connectionRate,
 		channelRate:     c.channelRate,
+
+		// Depths
+		totalReadyDepth:   c.totalReadyDepth,
+		totalUnackedDepth: c.totalUnackedDepth,
+		totalDepth:        c.totalDepth,
+
 		messageCount:    c.messageCount.Load(),
 		consumerCount:   c.consumerCount.Load(),
 		connectionCount: c.connectionCount.Load(),
@@ -465,6 +528,11 @@ type BrokerSnapshot struct {
 	NackRate       float64 `json:"nack_rate"`
 	ConnectionRate float64 `json:"connection_rate"`
 	ChannelRate    float64 `json:"channel_rate"`
+
+	// Depths
+	TotalReadyDepth   *RateTracker `json:"total_ready_depth"`
+	TotalUnackedDepth *RateTracker `json:"total_unacked_depth"`
+	TotalDepth        *RateTracker `json:"total_depth"`
 
 	// Broker-wide gauges
 	MessageCount    int64 `json:"message_count"`
@@ -494,6 +562,11 @@ func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 		NackRate:       bm.totalNacks.Rate(),
 		ConnectionRate: bm.connectionRate.Rate(),
 		ChannelRate:    bm.channelRate.Rate(),
+
+		// Depths
+		TotalReadyDepth:   bm.totalReadyDepth,
+		TotalUnackedDepth: bm.totalUnackedDepth,
+		TotalDepth:        bm.totalDepth,
 
 		// Gauges
 		MessageCount:    bm.messageCount,
@@ -590,8 +663,24 @@ func (c *Collector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
 	return c.totalDeliveries.GetSamples()
 }
 
+func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalAcks.GetSamples()
+}
+
 func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
 	return c.connectionRate.GetSamples()
+}
+
+func (c *Collector) GetPublishRate() float64 {
+	return c.totalPublishes.Rate()
+}
+
+func (c *Collector) GetDeliveryRate() float64 {
+	return c.totalDeliveries.Rate()
+}
+
+func (c *Collector) GetTotalAcksRate() float64 {
+	return c.totalAcks.Rate()
 }
 
 // ========================================
