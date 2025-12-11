@@ -233,7 +233,11 @@ func (m *MockCollector) GetPublishRateTimeSeries(duration time.Duration) []Sampl
 	return []Sample{}
 }
 
-func (m *MockCollector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
+func (m *MockCollector) GetDeliveryAutoAckRateTimeSeries(duration time.Duration) []Sample {
+	return []Sample{}
+}
+
+func (m *MockCollector) GetDeliveryManualAckRateTimeSeries(duration time.Duration) []Sample {
 	return []Sample{}
 }
 
