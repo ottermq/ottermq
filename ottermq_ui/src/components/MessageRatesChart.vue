@@ -2,11 +2,11 @@
   <q-card flat bordered>
     <q-card-section>
       <div class="text-h6">Message Rates (last 60s)</div>
-      <div class="text-caption text-grey-7">Publish • Deliver • Ack per second</div>
+      <div class="text-caption text-grey-7">Publish • Deliver AutoAck • Deliver Manual Ack • Ack per second</div>
     </q-card-section>
     <q-card-section class="q-pt-none">
       <apexchart
-        v-if="hasData"
+        v-if="chartData"
         type="area"
         height="300"
         :options="chartOptions"
@@ -28,7 +28,7 @@ const apexchart = VueApexCharts
 const props = defineProps({
   chartData: {
     type: Object,
-    required: true
+    default: null
   }
 })
 
@@ -69,12 +69,12 @@ const computedRateSeries = (points, name) => {
 const series = computed(() => {  
   return [
     computedRateSeries(props.chartData.publish, 'Publish'),
-    computedRateSeries(props.chartData.deliver, 'Deliver'),
+    computedRateSeries(props.chartData.deliver_auto_ack, 'Deliver (auto ack)'),
+    computedRateSeries(props.chartData.deliver_manual_ack, 'Deliver (manual ack)'),
     computedRateSeries(props.chartData.ack, 'Ack')
   ].filter(s => s.data.length > 0)
 })
 
-const hasData = computed(() => series.value.some(s => s.data.length > 0))
 
 const chartOptions = {
   chart: {
@@ -82,9 +82,9 @@ const chartOptions = {
     height: 300,
     toolbar: { show: false },
     animations: {
-      enabled: true,
-      easing: 'linear',
-      dynamicAnimation: { speed: 800 }
+      enabled: false,
+      // easing: 'linear',
+      // dynamicAnimation: { speed: 800 }
     },
     zoom: { enabled: false }
   },
@@ -100,7 +100,7 @@ const chartOptions = {
       opacityTo: 0.1,
     }
   },
-  colors: ['#1976D2', '#9C27B0', '#21BA45'],
+  colors: ['#EDC240','#1976D2', '#9C27B0', '#21BA45'],
   xaxis: {
     type: 'datetime',
     labels: {

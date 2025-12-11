@@ -72,9 +72,9 @@ const chartOptions = {
       show: false
     },
     animations: {
-      enabled: true,
-      easing: 'linear',
-      dynamicAnimation: { speed: 1000 }
+      enabled: false,
+      // easing: 'linear',
+      // dynamicAnimation: { speed: 1000 }
     },
     zoom: { enabled: false }
   },
