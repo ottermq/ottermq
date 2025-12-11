@@ -53,20 +53,21 @@ func (s *Service) GetBrokerInfo() models.OverviewBrokerDetails {
 // GetOverviewCharts returns time-series data for overview page charts
 func (s *Service) GetOverviewCharts() (*models.OverviewChartsDTO, error) {
 	collector := s.broker.GetCollector()
-	snapshot := *collector.GetBrokerSnapshot()
+	bm := collector.GetBrokerMetrics()
 	duration := time.Duration(60 * time.Second) // last 60 seconds
 
 	// Convert to time-series DTOs with rates
 	return &models.OverviewChartsDTO{
 		MessageStats: models.MessageStatsTimeSeriesDTO{
-			Ready:   samplesToTimeSeries(snapshot.TotalReadyDepth.GetSamples()),
-			Unacked: samplesToTimeSeries(snapshot.TotalUnackedDepth.GetSamples()),
-			Total:   samplesToTimeSeries(snapshot.TotalDepth.GetSamples()),
+			Ready:   samplesToTimeSeries(bm.TotalReadyDepth().GetSamplesForDuration(duration)),
+			Unacked: samplesToTimeSeries(bm.TotalUnackedDepth().GetSamplesForDuration(duration)),
+			Total:   samplesToTimeSeries(bm.TotalDepth().GetSamplesForDuration(duration)),
 		},
 		MessageRates: models.MessageRatesTimeSeriesDTO{
-			Publish: samplesToRates(collector.GetPublishRateTimeSeries(duration)),
-			Deliver: samplesToRates(collector.GetDeliveryRateTimeSeries(duration)),
-			Ack:     samplesToRates(collector.GetAckRateTimeSeries(duration)),
+			Publish:          samplesToRates(collector.GetPublishRateTimeSeries(duration)),
+			DeliverAutoAck:   samplesToRates(collector.GetDeliveryAutoAckRateTimeSeries(duration)),
+			DeliverManualAck: samplesToRates(collector.GetDeliveryManualAckRateTimeSeries(duration)),
+			Ack:              samplesToRates(collector.GetAckRateTimeSeries(duration)),
 		},
 	}, nil
 }
