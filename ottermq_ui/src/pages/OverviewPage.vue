@@ -169,7 +169,7 @@ onMounted(async () => {
   timer = setInterval(async () => {
     await store.fetch()
     await store.fetchCharts()
-  }, 10000) // refresh every 10 seconds
+  }, 5000) // refresh every 5 seconds
 })
 
 onBeforeUnmount(() => {
