@@ -58,11 +58,11 @@ func TestNewCollector(t *testing.T) {
 			}
 
 			// Verify rate trackers initialized
-			if c.totalPublishes == nil {
-				t.Error("totalPublishes not initialized")
+			if c.totalPublishesRate == nil {
+				t.Error("totalPublishesRate not initialized")
 			}
-			if c.totalDeliveries == nil {
-				t.Error("totalDeliveries not initialized")
+			if c.totalDeliveriesAutoAckRate == nil {
+				t.Error("totalDeliveriesAutoAckRate not initialized")
 			}
 			if c.connectionRate == nil {
 				t.Error("connectionRate not initialized")
@@ -561,7 +561,7 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 
 	// Verify rate tracker recorded
 	time.Sleep(10 * time.Millisecond)
-	rate := c.totalPublishes.Rate()
+	rate := c.totalPublishesRate.Rate()
 	if rate <= 0 {
 		t.Error("totalPublishes rate should be positive")
 	}
@@ -666,7 +666,7 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 
 	// Get time series
 	publishSamples := c.GetPublishRateTimeSeries(5 * time.Minute)
-	deliverySamples := c.GetDeliveryRateTimeSeries(5 * time.Minute)
+	deliverySamples := c.GetDeliveryAutoAckRateTimeSeries(5 * time.Minute)
 	connSamples := c.GetConnectionRateTimeSeries(5 * time.Minute)
 
 	if len(publishSamples) == 0 {
