@@ -1826,14 +1826,14 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "message_count": {
-                    "description": "Broker-wide gauges",
+                    "description": "Current gauges",
                     "type": "integer"
                 },
                 "nack_rate": {
                     "type": "number"
                 },
                 "publish_rate": {
-                    "description": "Broker-wide rates (current)",
+                    "description": "Current rates (single values for display cards)",
                     "type": "number"
                 },
                 "queue_count": {
@@ -1841,8 +1841,20 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "total_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_ready_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_unacked_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
                 }
             }
+        },
+        "metrics.RateTracker": {
+            "type": "object"
         },
         "models.AuthRequest": {
             "type": "object",
@@ -2318,7 +2330,13 @@ const docTemplate = `{
                         "$ref": "#/definitions/models.TimeSeriesDTO"
                     }
                 },
-                "deliver": {
+                "deliver_auto_ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver_manual_ack": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.TimeSeriesDTO"
