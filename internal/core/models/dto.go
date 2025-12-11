@@ -22,9 +22,10 @@ type MessageStatsTimeSeriesDTO struct {
 
 // MessageRatesTimeSeriesDTO contains historical message rate data for charting
 type MessageRatesTimeSeriesDTO struct {
-	Publish []TimeSeriesDTO `json:"publish"`
-	Deliver []TimeSeriesDTO `json:"deliver"`
-	Ack     []TimeSeriesDTO `json:"ack"`
+	Publish          []TimeSeriesDTO `json:"publish"`
+	DeliverAutoAck   []TimeSeriesDTO `json:"deliver_auto_ack"`
+	DeliverManualAck []TimeSeriesDTO `json:"deliver_manual_ack"`
+	Ack              []TimeSeriesDTO `json:"ack"`
 }
 
 // OverviewChartsDTO combines all chart data for the overview page
