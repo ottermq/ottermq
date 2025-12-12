@@ -40,6 +40,7 @@ A ring buffer-based time-series tracker that:
 - **Delivery Count**: Total messages routed from the exchange
 
 #### Queue Metrics
+
 - **Message Rate**: Messages enqueued per second
 - **Message Count**: Current queue depth (ready messages)
 - **Delivery Rate**: Messages delivered to consumers per second
@@ -49,6 +50,7 @@ A ring buffer-based time-series tracker that:
 - **Consumer Count**: Active consumers on the queue
 
 #### Broker Metrics
+
 - **Publish Rate**: Total publishes across all exchanges per second
 - **Delivery Rate**: Total deliveries (auto-ack and manual-ack) per second
 - **Ack Rate**: Total acknowledgments per second
@@ -225,6 +227,7 @@ type Config struct {
 ```
 
 **Default Configuration:**
+
 - `Enabled`: `true`
 - `WindowSize`: `5 minutes`
 - `MaxSamples`: `60`
@@ -254,7 +257,7 @@ The `StartPeriodicSampling()` method launches a background goroutine that:
 
 Rates are calculated using a sliding window approach:
 
-```
+```cide
 Rate = (Current Value - Oldest Value in Window) / Window Duration
 ```
 
