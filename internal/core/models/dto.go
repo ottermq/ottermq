@@ -178,10 +178,11 @@ type ChannelDetailDTO struct {
 	PrefetchCount    uint16 `json:"prefetch_count"`
 	UnackedCount     int    `json:"unacked_count"`
 	// Stats
-	PublishRate float64 `json:"publish_rate"`
-	ConfirmRate float64 `json:"confirm_rate"`
-	DeliverRate float64 `json:"deliver_rate"`
-	AckRate     float64 `json:"ack_rate"`
+	PublishRate    float64 `json:"publish_rate"`
+	ConfirmRate    float64 `json:"confirm_rate"`
+	DeliverRate    float64 `json:"deliver_rate"`
+	UnroutableRate float64 `json:"unroutable_rate"`
+	AckRate        float64 `json:"ack_rate"`
 }
 
 type BindingDTO struct {
