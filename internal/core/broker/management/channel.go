@@ -60,6 +60,8 @@ func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDetailDTO {
 		UnackedCount:     chInfo.UnackedCount,
 		PublishRate:      0, // TODO: implement publish rate calculation
 		DeliverRate:      0, // TODO: implement deliver rate calculation
+		UnroutableRate:   0, // TODO: implement unroutable rate calculation
+		AckRate:          0,
 	}
 	return chDTO
 }
