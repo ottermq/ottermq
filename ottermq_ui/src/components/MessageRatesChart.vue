@@ -32,47 +32,32 @@ const props = defineProps({
   }
 })
 
-const computedRateSeries = (points, name) => {
-    if (!points || points.length < 2) return { name, data: [] };
+const series = computed(() => {
+  if (!props.chartData) return []
+  
+  const now = Date.now()
+  const selectedWindow = 1 
+  const cutoff = now - selectedWindow * 60 * 1000
 
-    const now = Date.now();
-    let selectedWindow = 1; // TODO: make this dynamic (1min, 10min, 1hr)
-    const cutoff = now - selectedWindow * 60 * 1000;
+  const transformToSeries = (points, name) => {
+    if (!points || points.length === 0) return null
 
-    const recent = points
-        .filter(p => new Date(p.timestamp).getTime() >= cutoff)
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const data = points
+      .filter(p => new Date(p.timestamp).getTime() >= cutoff)
+      .map(p => ({
+        x: new Date(p.timestamp).getTime(),
+        y: Math.max(0, Number(p.value.toFixed(2))) // value is already a rate!
+      }))
 
-    if (recent.length < 2) return { name, data: [] };
+    return data.length > 0 ? { name, data } : null
+  }
 
-    const data = [];
-    for (let i = 1; i < recent.length; i++) {
-        const prev = recent[i - 1];
-        const curr = recent[i];
-
-        const t1 = new Date(prev.timestamp).getTime();
-        const t2 = new Date(curr.timestamp).getTime();
-        const deltaTime = (t2 - t1) / 1000; // in secs
-
-        if (deltaTime <= 0) continue;
-
-        const rate = (curr.value - prev.value) / deltaTime;
-        data.push({ 
-            x: t2, 
-            y: Math.max(0, Number(rate.toFixed(2))) // clamp negative, round 
-        });
-    }
-
-    return { name, data };
-}
-
-const series = computed(() => {  
   return [
-    computedRateSeries(props.chartData.publish, 'Publish'),
-    computedRateSeries(props.chartData.deliver_auto_ack, 'Deliver (auto ack)'),
-    computedRateSeries(props.chartData.deliver_manual_ack, 'Deliver (manual ack)'),
-    computedRateSeries(props.chartData.ack, 'Ack')
-  ].filter(s => s.data.length > 0)
+    transformToSeries(props.chartData.publish, 'Publish'),
+    transformToSeries(props.chartData.deliver_auto_ack, 'Deliver (auto ack)'),
+    transformToSeries(props.chartData.deliver_manual_ack, 'Deliver (manual ack)'),
+    transformToSeries(props.chartData.ack, 'Ack')
+  ].filter(s => s !== null)
 })
 
 
