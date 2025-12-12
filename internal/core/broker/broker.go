@@ -225,6 +225,11 @@ func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClie
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
+	if request == nil {
+		// Incomplete frame state, should not happen in normal operation
+		log.Debug().Msg("processRequest called with nil MethodFrame")
+		return nil, nil
+	}
 	connInfo, exist := b.Connections[conn]
 	if !exist {
 		// connection terminated while processing the request
