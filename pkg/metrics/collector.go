@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +43,8 @@ type Collector struct {
 	totalAckCount atomic.Int64
 
 	config *Config
+
+	ctx context.Context
 }
 
 // ExchangeMetrics tracks statistics for a single exchange
@@ -92,7 +95,7 @@ func DefaultConfig() *Config {
 }
 
 // NewCollector creates a new metrics collector with the given configuration
-func NewCollector(config *Config) *Collector {
+func NewCollector(config *Config, ctx context.Context) *Collector {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -111,6 +114,8 @@ func NewCollector(config *Config) *Collector {
 		totalRate:        NewRateTracker(config.WindowSize, config.MaxSamples),
 
 		config: config,
+
+		ctx: ctx,
 	}
 }
 
@@ -432,7 +437,13 @@ func (c *Collector) StartPeriodicSampling() {
 	ticker := time.NewTicker(interval)
 	go func() {
 		for range ticker.C {
-			c.sampleBrokerMetrics()
+			select {
+			case <-c.ctx.Done():
+				ticker.Stop()
+				return
+			default:
+				c.sampleBrokerMetrics()
+			}
 		}
 	}()
 }

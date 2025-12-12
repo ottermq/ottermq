@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestChannelDeliveryState_SingleAck(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	vh.SetMetricsCollector(metrics.NewCollector(nil))
+	vh.SetMetricsCollector(metrics.NewCollector(nil, context.Background()))
 
 	// Fake connection (nil is sufficient for HandleBasicAck)
 	// var conn net.Conn = nil
@@ -100,7 +101,7 @@ func TestChannelDeliveryState_MultipleAck(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}))
+	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}, context.Background()))
 	connID := newTestConsumerConnID()
 	key := ConnectionChannelKey{ConnectionID: connID, Channel: 1}
 	ch := &ChannelDeliveryState{
@@ -209,7 +210,7 @@ func TestCleanupChannel_RequeuesUnacked(t *testing.T) {
 		Persistence:     nil,
 	}
 	vh := NewVhost("test-vhost", options)
-	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}))
+	vh.SetMetricsCollector(metrics.NewCollector(&metrics.Config{Enabled: false}, context.Background()))
 	connID := newTestConsumerConnID()
 	// Create a queue
 	q, err := vh.CreateQueue("q-clean", nil, connID)

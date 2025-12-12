@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"net"
 	"strings"
 	"testing"
@@ -40,7 +41,7 @@ func (m *MockAddr) String() string  { return m.address }
 
 func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	mockFramer := &testutil.MockFramer{}
-	mockCollector := metrics.NewCollector(nil)
+	mockCollector := metrics.NewCollector(nil, context.Background())
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),

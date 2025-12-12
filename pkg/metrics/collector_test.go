@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -43,7 +44,9 @@ func TestNewCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewCollector(tt.config)
+			// create dummy context
+			ctx := context.Background()
+			c := NewCollector(tt.config, ctx)
 
 			if c.IsEnabled() != tt.wantEnabled {
 				t.Errorf("IsEnabled() = %v, want %v", c.IsEnabled(), tt.wantEnabled)
@@ -92,7 +95,8 @@ func TestDefaultConfig(t *testing.T) {
 // ========================================
 
 func TestExchangeMetricsBasic(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Record some publishes
 	c.RecordExchangePublish("amq.direct", "direct")
@@ -128,7 +132,9 @@ func TestExchangeMetricsBasic(t *testing.T) {
 }
 
 func TestExchangeMetricsSnapshot(t *testing.T) {
-	c := NewCollector(nil)
+
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Record publishes over time
 	c.RecordExchangePublish("test.exchange", "topic")
@@ -166,7 +172,8 @@ func TestExchangeMetricsSnapshot(t *testing.T) {
 }
 
 func TestGetAllExchangeMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Create multiple exchanges
 	c.RecordExchangePublish("exchange1", "direct")
@@ -194,7 +201,9 @@ func TestGetAllExchangeMetrics(t *testing.T) {
 }
 
 func TestRemoveExchange(t *testing.T) {
-	c := NewCollector(nil)
+
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordExchangePublish("temp.exchange", "direct")
 
@@ -217,7 +226,9 @@ func TestRemoveExchange(t *testing.T) {
 // ========================================
 
 func TestQueueMetricsBasic(t *testing.T) {
-	c := NewCollector(nil)
+
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Enqueue messages
 	c.RecordQueuePublish("queue1")
@@ -244,7 +255,8 @@ func TestQueueMetricsBasic(t *testing.T) {
 }
 
 func TestQueueDeliveryAndAck(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Enqueue 3 messages
 	c.RecordQueuePublish("testq")
@@ -295,7 +307,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 }
 
 func TestQueueNackWithRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 2 messages
 	c.RecordQueuePublish("testq")
@@ -329,7 +342,8 @@ func TestQueueNackWithRequeue(t *testing.T) {
 }
 
 func TestQueueNackWithoutRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 2 messages
 	c.RecordQueuePublish("testq")
@@ -359,7 +373,8 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 }
 
 func TestQueueRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Simulate consumer cancel scenario
 	c.RecordQueuePublish("testq")
@@ -388,7 +403,8 @@ func TestQueueRequeue(t *testing.T) {
 }
 
 func TestSetQueueDepth(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("testq")
 
@@ -402,7 +418,8 @@ func TestSetQueueDepth(t *testing.T) {
 }
 
 func TestSetQueueConsumers(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("testq")
 
@@ -446,7 +463,8 @@ func TestSetQueueConsumers(t *testing.T) {
 }
 
 func TestQueueMetricsSnapshot(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup queue with messages
 	c.RecordQueuePublish("testq")
@@ -483,7 +501,8 @@ func TestQueueMetricsSnapshot(t *testing.T) {
 }
 
 func TestGetAllQueueMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("q1")
 	c.RecordQueuePublish("q2")
@@ -509,7 +528,8 @@ func TestGetAllQueueMetrics(t *testing.T) {
 }
 
 func TestRemoveQueue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("tempq")
 	c.RecordQueuePublish("tempq")
@@ -547,7 +567,8 @@ func TestRemoveQueue(t *testing.T) {
 // ========================================
 
 func TestBrokerLevelPublishMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish to different exchanges
 	c.RecordExchangePublish("ex1", "direct")
@@ -568,7 +589,8 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 }
 
 func TestBrokerLevelConnectionMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Open connections
 	c.RecordConnection()
@@ -588,7 +610,8 @@ func TestBrokerLevelConnectionMetrics(t *testing.T) {
 }
 
 func TestBrokerLevelChannelMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Open channels
 	c.RecordChannelOpen()
@@ -611,7 +634,8 @@ func TestBrokerLevelChannelMetrics(t *testing.T) {
 // ========================================
 
 func TestBrokerSnapshot(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup broker state
 	c.RecordExchangePublish("ex1", "direct")
@@ -654,7 +678,8 @@ func TestBrokerSnapshot(t *testing.T) {
 }
 
 func TestGetTimeSeriesMethods(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Record some data
 	c.RecordExchangePublish("ex1", "direct")
@@ -687,7 +712,8 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 // ========================================
 
 func TestConcurrentExchangePublishes(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const goroutines = 10
 	const publishesPerGoroutine = 100
@@ -721,7 +747,8 @@ func TestConcurrentExchangePublishes(t *testing.T) {
 }
 
 func TestConcurrentQueueOperations(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const goroutines = 10
 	const opsPerGoroutine = 100
@@ -766,7 +793,8 @@ func TestConcurrentQueueOperations(t *testing.T) {
 }
 
 func TestConcurrentConnectionOperations(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const connections = 100
 
@@ -814,7 +842,7 @@ func TestDisabledCollector(t *testing.T) {
 		WindowSize: 5 * time.Minute,
 		MaxSamples: 60,
 	}
-	c := NewCollector(config)
+	c := NewCollector(config, context.Background())
 
 	// All operations should be no-ops when disabled
 	c.RecordExchangePublish("ex1", "direct")
@@ -828,7 +856,8 @@ func TestDisabledCollector(t *testing.T) {
 }
 
 func TestClearMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup data
 	c.RecordExchangePublish("ex1", "direct")
@@ -867,7 +896,8 @@ func TestClearMetrics(t *testing.T) {
 }
 
 func TestEmptyQueueName(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Should handle empty queue name gracefully
 	c.RecordQueuePublish("")
@@ -887,7 +917,8 @@ func TestEmptyQueueName(t *testing.T) {
 // ========================================
 
 func TestFullMessageLifecycle_Success(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish message to exchange
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -927,7 +958,8 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish and route
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -971,7 +1003,8 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish to exchange and route to queue
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -1003,7 +1036,8 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup queue with consumer
 	c.RecordQueuePublish("my.queue")
@@ -1038,7 +1072,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 10 messages
 	for i := 0; i < 10; i++ {
@@ -1092,7 +1127,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish to multiple queues
 	c.RecordExchangePublish("ex1", "direct")
@@ -1146,7 +1182,8 @@ func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
 // ========================================
 
 func BenchmarkRecordExchangePublish(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1155,7 +1192,8 @@ func BenchmarkRecordExchangePublish(b *testing.B) {
 }
 
 func BenchmarkRecordQueuePublish(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1164,7 +1202,8 @@ func BenchmarkRecordQueuePublish(b *testing.B) {
 }
 
 func BenchmarkRecordConnection(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1173,7 +1212,8 @@ func BenchmarkRecordConnection(b *testing.B) {
 }
 
 func BenchmarkSnapshot(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup some data
 	c.RecordExchangePublish("ex1", "direct")
@@ -1187,7 +1227,8 @@ func BenchmarkSnapshot(b *testing.B) {
 }
 
 func BenchmarkConcurrentPublishes(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

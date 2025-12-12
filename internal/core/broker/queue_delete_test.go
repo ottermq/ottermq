@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -20,7 +21,7 @@ func newTestConsumerConnID() vhost.ConnectionID {
 func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
 	mockCollector := metrics.NewCollector(&metrics.Config{
 		Enabled: false,
-	})
+	}, context.Background())
 	b := &Broker{
 		framer:      &amqp.DefaultFramer{},
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
@@ -158,7 +159,7 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
 	mockCollector := metrics.NewCollector(&metrics.Config{
 		Enabled: false,
-	})
+	}, context.Background())
 	b := &Broker{
 		framer:      &amqp.DefaultFramer{},
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),

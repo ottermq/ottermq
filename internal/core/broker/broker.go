@@ -98,7 +98,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 			WindowSize:      config.WindowSize,
 			MaxSamples:      config.MaxSamples,
 			SamplesInterval: config.SamplesInterval,
-		})
+		}, b.rootCtx)
 		b.collector.StartPeriodicSampling()
 	}
 	log.Info().Msg("Metrics collection enabled")
@@ -231,7 +231,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 		return nil, nil
 	}
-	vh := b.VHosts[connInfo.VHostName]
 	isConnectionClosing, err := b.isConnectionClosing(conn)
 	if err != nil {
 		return nil, err
@@ -245,6 +244,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		}
 	}
+
+	// Get vhost after shutdown check to avoid nil pointer during cleanup
+	vh := b.VHosts[connInfo.VHostName]
+	if vh == nil {
+		log.Debug().Str("vhost", connInfo.VHostName).Msg("VHost not found or already cleaned up")
+		return nil, nil
+	}
+
 	// Check if the channel is in closing state (stored state, not incoming frame)
 	if request.Channel > 0 {
 		b.mu.Lock()
