@@ -64,10 +64,12 @@ func (s *Service) GetOverviewCharts() (*models.OverviewChartsDTO, error) {
 			Total:   samplesToTimeSeries(bm.TotalDepth().GetSamplesForDuration(duration)),
 		},
 		MessageRates: models.MessageRatesTimeSeriesDTO{
-			Publish:          samplesToRates(collector.GetPublishRateTimeSeries(duration)),
-			DeliverAutoAck:   samplesToRates(collector.GetDeliveryAutoAckRateTimeSeries(duration)),
-			DeliverManualAck: samplesToRates(collector.GetDeliveryManualAckRateTimeSeries(duration)),
-			Ack:              samplesToRates(collector.GetAckRateTimeSeries(duration)),
+			// using 0 duration to get all samples and filter in samplesToRates
+			// to avoid gaps in the rate calculations
+			Publish:          samplesToRates(collector.GetPublishRateTimeSeries(0)),
+			DeliverAutoAck:   samplesToRates(collector.GetDeliveryAutoAckRateTimeSeries(0)),
+			DeliverManualAck: samplesToRates(collector.GetDeliveryManualAckRateTimeSeries(0)),
+			Ack:              samplesToRates(collector.GetAckRateTimeSeries(0)),
 		},
 	}, nil
 }
@@ -85,23 +87,36 @@ func samplesToTimeSeries(samples []metrics.Sample) []models.TimeSeriesDTO {
 }
 
 // samplesToRates converts cumulative count samples to rate-per-second values
+// FIXED: Now filters AFTER calculating rates to avoid gaps
 func samplesToRates(samples []metrics.Sample) []models.TimeSeriesDTO {
 	if len(samples) < 2 {
 		return []models.TimeSeriesDTO{}
 	}
 
 	result := make([]models.TimeSeriesDTO, 0, len(samples)-1)
+	cutoff := time.Now().Add(-60 * time.Second) // Filter to last 60 seconds
 
 	for i := 1; i < len(samples); i++ {
 		prev := samples[i-1]
 		curr := samples[i]
 
 		elapsed := curr.Timestamp.Sub(prev.Timestamp).Seconds()
-		log.Debug().Str("current", curr.Timestamp.String()).Str("previous", prev.Timestamp.String()).Msg("Getting timestamps")
-		log.Debug().Float64("elapsed", elapsed).Msg("Calculating rate")
-		if elapsed > 0 {
-			log.Debug().Int64("prevCount", prev.Count).Int64("currCount", curr.Count).Msg("Calculating rate counts")
+
+		// Only include if current timestamp is within our window
+		if curr.Timestamp.After(cutoff) && elapsed > 0 {
 			rate := float64(curr.Count-prev.Count) / elapsed
+
+			// Clamp negative rates to 0 (shouldn't happen with consecutive samples)
+			if rate < 0 {
+				log.Warn().
+					Int64("prevCount", prev.Count).
+					Int64("currCount", curr.Count).
+					Time("prevTime", prev.Timestamp).
+					Time("currTime", curr.Timestamp).
+					Msg("Negative rate detected - counter decreased")
+				rate = 0
+			}
+
 			result = append(result, models.TimeSeriesDTO{
 				Timestamp: curr.Timestamp,
 				Value:     rate,
