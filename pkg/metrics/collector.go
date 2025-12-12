@@ -459,15 +459,10 @@ func (c *Collector) sampleBrokerMetrics() {
 
 	// Sample broker-wide counters (reset after sampling)
 	c.totalPublishesRate.Record(c.totalPublishCount.Load())
-	c.totalPublishCount.Store(0)
 	c.totalDeliveriesAutoAckRate.Record(c.totalDeliverAutoAckCount.Load())
-	c.totalDeliverAutoAckCount.Store(0)
 	c.totalDeliveriesManualAckRate.Record(c.totalDeliverManualAckCount.Load())
-	c.totalDeliverManualAckCount.Store(0)
 	c.totalAcksRate.Record(c.totalAckCount.Load())
-	c.totalAckCount.Store(0)
 	c.totalNacksRate.Record(c.totalNackCount.Load())
-	c.totalNackCount.Store(0)
 
 	c.connectionRate.Record(c.connectionCount.Load())
 	c.channelRate.Record(c.channelCount.Load())
