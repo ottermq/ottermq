@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,7 @@ import (
 type Collector struct {
 	exchangeMetrics sync.Map
 	queueMetrics    sync.Map
+	channelMetrics  sync.Map
 
 	// Broker-wide rate metrics
 	totalPublishesRate           *RateTracker
@@ -74,6 +76,29 @@ type QueueMetrics struct {
 	CreatedAt     time.Time
 
 	mu sync.RWMutex
+}
+
+type ChannelMetrics struct {
+	ConnectionName string
+	Number         uint16
+	VHostName      string
+	PublishRate    *RateTracker
+	ConfirmRate    *RateTracker
+	UnroutableRate *RateTracker
+	DeliverRate    *RateTracker
+	AckRate        *RateTracker
+
+	// Atomic counters for periodic sampling
+	PublishCount    atomic.Int64 // Cumulative publish count
+	ConfirmCount    atomic.Int64 // Cumulative confirm count
+	UnroutableCount atomic.Int64 // Cumulative unroutable count
+	DeliverCount    atomic.Int64 // Cumulative deliver count
+	AckCount        atomic.Int64 // Cumulative ack count
+
+	UnackedCount  atomic.Int64 // Current unacknowledged messages
+	PrefetchCount atomic.Int64 // Current prefetch count
+	State         string       // e.g., "running", "flow", "closing"
+	CreatedAt     time.Time
 }
 
 // Config holds configuration for metrics collection
@@ -360,6 +385,129 @@ func (c *Collector) sampleQueueMetrics(queueName string) {
 }
 
 // ========================================
+// Channel Metrics
+// ========================================
+
+// sampleChannelMetrics records periodic samples for a channel
+func (c *Collector) sampleChannelMetrics(channelName string) {
+	cm := c.GetChannelMetricsByName(channelName)
+	if cm == nil {
+		return
+	}
+	cm.PublishRate.Record(cm.PublishCount.Load())
+	cm.ConfirmRate.Record(cm.ConfirmCount.Load())
+	cm.UnroutableRate.Record(cm.UnroutableCount.Load())
+	cm.DeliverRate.Record(cm.DeliverCount.Load())
+	cm.AckRate.Record(cm.AckCount.Load())
+}
+
+// getOrCreateChannelMetrics gets existing or creates new channel metrics
+func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
+	name := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(name); ok {
+		return value.(*ChannelMetrics)
+	}
+
+	cm := &ChannelMetrics{
+		ConnectionName: connName,
+		VHostName:      vhost,
+		Number:         channelNumber,
+		PublishRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		ConfirmRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		UnroutableRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		DeliverRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		AckRate:        NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		UnackedCount:   atomic.Int64{},
+		PrefetchCount:  atomic.Int64{},
+		State:          "running", // default state, can be updated later
+		CreatedAt:      time.Now(),
+	}
+
+	actual, _ := c.channelMetrics.LoadOrStore(name, cm)
+	return actual.(*ChannelMetrics)
+}
+
+// RecordChannelPublish records a message enqueued to a channel
+func (c *Collector) RecordChannelPublish(connName string, vhost string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm.PublishCount.Add(1)
+}
+
+// RecordChannelUnroutable records an unroutable message on a channel
+func (c *Collector) RecordChannelUnroutable(connName string, vhost string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm.UnroutableCount.Add(1)
+}
+
+// RecordChannelDeliver records a message delivered from a channel
+func (c *Collector) RecordChannelDeliver(connName string, vhost string, channelNumber uint16, autoAck bool) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm.DeliverCount.Add(1)
+	if autoAck {
+		cm.AckCount.Add(1)
+	} else {
+		cm.UnackedCount.Add(1)
+	}
+
+}
+
+// RecordChannelAck records an acknowledgment on a channel
+func (c *Collector) RecordChannelAck(connName string, vhost string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm.AckCount.Add(1)
+	unacked := cm.UnackedCount.Load()
+	if unacked > 0 {
+		cm.UnackedCount.Add(-1)
+	}
+}
+
+// GetChannelMetrics retrieves metrics for a specific channel
+func (c *Collector) GetChannelMetrics(connName string, vhost string, channelNumber uint16) *ChannelMetrics {
+	channelName := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(channelName); ok {
+		return value.(*ChannelMetrics)
+	}
+	return nil
+}
+// GetChannelMetricsByName retrieves metrics for a specific channel by its composite name
+func (c *Collector) GetChannelMetricsByName(channelName string) *ChannelMetrics {
+	if value, ok := c.channelMetrics.Load(channelName); ok {
+		return value.(*ChannelMetrics)
+	}
+	return nil
+}
+// GetAllChannelMetrics returns metrics for all channels
+func (c *Collector) GetAllChannelMetrics() []*ChannelMetrics {
+	result := make([]*ChannelMetrics, 0)
+	c.channelMetrics.Range(func(key, value interface{}) bool {
+		result = append(result, value.(*ChannelMetrics))
+		return true
+	})
+	return result
+}
+
+func buildChannelName(connName string, channelNumber uint16) string {
+	channelName := fmt.Sprintf("%s(%d)", connName, channelNumber)
+	return channelName
+}
+
+// ========================================
 // Broker-Level Metrics
 // ========================================
 
@@ -382,21 +530,23 @@ func (c *Collector) RecordConnectionClose() {
 }
 
 // RecordChannelOpen records a new channel opening
-func (c *Collector) RecordChannelOpen() {
+func (c *Collector) RecordChannelOpen(connName string, vhost string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
 	c.channelCount.Add(1)
+	c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
 }
 
 // RecordChannelClose records a channel closing
-func (c *Collector) RecordChannelClose() {
+func (c *Collector) RecordChannelClose(channelName string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
 	c.channelCount.Add(-1)
+	c.channelMetrics.Delete(buildChannelName(channelName, channelNumber))
 }
 
 // GetBrokerMetrics returns current broker-level metrics
@@ -481,6 +631,13 @@ func (c *Collector) sampleBrokerMetrics() {
 		return true
 	})
 
+	// Sample each channel (for per-channel charts)
+	c.channelMetrics.Range(func(key, value interface{}) bool {
+		channelName := key.(string)
+		c.sampleChannelMetrics(channelName)
+		return true
+	})
+
 }
 
 // ========================================
@@ -498,6 +655,8 @@ type BrokerMetrics struct {
 	totalReadyRate               *RateTracker
 	totalUnackedRate             *RateTracker
 	totalRate                    *RateTracker
+
+	// Connection
 
 	messageCount               int64
 	consumerCount              int64
@@ -694,6 +853,46 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 		ConsumerCount: qm.ConsumerCount.Load(),
 		Uptime:        time.Since(qm.CreatedAt).Seconds(),
 		CreatedAt:     qm.CreatedAt,
+	}
+}
+
+type ChannelSnapshot struct {
+	ConnectionName string    `json:"connection_name"`
+	ChannelNumber  uint16    `json:"channel_number"`
+	VHostName      string    `json:"vhost_name"`
+	PublishRate    float64   `json:"publish_rate"`
+	ConfirmRate    float64   `json:"confirm_rate"`
+	UnroutableRate float64   `json:"unroutable_rate"`
+	DeliverRate    float64   `json:"deliver_rate"`
+	AckRate        float64   `json:"ack_rate"`
+	UnackedCount   int64     `json:"unacked_count"`
+	PrefetchCount  int64     `json:"prefetch_count"`
+	State          string    `json:"state"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (c *Collector) GetChannelSnapshot(connName string, vhost string, channelNumber uint16) *ChannelSnapshot {
+	if cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber); cm != nil {
+		return cm.Snapshot()
+	}
+	return nil
+}
+
+// Snapshot returns a snapshot of this channel's metrics
+func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
+	return &ChannelSnapshot{
+		ConnectionName: cm.ConnectionName,
+		ChannelNumber:  cm.Number,
+		VHostName:      cm.VHostName,
+		PublishRate:    cm.PublishRate.Rate(),
+		ConfirmRate:    cm.ConfirmRate.Rate(),
+		UnroutableRate: cm.UnroutableRate.Rate(),
+		DeliverRate:    cm.DeliverRate.Rate(),
+		AckRate:        cm.AckRate.Rate(),
+		UnackedCount:   cm.UnackedCount.Load(),
+		PrefetchCount:  cm.PrefetchCount.Load(),
+		State:          cm.State,
+		CreatedAt:      cm.CreatedAt,
 	}
 }
 

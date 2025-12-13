@@ -25,16 +25,26 @@ type MetricsCollector interface {
 	GetAllQueueMetrics() []*QueueMetrics
 	RemoveQueue(queueName string)
 
+	// Channel metrics
+	RecordChannelPublish(connName string, vhost string, channelNumber uint16)
+	RecordChannelUnroutable(connName string, vhost string, channelNumber uint16)
+	RecordChannelDeliver(connName string, vhost string, channelNumber uint16, autoAck bool)
+	RecordChannelAck(connName string, vhost string, channelNumber uint16)
+	GetChannelMetrics(connName string, vhost string, channelNumber uint16) *ChannelMetrics
+	GetChannelMetricsByName(channelName string) *ChannelMetrics
+	GetAllChannelMetrics() []*ChannelMetrics
+
 	// Broker-level metrics
 	RecordConnection()
 	RecordConnectionClose()
-	RecordChannelOpen()
-	RecordChannelClose()
+	RecordChannelOpen(connName string, vhost string, channelNumber uint16)
+	RecordChannelClose(connName string, channelNumber uint16)
 	GetBrokerMetrics() *BrokerMetrics
 
 	GetBrokerSnapshot() *BrokerSnapshot
 	GetExchangeSnapshot(exchangeName string) *ExchangeSnapshot
 	GetQueueSnapshot(queueName string) *QueueSnapshot
+	GetChannelSnapshot(connName string, vhost string, channelNumber uint16) *ChannelSnapshot
 
 	// Time series
 	GetPublishRateTimeSeries(duration time.Duration) []Sample

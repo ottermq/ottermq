@@ -614,15 +614,15 @@ func TestBrokerLevelChannelMetrics(t *testing.T) {
 	c := NewCollector(nil, ctx)
 
 	// Open channels
-	c.RecordChannelOpen()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", 1)
+	c.RecordChannelOpen("conn1", "", 2)
 
 	if c.channelCount.Load() != 2 {
 		t.Errorf("channelCount = %d, want 2", c.channelCount.Load())
 	}
 
 	// Close one
-	c.RecordChannelClose()
+	c.RecordChannelClose("conn1", 1)
 
 	if c.channelCount.Load() != 1 {
 		t.Errorf("channelCount = %d, want 1", c.channelCount.Load())
@@ -648,7 +648,7 @@ func TestBrokerSnapshot(t *testing.T) {
 	c.RecordQueueAck("q1")
 
 	c.RecordConnection()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", 1)
 
 	// Get snapshot
 	bm := c.GetBrokerMetrics()
@@ -692,7 +692,7 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 	// Get time series
 	publishSamples := c.GetPublishRateTimeSeries(5 * time.Minute)
 	deliverySamples := c.GetDeliveryAutoAckRateTimeSeries(5 * time.Minute)
-	connSamples := c.GetConnectionRateTimeSeries(5 * time.Minute)
+	connSamples := c.GetConnectionRateTimeSeries(0)
 
 	if len(publishSamples) == 0 {
 		t.Error("expected at least one publish sample")
@@ -863,7 +863,7 @@ func TestClearMetrics(t *testing.T) {
 	c.RecordExchangePublish("ex1", "direct")
 	c.RecordQueuePublish("q1")
 	c.RecordConnection()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", 1)
 
 	// Verify data exists
 	if c.GetExchangeMetrics("ex1") == nil {
