@@ -200,8 +200,9 @@ func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage
 
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
 	log.Debug().Uint16("channel", frame.Channel).Msg("New channel added")
-
-	b.collector.RecordChannelOpen()
+	connName := conn.RemoteAddr().String()
+	conInfo := b.Connections[conn]
+	b.collector.RecordChannelOpen(connName, conInfo.VHostName, frame.Channel)
 }
 
 // removeChannel removes a channel from the connection
@@ -209,7 +210,8 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.Connections[conn].Channels, channel)
-	b.collector.RecordChannelClose()
+	connName := conn.RemoteAddr().String()
+	b.collector.RecordChannelClose(connName, channel)
 }
 
 // checkChannel checks if a channel is already open

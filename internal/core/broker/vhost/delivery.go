@@ -146,6 +146,8 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 	}
 
 	vh.collector.RecordQueueDelivery(consumer.QueueName, consumer.Props.NoAck)
+	connName := consumer.ConnectionID.String()
+	vh.collector.RecordChannelDeliver(connName, vh.Name, consumer.Channel, consumer.Props.NoAck)
 
 	// Persistence
 	if consumer.Props.NoAck && vh.persist != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
