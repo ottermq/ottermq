@@ -55,18 +55,20 @@ const columns = [
   { name: 'unacked_count', label: 'Unacked', field: 'unacked_count', align: 'right' },
   { name: 'unconfirmed_count', label: 'Unconfirmed', field: 'unconfirmed_count', align: 'right' },
   { name: 'publish_rate', label: 'Publish/s', field: 'publish_rate', align: 'right' },
+  { name: 'confirm_rate', label: 'Confirm/s', field: 'confirm_rate', align: 'right' },
+  { name: 'unroutable_rate', label: 'Unroutable (drop)', field: 'unroutable_rate', align: 'right' },
   { name: 'deliver_rate', label: 'Deliver/s', field: 'deliver_rate', align: 'right' },
   { name: 'ack_rate', label: 'Ack/s', field: 'ack_rate', align: 'right' },
-  { name: 'confirm_rate', label: 'Confirm/s', field: 'confirm_rate', align: 'right' }
 ]
 
 const rows = computed(() => store.items.map(c => ({
   ...c,
   id: `${c.connection_name}-${c.number}`,
   publish_rate: formatRate(c.publish_rate),
+  confirm_rate: formatRate(c.confirm_rate),
+  unroutable_rate: formatRate(c.unroutable_rate),
   deliver_rate: formatRate(c.deliver_rate),
   ack_rate: formatRate(c.ack_rate),
-  confirm_rate: formatRate(c.confirm_rate)
 })))
 
 function formatRate(rate) {
@@ -92,26 +94,5 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 </script>
 
 <style scoped lang="scss">
-.small-square {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  
-  &--green {
-    background-color: #4caf50;
-  }
-  
-  &--yellow {
-    background-color: #ff9800;
-  }
-  
-  &--red {
-    background-color: #f44336;
-  }
-  
-  &--gray {
-    background-color: #9e9e9e;
-  }
-}
-</style>
+
+</style> 
