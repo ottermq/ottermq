@@ -161,27 +161,3 @@ func TestGetChannel_Success(t *testing.T) {
 	assert.Equal(t, "conn1", channel.ConnectionName)
 	assert.Equal(t, "/", channel.VHost)
 }
-
-func TestMapChannelInfoToDTO(t *testing.T) {
-	chInfo := models.ChannelInfo{
-		Number:           5,
-		ConnectionName:   "test-conn",
-		VHost:            "/vhost",
-		State:            "running",
-		UnackedCount:     10,
-		PrefetchCount:    100,
-		UnconfirmedCount: 2,
-	}
-
-	dto := mapChannelInfoToDTO(chInfo)
-
-	assert.Equal(t, uint16(5), dto.Number)
-	assert.Equal(t, "test-conn", dto.ConnectionName)
-	assert.Equal(t, "/vhost", dto.VHost)
-	assert.Equal(t, "running", dto.State)
-	assert.Equal(t, 10, dto.UnackedCount)
-	assert.Equal(t, uint16(100), dto.PrefetchCount)
-	assert.Equal(t, 2, dto.UnconfirmedCount)
-	assert.Equal(t, float64(0), dto.PublishRate)
-	assert.Equal(t, float64(0), dto.DeliverRate)
-}

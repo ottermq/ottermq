@@ -180,8 +180,8 @@ type ChannelDetailDTO struct {
 	// Stats
 	PublishRate    float64 `json:"publish_rate"`
 	ConfirmRate    float64 `json:"confirm_rate"`
-	DeliverRate    float64 `json:"deliver_rate"`
 	UnroutableRate float64 `json:"unroutable_rate"`
+	DeliverRate    float64 `json:"deliver_rate"`
 	AckRate        float64 `json:"ack_rate"`
 }
 
