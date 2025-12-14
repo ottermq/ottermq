@@ -231,6 +231,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 				return b.BasicReturn(conn, channel, exchange, routingKey, amqpMsg)
 			}
 			// No routing and not mandatory - silently drop the message
+			b.collector.RecordChannelUnroutable(conn.RemoteAddr().String(), vh.Name, channel)
 			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, silently dropped (not mandatory)")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			return nil, nil
@@ -241,6 +242,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		if err == nil {
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+			b.collector.RecordChannelPublish(conn.RemoteAddr().String(), vh.Name, channel)
 		}
 
 		// Check the flow state of the channel
