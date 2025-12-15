@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -43,7 +44,9 @@ func TestNewCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewCollector(tt.config)
+			// create dummy context
+			ctx := context.Background()
+			c := NewCollector(tt.config, ctx)
 
 			if c.IsEnabled() != tt.wantEnabled {
 				t.Errorf("IsEnabled() = %v, want %v", c.IsEnabled(), tt.wantEnabled)
@@ -58,11 +61,11 @@ func TestNewCollector(t *testing.T) {
 			}
 
 			// Verify rate trackers initialized
-			if c.totalPublishes == nil {
-				t.Error("totalPublishes not initialized")
+			if c.totalPublishesRate == nil {
+				t.Error("totalPublishesRate not initialized")
 			}
-			if c.totalDeliveries == nil {
-				t.Error("totalDeliveries not initialized")
+			if c.totalDeliveriesAutoAckRate == nil {
+				t.Error("totalDeliveriesAutoAckRate not initialized")
 			}
 			if c.connectionRate == nil {
 				t.Error("connectionRate not initialized")
@@ -92,7 +95,8 @@ func TestDefaultConfig(t *testing.T) {
 // ========================================
 
 func TestExchangeMetricsBasic(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Record some publishes
 	c.RecordExchangePublish("amq.direct", "direct")
@@ -128,14 +132,20 @@ func TestExchangeMetricsBasic(t *testing.T) {
 }
 
 func TestExchangeMetricsSnapshot(t *testing.T) {
-	c := NewCollector(nil)
 
-	// Record publishes over time
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
+
+	// Record publishes over time and sample them
 	c.RecordExchangePublish("test.exchange", "topic")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("test.exchange", "topic")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("test.exchange", "topic")
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 
 	em := c.GetExchangeMetrics("test.exchange")
 	if em == nil {
@@ -166,7 +176,8 @@ func TestExchangeMetricsSnapshot(t *testing.T) {
 }
 
 func TestGetAllExchangeMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Create multiple exchanges
 	c.RecordExchangePublish("exchange1", "direct")
@@ -194,7 +205,9 @@ func TestGetAllExchangeMetrics(t *testing.T) {
 }
 
 func TestRemoveExchange(t *testing.T) {
-	c := NewCollector(nil)
+
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordExchangePublish("temp.exchange", "direct")
 
@@ -217,7 +230,9 @@ func TestRemoveExchange(t *testing.T) {
 // ========================================
 
 func TestQueueMetricsBasic(t *testing.T) {
-	c := NewCollector(nil)
+
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Enqueue messages
 	c.RecordQueuePublish("queue1")
@@ -244,7 +259,8 @@ func TestQueueMetricsBasic(t *testing.T) {
 }
 
 func TestQueueDeliveryAndAck(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Enqueue 3 messages
 	c.RecordQueuePublish("testq")
@@ -260,7 +276,7 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	}
 
 	// Deliver 1 message (moves from ready to unacked)
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	time.Sleep(5 * time.Millisecond)
 
 	if qm.MessageCount.Load() != 2 {
@@ -281,9 +297,9 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	}
 
 	// Deliver and ack remaining
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	c.RecordQueueAck("testq")
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 	c.RecordQueueAck("testq")
 
 	if qm.MessageCount.Load() != 0 {
@@ -295,7 +311,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 }
 
 func TestQueueNackWithRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 2 messages
 	c.RecordQueuePublish("testq")
@@ -307,7 +324,7 @@ func TestQueueNackWithRequeue(t *testing.T) {
 	}
 
 	// Deliver 1 message (moves from ready to unacked)
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 
 	if qm.MessageCount.Load() != 1 {
 		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
@@ -329,7 +346,8 @@ func TestQueueNackWithRequeue(t *testing.T) {
 }
 
 func TestQueueNackWithoutRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 2 messages
 	c.RecordQueuePublish("testq")
@@ -338,7 +356,7 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 	qm := c.GetQueueMetrics("testq")
 
 	// Deliver 1 message
-	c.RecordQueueDelivery("testq")
+	c.RecordQueueDelivery("testq", false)
 
 	if qm.MessageCount.Load() != 1 {
 		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
@@ -359,11 +377,12 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 }
 
 func TestQueueRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Simulate consumer cancel scenario
 	c.RecordQueuePublish("testq")
-	c.RecordQueueDelivery("testq") // Message delivered to consumer
+	c.RecordQueueDelivery("testq", false) // Message delivered to consumer
 
 	qm := c.GetQueueMetrics("testq")
 
@@ -388,7 +407,8 @@ func TestQueueRequeue(t *testing.T) {
 }
 
 func TestSetQueueDepth(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("testq")
 
@@ -402,7 +422,8 @@ func TestSetQueueDepth(t *testing.T) {
 }
 
 func TestSetQueueConsumers(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("testq")
 
@@ -446,14 +467,19 @@ func TestSetQueueConsumers(t *testing.T) {
 }
 
 func TestQueueMetricsSnapshot(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
-	// Setup queue with messages
+	// Setup queue with messages and sample them
 	c.RecordQueuePublish("testq")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordQueuePublish("testq")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordQueuePublish("testq")
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 
 	c.RecordConsumerAdded("testq")
 	c.RecordConsumerAdded("testq")
@@ -483,7 +509,8 @@ func TestQueueMetricsSnapshot(t *testing.T) {
 }
 
 func TestGetAllQueueMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("q1")
 	c.RecordQueuePublish("q2")
@@ -509,7 +536,8 @@ func TestGetAllQueueMetrics(t *testing.T) {
 }
 
 func TestRemoveQueue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	c.RecordQueuePublish("tempq")
 	c.RecordQueuePublish("tempq")
@@ -547,12 +575,19 @@ func TestRemoveQueue(t *testing.T) {
 // ========================================
 
 func TestBrokerLevelPublishMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
-	// Publish to different exchanges
+	// Publish to different exchanges with delays and sample them
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex2", "fanout")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
 	// Verify broker-level count
 	if c.messageCount.Load() != 3 {
@@ -560,15 +595,15 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 	}
 
 	// Verify rate tracker recorded
-	time.Sleep(10 * time.Millisecond)
-	rate := c.totalPublishes.Rate()
+	rate := c.totalPublishesRate.Rate()
 	if rate <= 0 {
 		t.Error("totalPublishes rate should be positive")
 	}
 }
 
 func TestBrokerLevelConnectionMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Open connections
 	c.RecordConnection()
@@ -588,18 +623,19 @@ func TestBrokerLevelConnectionMetrics(t *testing.T) {
 }
 
 func TestBrokerLevelChannelMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Open channels
-	c.RecordChannelOpen()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", "", 1)
+	c.RecordChannelOpen("conn1", "", "", 2)
 
 	if c.channelCount.Load() != 2 {
 		t.Errorf("channelCount = %d, want 2", c.channelCount.Load())
 	}
 
 	// Close one
-	c.RecordChannelClose()
+	c.RecordChannelClose("conn1", 1)
 
 	if c.channelCount.Load() != 1 {
 		t.Errorf("channelCount = %d, want 1", c.channelCount.Load())
@@ -611,7 +647,8 @@ func TestBrokerLevelChannelMetrics(t *testing.T) {
 // ========================================
 
 func TestBrokerSnapshot(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup broker state
 	c.RecordExchangePublish("ex1", "direct")
@@ -619,12 +656,12 @@ func TestBrokerSnapshot(t *testing.T) {
 	c.RecordExchangePublish("ex1", "direct")
 
 	c.RecordQueuePublish("q1")
-	c.RecordQueueDelivery("q1")
+	c.RecordQueueDelivery("q1", false)
 	time.Sleep(10 * time.Millisecond)
 	c.RecordQueueAck("q1")
 
 	c.RecordConnection()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", "", 1)
 
 	// Get snapshot
 	bm := c.GetBrokerMetrics()
@@ -654,31 +691,47 @@ func TestBrokerSnapshot(t *testing.T) {
 }
 
 func TestGetTimeSeriesMethods(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
-	// Record some data
+	// Record some data with delays and sample them to populate rate trackers
 	c.RecordExchangePublish("ex1", "direct")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
-	c.RecordQueueDelivery("q1")
+	c.RecordQueueDelivery("q1", false)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+	c.RecordQueueDelivery("q1", false)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+
 	c.RecordConnection()
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+	c.RecordConnection()
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
 	// Get time series
 	publishSamples := c.GetPublishRateTimeSeries(5 * time.Minute)
-	deliverySamples := c.GetDeliveryRateTimeSeries(5 * time.Minute)
-	connSamples := c.GetConnectionRateTimeSeries(5 * time.Minute)
+	deliverySamples := c.GetDeliveryAutoAckRateTimeSeries(5 * time.Minute)
+	connSamples := c.GetConnectionRateTimeSeries(0)
 
-	if len(publishSamples) == 0 {
-		t.Error("expected at least one publish sample")
+	// Need at least 2 samples for rate calculation
+	if len(publishSamples) < 2 {
+		t.Errorf("expected at least 2 publish samples, got %d", len(publishSamples))
 	}
 
-	if len(deliverySamples) == 0 {
-		t.Error("expected at least one delivery sample")
+	if len(deliverySamples) < 2 {
+		t.Errorf("expected at least 2 delivery samples, got %d", len(deliverySamples))
 	}
 
-	if len(connSamples) == 0 {
-		t.Error("expected at least one connection sample")
+	if len(connSamples) < 2 {
+		t.Errorf("expected at least 2 connection samples, got %d", len(connSamples))
 	}
 }
 
@@ -687,7 +740,8 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 // ========================================
 
 func TestConcurrentExchangePublishes(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const goroutines = 10
 	const publishesPerGoroutine = 100
@@ -721,7 +775,8 @@ func TestConcurrentExchangePublishes(t *testing.T) {
 }
 
 func TestConcurrentQueueOperations(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const goroutines = 10
 	const opsPerGoroutine = 100
@@ -745,7 +800,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < opsPerGoroutine; j++ {
-				c.RecordQueueDelivery("testq")
+				c.RecordQueueDelivery("testq", false)
 				c.RecordQueueAck("testq")
 			}
 		}()
@@ -766,7 +821,8 @@ func TestConcurrentQueueOperations(t *testing.T) {
 }
 
 func TestConcurrentConnectionOperations(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	const connections = 100
 
@@ -814,7 +870,7 @@ func TestDisabledCollector(t *testing.T) {
 		WindowSize: 5 * time.Minute,
 		MaxSamples: 60,
 	}
-	c := NewCollector(config)
+	c := NewCollector(config, context.Background())
 
 	// All operations should be no-ops when disabled
 	c.RecordExchangePublish("ex1", "direct")
@@ -828,13 +884,14 @@ func TestDisabledCollector(t *testing.T) {
 }
 
 func TestClearMetrics(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup data
 	c.RecordExchangePublish("ex1", "direct")
 	c.RecordQueuePublish("q1")
 	c.RecordConnection()
-	c.RecordChannelOpen()
+	c.RecordChannelOpen("conn1", "", "", 1)
 
 	// Verify data exists
 	if c.GetExchangeMetrics("ex1") == nil {
@@ -867,7 +924,8 @@ func TestClearMetrics(t *testing.T) {
 }
 
 func TestEmptyQueueName(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Should handle empty queue name gracefully
 	c.RecordQueuePublish("")
@@ -887,7 +945,8 @@ func TestEmptyQueueName(t *testing.T) {
 // ========================================
 
 func TestFullMessageLifecycle_Success(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish message to exchange
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -901,7 +960,7 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 	}
 
 	// 3. Consumer receives message
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -927,7 +986,8 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish and route
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -936,7 +996,7 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// 2. Deliver to consumer
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -957,7 +1017,7 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	}
 
 	// 4. Deliver again
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	// 5. ACK this time
 	c.RecordQueueAck("my.queue")
@@ -971,7 +1031,8 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// 1. Publish to exchange and route to queue
 	c.RecordExchangePublish("my.exchange", "direct")
@@ -980,7 +1041,7 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// 2. Deliver to consumer
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -1003,7 +1064,8 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup queue with consumer
 	c.RecordQueuePublish("my.queue")
@@ -1012,7 +1074,7 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 	qm := c.GetQueueMetrics("my.queue")
 
 	// Deliver message
-	c.RecordQueueDelivery("my.queue")
+	c.RecordQueueDelivery("my.queue", false)
 
 	if qm.MessageCount.Load() != 0 {
 		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
@@ -1038,7 +1100,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish 10 messages
 	for i := 0; i < 10; i++ {
@@ -1053,7 +1116,7 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 
 	// Deliver 5 messages
 	for i := 0; i < 5; i++ {
-		c.RecordQueueDelivery("my.queue")
+		c.RecordQueueDelivery("my.queue", false)
 	}
 
 	if qm.MessageCount.Load() != 5 {
@@ -1092,7 +1155,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 }
 
 func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Publish to multiple queues
 	c.RecordExchangePublish("ex1", "direct")
@@ -1110,9 +1174,9 @@ func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
 	}
 
 	// Deliver all
-	c.RecordQueueDelivery("q1")
-	c.RecordQueueDelivery("q2")
-	c.RecordQueueDelivery("q3")
+	c.RecordQueueDelivery("q1", false)
+	c.RecordQueueDelivery("q2", false)
+	c.RecordQueueDelivery("q3", false)
 
 	// ACK all
 	c.RecordQueueAck("q1")
@@ -1146,7 +1210,8 @@ func TestFullMessageLifecycle_BrokerCounters(t *testing.T) {
 // ========================================
 
 func BenchmarkRecordExchangePublish(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1155,7 +1220,8 @@ func BenchmarkRecordExchangePublish(b *testing.B) {
 }
 
 func BenchmarkRecordQueuePublish(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1164,7 +1230,8 @@ func BenchmarkRecordQueuePublish(b *testing.B) {
 }
 
 func BenchmarkRecordConnection(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1173,7 +1240,8 @@ func BenchmarkRecordConnection(b *testing.B) {
 }
 
 func BenchmarkSnapshot(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	// Setup some data
 	c.RecordExchangePublish("ex1", "direct")
@@ -1187,7 +1255,8 @@ func BenchmarkSnapshot(b *testing.B) {
 }
 
 func BenchmarkConcurrentPublishes(b *testing.B) {
-	c := NewCollector(nil)
+	ctx := context.Background()
+	c := NewCollector(nil, ctx)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

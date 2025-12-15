@@ -32,6 +32,7 @@
         >
         <q-route-tab to="/overview" name="overview" label="Overview" />
         <q-route-tab to="/connections" name="connections" label="Connections" />
+        <q-route-tab to="/channels" name="channels" label="Channels" />
         <q-route-tab to="/exchanges" name="exchanges" label="Exchanges" />
         <q-route-tab to="/queues" name="queues" label="Queues" />
       </q-tabs>

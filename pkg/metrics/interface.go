@@ -15,7 +15,7 @@ type MetricsCollector interface {
 	// Queue metrics
 	RecordQueuePublish(queueName string)
 	RecordQueueRequeue(queueName string)
-	RecordQueueDelivery(queueName string)
+	RecordQueueDelivery(queueName string, autoAck bool)
 	RecordQueueAck(queueName string)
 	RecordQueueNack(queueName string)
 	SetQueueDepth(queueName string, depth int64)
@@ -25,25 +25,41 @@ type MetricsCollector interface {
 	GetAllQueueMetrics() []*QueueMetrics
 	RemoveQueue(queueName string)
 
+	// Channel metrics
+	RecordChannelConsumer(connName, vhost, user string, channelNumber uint16)
+	RecordChannelPublish(connName, vhost, user string, channelNumber uint16)
+	RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16)
+	RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool)
+	RecordChannelAck(connName, vhost string, channelNumber uint16)
+	RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool)
+	GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics
+	GetChannelMetricsByName(channelName string) *ChannelMetrics
+	GetAllChannelMetrics() []*ChannelMetrics
+
 	// Broker-level metrics
 	RecordConnection()
 	RecordConnectionClose()
-	RecordChannelOpen()
-	RecordChannelClose()
+	RecordChannelOpen(connName, vhost, user string, channelNumber uint16)
+	RecordChannelClose(connName string, channelNumber uint16)
 	GetBrokerMetrics() *BrokerMetrics
 
 	GetBrokerSnapshot() *BrokerSnapshot
 	GetExchangeSnapshot(exchangeName string) *ExchangeSnapshot
 	GetQueueSnapshot(queueName string) *QueueSnapshot
+	GetChannelSnapshot(connName, vhost string, channelNumber uint16) *ChannelSnapshot
 
 	// Time series
 	GetPublishRateTimeSeries(duration time.Duration) []Sample
-	GetDeliveryRateTimeSeries(duration time.Duration) []Sample
+	GetDeliveryAutoAckRateTimeSeries(duration time.Duration) []Sample
+	GetDeliveryManualAckRateTimeSeries(duration time.Duration) []Sample
+	GetAckRateTimeSeries(duration time.Duration) []Sample
 	GetConnectionRateTimeSeries(duration time.Duration) []Sample
 
 	// Utility
 	Clear()
 	IsEnabled() bool
+	// StartPeriodicSampling starts the periodic sampling of metrics at the given interval
+	StartPeriodicSampling()
 }
 
 // Ensure Collector implements MetricsCollector

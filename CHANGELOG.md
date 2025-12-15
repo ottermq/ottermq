@@ -7,7 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** Prior to establishing this CHANGELOG.md file, release notes were maintained directly in [GitHub Releases](https://github.com/ottermq/ottermq/releases). Going forward, all changes will be tracked here and synchronized with releases.
 
-## [Unreleased]
+## [v0.17.0] - 2025-12-15
+
+### Added
+
+- **Metrics Collection System**: Comprehensive observability infrastructure
+  - **Core Package** (`pkg/metrics`): Lock-free, thread-safe metrics collection
+    - `Collector`: Central aggregation with `sync.Map` for concurrent access
+    - `RateTracker`: Ring buffer-based time-series for rate calculation
+    - `MetricsCollector` interface for testability
+    - Configurable retention (default: 5min window, 60 samples, 5s intervals)
+    - Periodic sampling via background goroutine (`StartPeriodicSampling`)
+  
+  - **Exchange Metrics**: Per-exchange publish and delivery rate tracking
+    - `RecordExchangePublish`, `RecordExchangeDelivery`
+    - `GetExchangeSnapshot`, `GetAllExchangeMetrics`
+    
+  - **Queue Metrics**: Comprehensive per-queue observability ✅ **Fully Integrated**
+    - Publish rate, delivery rate, ack rate, nack rate
+    - Current depth (ready messages), unacked count, consumer count
+    - Requeue tracking for message lifecycle visibility
+    - `RecordQueuePublish`, `RecordQueueDelivery`, `RecordQueueAck`, `RecordQueueNack`, `RecordQueueRequeue`
+    - `GetQueueSnapshot`, `GetAllQueueMetrics`
+    - **Integrated throughout VHost**: delivery loop, ack handling, nack handling, requeue, recovery
+    
+  - **Broker-Level Metrics**: Global broker statistics
+    - Total publish rate, delivery rate (auto-ack + manual-ack), ack rate, nack rate
+    - Connection count, channel count, queue count, exchange count
+    - Total message count, consumer count, ready depth, unacked depth
+    - `RecordConnection`, `RecordConnectionClose`
+    - `GetBrokerSnapshot`, `GetBrokerMetrics`
+    
+  - **Channel Metrics**: Per-channel activity tracking 🆕
+    - Publish rate, deliver rate, ack rate, unroutable rate per channel
+    - Channel state tracking (running, idle, flow, closing)
+    - Unacked count and prefetch count per channel
+    - User and VHost association for multi-tenant visibility
+    - `RecordChannelPublish`, `RecordChannelDeliver`, `RecordChannelAck`, `RecordChannelUnroutable`
+    - `RecordChannelFlow`, `RecordChannelOpen`, `RecordChannelClose`
+    - `GetChannelSnapshot`, `GetChannelMetrics`, `GetAllChannelMetrics`
+    - **Integrated in broker**: basic.publish, message delivery, ack handling
+    
+  - **Configuration**:
+    - `OTTERMQ_ENABLE_METRICS` - Enable/disable metrics collection (default: true)
+    - `OTTERMQ_METRICS_WINDOW_SIZE` - Time window for rate calculation (default: 5m)
+    - `OTTERMQ_METRICS_MAX_SAMPLES` - Ring buffer size (default: 60)
+    - `OTTERMQ_METRICS_SAMPLES_INTERVAL` - Sampling frequency (default: 5s)
+    - Mock collector for testing without metrics overhead
+    
+  - **Documentation**:
+    - [`pkg/metrics/README.md`](pkg/metrics/README.md) - Complete package documentation
+    - [`docs/observability-roadmap.md`](docs/observability-roadmap.md) - Multi-phase implementation plan
+    - 30+ unit tests with 80%+ coverage
+
+### Changed
+
+- **Management API - Channel Endpoints**: Now return live metrics
+  - `GET /api/channels` - Lists channels with publish/deliver/ack rates
+  - `GET /api/channels/{vhost}` - Lists vhost channels with metrics
+  - `GET /api/connections/{name}/channels` - Lists connection channels with metrics
+  - `GET /api/connections/{name}/channels/{id}` - Returns channel details with rates
+  - `ChannelDetailDTO` enhanced with: `publish_rate`, `deliver_rate`, `ack_rate`, `unroutable_rate`, `confirm_rate`
+
+- **VHost**: Added `SetMetricsCollector()` for dependency injection
+- **Broker**: Initializes metrics collector on startup, starts periodic sampling
+
+### Fixed
+
+- **Channel Metrics Sampling**: Fixed rates showing as "0" by implementing proper periodic sampling
+  - Channel counters now sampled every 5 seconds (matching queue/exchange pattern)
+  - RateTrackers calculate rates from cumulative atomic counters
+  - Removed incorrect direct `Record(1)` calls in channel methods
+
+### Performance
+
+- **Lock-free metric recording**: All `Record*` methods use atomic operations
+- **O(1) lookups**: `sync.Map` with composite keys for channel metrics
+- **Efficient sampling**: Single background goroutine, 5s interval for all metrics
+- **Zero overhead when disabled**: Mock collector replaces real collector if `OTTERMQ_ENABLE_METRICS=false`
+- **Fixed memory footprint**: Ring buffers prevent unbounded growth
+
+## [v0.16.0] - 2025-12-04
 
 ### Added
 

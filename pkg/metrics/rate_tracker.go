@@ -81,6 +81,7 @@ func (rt *RateTracker) Rate() float64 {
 	return float64(countDelta) / elapsed
 }
 
+// GetStats returns the latest count and computed rate.
 func (rt *RateTracker) GetStats() (count int64, rate float64) {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()
@@ -103,6 +104,7 @@ func (rt *RateTracker) GetStats() (count int64, rate float64) {
 	return count, rate
 }
 
+// GetSamples returns a copy of the current samples.
 func (rt *RateTracker) GetSamples() []Sample {
 	rt.mu.RLock()
 	defer rt.mu.RUnlock()
@@ -117,4 +119,26 @@ func (rt *RateTracker) Clear() {
 	defer rt.mu.Unlock()
 
 	rt.samples = rt.samples[:0]
+}
+
+func (rt *RateTracker) GetSamplesForDuration(duration time.Duration) []Sample {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+
+	if duration <= 0 {
+		result := make([]Sample, len(rt.samples))
+		copy(result, rt.samples)
+		return result
+	}
+
+	cutoff := time.Now().Add(-duration)
+	result := []Sample{}
+
+	for _, sample := range rt.samples {
+		if sample.Timestamp.After(cutoff) {
+			result = append(result, sample)
+		}
+	}
+
+	return result
 }

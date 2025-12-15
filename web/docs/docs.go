@@ -1198,6 +1198,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/overview/charts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve time-series data for overview page charts (message stats and rates)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "overview"
+                ],
+                "summary": "Get overview charts data",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OverviewChartsDTO"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get chart data",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/queues": {
             "get": {
                 "security": [
@@ -1764,6 +1798,64 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "metrics.BrokerSnapshot": {
+            "type": "object",
+            "properties": {
+                "ack_rate": {
+                    "type": "number"
+                },
+                "channel_count": {
+                    "type": "integer"
+                },
+                "channel_rate": {
+                    "type": "number"
+                },
+                "connection_count": {
+                    "type": "integer"
+                },
+                "connection_rate": {
+                    "type": "number"
+                },
+                "consumer_count": {
+                    "type": "integer"
+                },
+                "delivery_rate": {
+                    "type": "number"
+                },
+                "exchange_count": {
+                    "type": "integer"
+                },
+                "message_count": {
+                    "description": "Current gauges",
+                    "type": "integer"
+                },
+                "nack_rate": {
+                    "type": "number"
+                },
+                "publish_rate": {
+                    "description": "Current rates (single values for display cards)",
+                    "type": "number"
+                },
+                "queue_count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_ready_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_unacked_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                }
+            }
+        },
+        "metrics.RateTracker": {
+            "type": "object"
+        },
         "models.AuthRequest": {
             "type": "object",
             "properties": {
@@ -2229,6 +2321,35 @@ const docTemplate = `{
                 }
             }
         },
+        "models.MessageRatesTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver_auto_ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver_manual_ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "publish": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                }
+            }
+        },
         "models.MessageStats": {
             "type": "object",
             "properties": {
@@ -2243,6 +2364,29 @@ const docTemplate = `{
                 },
                 "publish_details.rate": {
                     "type": "number"
+                }
+            }
+        },
+        "models.MessageStatsTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ready": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "total": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "unacked": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
                 }
             }
         },
@@ -2293,6 +2437,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.OverviewChartsDTO": {
+            "type": "object",
+            "properties": {
+                "message_rates": {
+                    "$ref": "#/definitions/models.MessageRatesTimeSeriesDTO"
+                },
+                "message_stats": {
+                    "$ref": "#/definitions/models.MessageStatsTimeSeriesDTO"
+                }
+            }
+        },
         "models.OverviewConnectionStats": {
             "type": "object",
             "properties": {
@@ -2330,6 +2485,9 @@ const docTemplate = `{
                 },
                 "message_stats": {
                     "$ref": "#/definitions/models.OverviewMessageStats"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/metrics.BrokerSnapshot"
                 },
                 "node": {
                     "$ref": "#/definitions/models.OverviewNodeDetails"
@@ -2498,9 +2656,6 @@ const docTemplate = `{
                     "description": "Consumers stats",
                     "type": "integer"
                 },
-                "consumers_active": {
-                    "type": "integer"
-                },
                 "dead_letter_exchange": {
                     "description": "DLX Configuration (extracted for convenience)",
                     "type": "string"
@@ -2517,6 +2672,10 @@ const docTemplate = `{
                 },
                 "max_length": {
                     "description": "Queue Length Limit (QLL AKA Max Length)",
+                    "type": "integer"
+                },
+                "max_priority": {
+                    "description": "Priority queue configuration",
                     "type": "integer"
                 },
                 "message_ttl": {
@@ -2594,6 +2753,17 @@ const docTemplate = `{
             "properties": {
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "models.TimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
                 }
             }
         },

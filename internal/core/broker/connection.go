@@ -80,7 +80,19 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			} else if newState.Body != nil {
 				log.Trace().Interface("body", newState.Body).Msg("Body")
 			}
-			if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
+
+			// check if connection still exists
+			b.mu.Lock()
+			connInfo, exists := b.Connections[conn]
+			b.mu.Unlock()
+
+			if !exists {
+				log.Debug().Msg("Connection already cleaned up, stopping frame processing")
+				client.Cancel()
+				return
+			}
+
+			if previousState, exists := connInfo.Channels[channelNum]; exists {
 				newState.MethodFrame = previousState.MethodFrame
 				log.Trace().Interface("method_frame", previousState.MethodFrame).Msg("Recovered method frame")
 			} else {

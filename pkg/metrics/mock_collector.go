@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -25,6 +26,7 @@ type MockCollector struct {
 	// Pre-configured data to return
 	exchangeSnapshots map[string]ExchangeSnapshot
 	queueSnapshots    map[string]QueueSnapshot
+	channelSnapshots  map[string]ChannelSnapshot
 	brokerSnapshot    *BrokerSnapshot
 
 	enabled bool
@@ -36,6 +38,7 @@ func NewMockCollector(data *MockMetricsData) *MockCollector {
 	mock := &MockCollector{
 		exchangeSnapshots: make(map[string]ExchangeSnapshot),
 		queueSnapshots:    make(map[string]QueueSnapshot),
+		channelSnapshots:  make(map[string]ChannelSnapshot),
 		brokerSnapshot: &BrokerSnapshot{
 			ConnectionCount: 0,
 			ChannelCount:    0,
@@ -116,7 +119,7 @@ func (m *MockCollector) RecordQueuePublish(queueName string) {}
 
 func (m *MockCollector) RecordQueueRequeue(queueName string) {}
 
-func (m *MockCollector) RecordQueueDelivery(queueName string) {}
+func (m *MockCollector) RecordQueueDelivery(queueName string, autoAck bool) {}
 
 func (m *MockCollector) RecordQueueAck(queueName string) {}
 
@@ -175,14 +178,88 @@ func (m *MockCollector) RemoveQueue(queueName string) {
 	delete(m.queueSnapshots, queueName)
 }
 
+// Channel metrics
+
+func (m *MockCollector) RecordChannelConsumer(connName, vhost, user string, channelNumber uint16) {}
+
+func (m *MockCollector) RecordChannelPublish(connName, vhost, user string, channelNumber uint16) {}
+
+func (m *MockCollector) RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16) {
+}
+
+func (m *MockCollector) RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool) {
+}
+
+func (m *MockCollector) RecordChannelAck(connName, vhost string, channelNumber uint16) {}
+
+func (m *MockCollector) RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool) {
+}
+
+func (m *MockCollector) GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	channelName := fmt.Sprintf("%s(%d)", connName, channelNumber)
+	snapshot, ok := m.channelSnapshots[channelName]
+	if !ok {
+		return nil
+	}
+
+	// Convert snapshot back to ChannelMetrics for compatibility
+	cm := &ChannelMetrics{
+		ConnectionName: "",
+
+		CreatedAt: snapshot.CreatedAt,
+	}
+	cm.UnackedCount.Store(snapshot.UnackedCount)
+	return cm
+}
+
+func (m *MockCollector) GetChannelMetricsByName(channelName string) *ChannelMetrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	snapshot, ok := m.channelSnapshots[channelName]
+	if !ok {
+		return nil
+	}
+
+	// Convert snapshot back to ChannelMetrics for compatibility
+	cm := &ChannelMetrics{
+		ConnectionName: snapshot.ConnectionName,
+		ChannelNumber:  snapshot.ChannelNumber,
+		VHostName:      snapshot.VHostName,
+		CreatedAt:      snapshot.CreatedAt,
+	}
+	cm.UnackedCount.Store(snapshot.UnackedCount)
+	return cm
+}
+
+func (m *MockCollector) GetAllChannelMetrics() []*ChannelMetrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make([]*ChannelMetrics, 0, len(m.channelSnapshots))
+	for _, snapshot := range m.channelSnapshots {
+		cm := &ChannelMetrics{
+			ConnectionName: snapshot.ConnectionName,
+			ChannelNumber:  snapshot.ChannelNumber,
+			VHostName:      snapshot.VHostName,
+			CreatedAt:      snapshot.CreatedAt,
+		}
+		cm.UnackedCount.Store(snapshot.UnackedCount)
+		result = append(result, cm)
+	}
+	return result
+}
+
 // Broker-level metrics - all recording methods are no-ops
 func (m *MockCollector) RecordConnection() {}
 
 func (m *MockCollector) RecordConnectionClose() {}
 
-func (m *MockCollector) RecordChannelOpen() {}
+func (m *MockCollector) RecordChannelOpen(connName, vhost, user string, channelNumber uint16) {}
 
-func (m *MockCollector) RecordChannelClose() {}
+func (m *MockCollector) RecordChannelClose(connName string, channelNumber uint16) {}
 
 func (m *MockCollector) GetBrokerMetrics() *BrokerMetrics {
 	m.mu.RLock()
@@ -228,18 +305,40 @@ func (m *MockCollector) GetQueueSnapshot(queueName string) *QueueSnapshot {
 	return &snapshot
 }
 
+func (m *MockCollector) GetChannelSnapshot(connName, vhost string, channelNumber uint16) *ChannelSnapshot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	channelName := fmt.Sprintf("%s(%d)", connName, channelNumber)
+	snapshot, ok := m.channelSnapshots[channelName]
+	if !ok {
+		return nil
+	}
+	return &snapshot
+}
+
 // Time series (mock returns empty slices)
 func (m *MockCollector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
 	return []Sample{}
 }
 
-func (m *MockCollector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
+func (m *MockCollector) GetDeliveryAutoAckRateTimeSeries(duration time.Duration) []Sample {
+	return []Sample{}
+}
+
+func (m *MockCollector) GetDeliveryManualAckRateTimeSeries(duration time.Duration) []Sample {
+	return []Sample{}
+}
+
+func (m *MockCollector) GetAckRateTimeSeries(duration time.Duration) []Sample {
 	return []Sample{}
 }
 
 func (m *MockCollector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
 	return []Sample{}
 }
+
+func (m *MockCollector) StartPeriodicSampling() {}
 
 // Utility
 func (m *MockCollector) Clear() {
@@ -270,4 +369,10 @@ func (m *MockCollector) SetBrokerMetrics(snapshot *BrokerSnapshot) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.brokerSnapshot = snapshot
+}
+
+func (m *MockCollector) SetChannelMetrics(channelName string, snapshot ChannelSnapshot) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.channelSnapshots[channelName] = snapshot
 }

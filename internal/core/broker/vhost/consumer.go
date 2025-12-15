@@ -17,6 +17,10 @@ const (
 
 type ConnectionID string
 
+func (id ConnectionID) String() string {
+	return string(id)
+}
+
 type ConsumerKey struct {
 	Channel uint16
 	Tag     string

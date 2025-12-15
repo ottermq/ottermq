@@ -67,7 +67,7 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 	}
 
 	for i := 0; i < count; i++ {
-		msg := vh.GetMessage(queue)
+		msg := vh.GetMessage(queue, noAck)
 
 		if msgCount == 0 || msg == nil {
 			return []models.MessageDTO{}, nil

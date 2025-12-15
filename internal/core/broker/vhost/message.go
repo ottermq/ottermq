@@ -189,6 +189,9 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 			log.Debug().Str("routing_key", routingKey).
 				Str("exchange", exchangeName).
 				Msg("No matching bindings for routing key")
+			if vh.collector != nil {
+				vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
+			}
 			return msg.ID, nil
 		}
 
@@ -215,6 +218,11 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 		}
 	}
 
+	// Record exchange publish before releasing lock
+	if vh.collector != nil {
+		vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
+	}
+
 	// Release lock BEFORE calling queue.Push() to avoid deadlock during QLL enforcement
 	vh.mu.Unlock()
 
@@ -222,17 +230,20 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
 	for _, queue := range targetQueues {
 		queue.Push(*msg)
-		vh.collector.RecordQueuePublish(queue.Name)
-		vh.collector.RecordExchangeDelivery(exchange.Name) // Messages delivered (routed)
+		if vh.collector != nil {
+			vh.collector.RecordQueuePublish(queue.Name)
+			vh.collector.RecordExchangeDelivery(exchange.Name) // Messages delivered (routed)
+		}
 	}
+
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
 	vh.mu.Lock()
-	vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
+
 	return msg.ID, nil
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) GetMessage(queueName string) *Message {
+func (vh *VHost) GetMessage(queueName string, autoAck bool) *Message {
 	vh.mu.Lock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
@@ -241,7 +252,9 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		return nil
 	}
 	msg := queue.Pop()
-	vh.collector.RecordQueueDelivery(queue.Name)
+	if vh.collector != nil {
+		vh.collector.RecordQueueDelivery(queue.Name, autoAck)
+	}
 	if msg == nil {
 		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")

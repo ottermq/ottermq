@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -9,70 +11,43 @@ import (
 // Collector is the central metrics aggregation point for the broker.
 // It tracks exchange, queue, and broker-level metrics using RateTrackers.
 type Collector struct {
-	// Exchange metrics (map[exchangeName]*ExchangeMetrics)
 	exchangeMetrics sync.Map
-	exchangeMu      sync.RWMutex
-
-	// Queue metrics (map[queueName]*QueueMetrics)
-	queueMetrics sync.Map
-	queueMu      sync.RWMutex
+	queueMetrics    sync.Map
+	channelMetrics  sync.Map
 
 	// Broker-wide rate metrics
-	totalPublishes  *RateTracker
-	totalDeliveries *RateTracker
-	totalAcks       *RateTracker
-	totalNacks      *RateTracker
-	connectionRate  *RateTracker
-	channelRate     *RateTracker
+	totalPublishesRate           *RateTracker
+	totalDeliveriesAutoAckRate   *RateTracker
+	totalDeliveriesManualAckRate *RateTracker
+	totalAcksRate                *RateTracker
+	totalNacksRate               *RateTracker
+	connectionRate               *RateTracker
+	channelRate                  *RateTracker
+	totalReadyRate               *RateTracker
+	totalUnackedRate             *RateTracker
+	totalRate                    *RateTracker
 
-	// Broker-wide gauges (current values)
 	messageCount    atomic.Int64
 	consumerCount   atomic.Int64
 	connectionCount atomic.Int64
 	channelCount    atomic.Int64
 	queueCount      atomic.Int64
 	exchangeCount   atomic.Int64
+	readyDepth      atomic.Int64
+	unackedDepth    atomic.Int64
+	totalNackCount  atomic.Int64
 
-	// Cumulative counters for rate calculation
-	totalAckCount  atomic.Int64
-	totalNackCount atomic.Int64
+	// RateCounters -- reset periodically
+	totalPublishCount          atomic.Int64
+	totalDeliverAutoAckCount   atomic.Int64
+	totalDeliverManualAckCount atomic.Int64
+	// TODO: add Get Count (auto & manual)
+	totalAckCount atomic.Int64
 
-	// Configuration
 	config *Config
+
+	ctx context.Context
 }
-
-type BrokerMetrics struct {
-	// Broker-wide rate metrics
-	totalPublishes  *RateTracker
-	totalDeliveries *RateTracker
-	totalAcks       *RateTracker
-	totalNacks      *RateTracker
-	connectionRate  *RateTracker
-	channelRate     *RateTracker
-
-	// Broker-wide gauges (current values)
-	messageCount    int64
-	consumerCount   int64
-	connectionCount int64
-	channelCount    int64
-	queueCount      int64
-	exchangeCount   int64
-}
-
-// Getters for BrokerMetrics (public API)
-func (bm *BrokerMetrics) TotalPublishes() *RateTracker  { return bm.totalPublishes }
-func (bm *BrokerMetrics) TotalDeliveries() *RateTracker { return bm.totalDeliveries }
-func (bm *BrokerMetrics) TotalAcks() *RateTracker       { return bm.totalAcks }
-func (bm *BrokerMetrics) TotalNacks() *RateTracker      { return bm.totalNacks }
-func (bm *BrokerMetrics) ConnectionRate() *RateTracker  { return bm.connectionRate }
-func (bm *BrokerMetrics) ChannelRate() *RateTracker     { return bm.channelRate }
-
-func (bm *BrokerMetrics) MessageCount() int64    { return bm.messageCount }
-func (bm *BrokerMetrics) ConsumerCount() int64   { return bm.consumerCount }
-func (bm *BrokerMetrics) ConnectionCount() int64 { return bm.connectionCount }
-func (bm *BrokerMetrics) ChannelCount() int64    { return bm.channelCount }
-func (bm *BrokerMetrics) QueueCount() int64      { return bm.queueCount }
-func (bm *BrokerMetrics) ExchangeCount() int64   { return bm.exchangeCount }
 
 // ExchangeMetrics tracks statistics for a single exchange
 type ExchangeMetrics struct {
@@ -89,11 +64,12 @@ type ExchangeMetrics struct {
 
 // QueueMetrics tracks statistics for a single queue
 type QueueMetrics struct {
-	Name          string
-	MessageRate   *RateTracker // Messages enqueued per second
-	DeliveryRate  *RateTracker // Messages delivered per second
-	AckRate       *RateTracker // ACKs per second
-	MessageCount  atomic.Int64 // Current queue depth
+	Name         string
+	MessageRate  *RateTracker // Messages enqueued per second
+	DeliveryRate *RateTracker // Messages delivered per second
+	AckRate      *RateTracker // ACKs per second
+	MessageCount atomic.Int64 // Current queue depth
+	// Todo: add DeliveryCount atomic.Int64 // Total messages delivered
 	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	ConsumerCount atomic.Int64 // Current consumer count
 	AckCount      atomic.Int64 // Cumulative ACK count (for rate calculation)
@@ -102,36 +78,71 @@ type QueueMetrics struct {
 	mu sync.RWMutex
 }
 
+type ChannelMetrics struct {
+	ConnectionName string
+	VHostName      string
+	ChannelNumber  uint16
+	User           string
+	State          string // e.g., "running", "flow", "closing"
+
+	PublishRate    *RateTracker
+	ConfirmRate    *RateTracker
+	UnroutableRate *RateTracker
+	DeliverRate    *RateTracker
+	AckRate        *RateTracker
+
+	// Atomic counters for periodic sampling
+	PublishCount    atomic.Int64 // Cumulative publish count
+	ConfirmCount    atomic.Int64 // Cumulative confirm count
+	UnroutableCount atomic.Int64 // Cumulative unroutable count
+	DeliverCount    atomic.Int64 // Cumulative deliver count
+	AckCount        atomic.Int64 // Cumulative ack count
+
+	UnackedCount  atomic.Int64 // Current unacknowledged messages
+	PrefetchCount atomic.Int64 // Current prefetch count
+	CreatedAt     time.Time
+}
+
 // Config holds configuration for metrics collection
 type Config struct {
-	Enabled    bool          // Enable/disable metrics collection
-	WindowSize time.Duration // Time window for rate calculations (e.g., 5 minutes)
-	MaxSamples int           // Maximum samples to keep in ring buffer (e.g., 60)
+	Enabled         bool          // Enable/disable metrics collection
+	WindowSize      time.Duration // Time window for rate calculations (e.g., 5 minutes)
+	MaxSamples      int           // Maximum samples to keep in ring buffer (e.g., 60)
+	SamplesInterval uint8         // Interval between samples (e.g., 5 seconds)
 }
 
 // DefaultConfig returns sensible defaults for metrics collection
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:    true,
-		WindowSize: 5 * time.Minute,
-		MaxSamples: 60, // One sample per 5 seconds for 5 minutes
+		Enabled:         true,
+		WindowSize:      5 * time.Minute,
+		MaxSamples:      60, // One sample per 5 seconds for 5 minutes
+		SamplesInterval: 5,
 	}
 }
 
 // NewCollector creates a new metrics collector with the given configuration
-func NewCollector(config *Config) *Collector {
+func NewCollector(config *Config, ctx context.Context) *Collector {
 	if config == nil {
 		config = DefaultConfig()
 	}
 
 	return &Collector{
-		totalPublishes:  NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalDeliveries: NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalAcks:       NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalNacks:      NewRateTracker(config.WindowSize, config.MaxSamples),
-		connectionRate:  NewRateTracker(config.WindowSize, config.MaxSamples),
-		channelRate:     NewRateTracker(config.WindowSize, config.MaxSamples),
-		config:          config,
+		totalPublishesRate:           NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalDeliveriesAutoAckRate:   NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalDeliveriesManualAckRate: NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalAcksRate:                NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalNacksRate:               NewRateTracker(config.WindowSize, config.MaxSamples),
+		connectionRate:               NewRateTracker(config.WindowSize, config.MaxSamples),
+		channelRate:                  NewRateTracker(config.WindowSize, config.MaxSamples),
+
+		totalReadyRate:   NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalUnackedRate: NewRateTracker(config.WindowSize, config.MaxSamples),
+		totalRate:        NewRateTracker(config.WindowSize, config.MaxSamples),
+
+		config: config,
+
+		ctx: ctx,
 	}
 }
 
@@ -145,30 +156,20 @@ func (c *Collector) RecordExchangePublish(exchangeName, exchangeType string) {
 		return
 	}
 
-	// Get or create exchange metrics
 	em := c.getOrCreateExchangeMetrics(exchangeName, exchangeType)
-
-	// Record publish
-	count := em.PublishCount.Add(1)
-	em.PublishRate.Record(count)
-
-	// Also record at broker level
-	brokerCount := c.messageCount.Add(1)
-	c.totalPublishes.Record(brokerCount)
+	em.PublishCount.Add(1)
+	c.messageCount.Add(1)
+	c.totalPublishCount.Add(1)
 }
 
-// RecordExchangeDelivery records a message delivered (routed) from an exchange
+// RecordExchangeDelivery records a message routed from an exchange
 func (c *Collector) RecordExchangeDelivery(exchangeName string) {
 	if !c.config.Enabled {
 		return
 	}
 
 	em := c.getOrCreateExchangeMetrics(exchangeName, "")
-
-	// Record delivery rate
-	count := em.DeliveryCount.Add(1)
-	em.DeliveryRate.Record(count)
-	// the broker level is recorded in queue delivery
+	em.DeliveryCount.Add(1)
 }
 
 // GetExchangeMetrics retrieves metrics for a specific exchange
@@ -191,12 +192,10 @@ func (c *Collector) GetAllExchangeMetrics() []*ExchangeMetrics {
 
 // getOrCreateExchangeMetrics gets existing or creates new exchange metrics
 func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *ExchangeMetrics {
-	// Try to load existing
 	if value, ok := c.exchangeMetrics.Load(name); ok {
 		return value.(*ExchangeMetrics)
 	}
 
-	// Create new
 	em := &ExchangeMetrics{
 		Name:         name,
 		Type:         exchangeType,
@@ -205,7 +204,6 @@ func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *Excha
 		CreatedAt:    time.Now(),
 	}
 
-	// Store and return (LoadOrStore handles race)
 	actual, _ := c.exchangeMetrics.LoadOrStore(name, em)
 	return actual.(*ExchangeMetrics)
 }
@@ -216,22 +214,32 @@ func (c *Collector) RemoveExchange(exchangeName string) {
 	c.exchangeCount.Add(-1)
 }
 
+// sampleExchangeMetrics records periodic samples for an exchange
+func (c *Collector) sampleExchangeMetrics(exchangeName string) {
+	em := c.GetExchangeMetrics(exchangeName)
+	if em == nil {
+		return
+	}
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	em.PublishRate.Record(em.PublishCount.Load())
+	em.DeliveryRate.Record(em.DeliveryCount.Load())
+}
+
 // ========================================
 // Queue Metrics
 // ========================================
 
 // RecordQueuePublish records a message enqueued to a queue
-// Also shall be called when messages are requeued (NACK->requeue)
+// Called on EVERY enqueue
 func (c *Collector) RecordQueuePublish(queueName string) {
 	if !c.config.Enabled {
 		return
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-
-	// Record message rate and update count
-	count := qm.MessageCount.Add(1)
-	qm.MessageRate.Record(count)
+	qm.MessageCount.Add(1)
+	c.readyDepth.Add(1)
 }
 
 // RecordQueueRequeue records a message requeued to a queue
@@ -241,25 +249,25 @@ func (c *Collector) RecordQueueRequeue(queueName string) {
 }
 
 // RecordQueueDelivery records a message delivered from a queue
-func (c *Collector) RecordQueueDelivery(queueName string) {
+func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	if !c.config.Enabled {
 		return
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-
-	// Record delivery rate
-	qm.DeliveryRate.Record(qm.MessageCount.Load())
-
-	// Decrease message count
 	qm.MessageCount.Add(-1)
+	c.readyDepth.Add(-1)
 
-	// Increase unacked count
-	qm.UnackedCount.Add(1)
-
-	// Record at broker level
-	brokerCount := c.messageCount.Load()
-	c.totalDeliveries.Record(brokerCount)
+	if autoAck {
+		qm.AckCount.Add(1)
+		c.messageCount.Add(-1)
+		c.totalAckCount.Add(1)
+		c.totalDeliverAutoAckCount.Add(1)
+	} else {
+		qm.UnackedCount.Add(1)
+		c.unackedDepth.Add(1)
+		c.totalDeliverManualAckCount.Add(1)
+	}
 }
 
 // RecordQueueAck records a message acknowledgment
@@ -269,17 +277,12 @@ func (c *Collector) RecordQueueAck(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	// Decrease unacked count
 	qm.UnackedCount.Add(-1)
-
-	// Increment cumulative ACK count for rate tracking
-	ackCount := qm.AckCount.Add(1)
-	qm.AckRate.Record(ackCount)
-
-	// Record at broker level (also cumulative)
+	qm.AckCount.Add(1)
 	c.messageCount.Add(-1)
-	brokerAckCount := c.totalAckCount.Add(1)
-	c.totalAcks.Record(brokerAckCount)
+	c.totalAckCount.Add(1)
+	c.unackedDepth.Add(-1)
+
 }
 
 // RecordQueueNack records a message negative acknowledgment
@@ -289,12 +292,8 @@ func (c *Collector) RecordQueueNack(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	// Decrease unacked count
 	qm.UnackedCount.Add(-1)
-
-	// Record at broker level
-	brokerNackCount := c.totalNackCount.Add(1)
-	c.totalNacks.Record(brokerNackCount)
+	c.totalNackCount.Add(1)
 }
 
 // SetQueueDepth explicitly sets the queue depth (for periodic updates)
@@ -349,12 +348,10 @@ func (c *Collector) GetAllQueueMetrics() []*QueueMetrics {
 
 // getOrCreateQueueMetrics gets existing or creates new queue metrics
 func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
-	// Try to load existing
 	if value, ok := c.queueMetrics.Load(name); ok {
 		return value.(*QueueMetrics)
 	}
 
-	// Create new
 	qm := &QueueMetrics{
 		Name:         name,
 		MessageRate:  NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
@@ -363,7 +360,6 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 		CreatedAt:    time.Now(),
 	}
 
-	// Store and return (LoadOrStore handles race)
 	actual, _ := c.queueMetrics.LoadOrStore(name, qm)
 	return actual.(*QueueMetrics)
 }
@@ -371,12 +367,201 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 // RemoveQueue removes metrics tracking for a queue
 func (c *Collector) RemoveQueue(queueName string) {
 	if qm := c.GetQueueMetrics(queueName); qm != nil {
-		// Update broker-level counts
 		c.messageCount.Add(-qm.MessageCount.Load())
 		c.consumerCount.Add(-qm.ConsumerCount.Load())
 	}
 	c.queueMetrics.Delete(queueName)
 	c.queueCount.Add(-1)
+}
+
+func (c *Collector) sampleQueueMetrics(queueName string) {
+	qm := c.GetQueueMetrics(queueName)
+	if qm == nil {
+		return
+	}
+	qm.mu.RLock()
+	defer qm.mu.RUnlock()
+	qm.MessageRate.Record(qm.MessageCount.Load())
+	qm.DeliveryRate.Record(qm.MessageCount.Load()) // TODO: change to DeliveryCount when implemented
+	qm.AckRate.Record(qm.AckCount.Load())
+}
+
+// ========================================
+// Channel Metrics
+// ========================================
+
+// sampleChannelMetrics records periodic samples for a channel
+func (c *Collector) sampleChannelMetrics(channelName string) {
+	cm := c.GetChannelMetricsByName(channelName)
+	if cm == nil {
+		return
+	}
+	cm.PublishRate.Record(cm.PublishCount.Load())
+	cm.ConfirmRate.Record(cm.ConfirmCount.Load())
+	cm.UnroutableRate.Record(cm.UnroutableCount.Load())
+	cm.DeliverRate.Record(cm.DeliverCount.Load())
+	cm.AckRate.Record(cm.AckCount.Load())
+
+	if cm.State != "flow" {
+		if cm.PublishRate.Rate() > 0 || cm.DeliverRate.Rate() > 0 {
+			cm.State = "running"
+		} else {
+			cm.State = "idle"
+		}
+	}
+	// TODO: handle "flow" and "closing" states based on channel state in broker
+}
+
+// getOrCreateChannelMetrics gets existing or creates new channel metrics
+func (c *Collector) getOrCreateChannelMetrics(connName, vhost, user string, channelNumber uint16) *ChannelMetrics {
+	name := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(name); ok {
+		return value.(*ChannelMetrics)
+	}
+
+	cm := &ChannelMetrics{
+		ConnectionName: connName,
+		VHostName:      vhost,
+		User:           user,
+		ChannelNumber:  channelNumber,
+		PublishRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		ConfirmRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		UnroutableRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		DeliverRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		AckRate:        NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		UnackedCount:   atomic.Int64{},
+		PrefetchCount:  atomic.Int64{},
+		State:          "idle", // default state, can be updated later
+		CreatedAt:      time.Now(),
+	}
+
+	actual, _ := c.channelMetrics.LoadOrStore(name, cm)
+	return actual.(*ChannelMetrics)
+}
+
+func (c *Collector) getChannelMetrics(connName, vhost string, channelNumber uint16) (*ChannelMetrics, bool) {
+	name := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(name); ok {
+		return value.(*ChannelMetrics), true
+	}
+
+	return nil, false
+}
+
+// RecordChannelConsumer records a new consumer registration on a channel
+func (c *Collector) RecordChannelConsumer(connName, vhost, user string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
+	// Potentially track consumer count per channel if needed
+}
+
+// RecordChannelPublish records a message enqueued to a channel
+func (c *Collector) RecordChannelPublish(connName, vhost, user string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
+	cm.PublishCount.Add(1)
+}
+
+// RecordChannelUnroutable records an unroutable message on a channel
+func (c *Collector) RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
+	cm.UnroutableCount.Add(1)
+}
+
+// RecordChannelDeliver records a message delivered from a channel
+func (c *Collector) RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool) {
+	if !c.config.Enabled {
+		return
+	}
+
+	// The user is empty because, at this point, the channel was already created
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
+	cm.DeliverCount.Add(1)
+	if autoAck {
+		cm.AckCount.Add(1)
+	} else {
+		cm.UnackedCount.Add(1)
+	}
+
+}
+
+// RecordChannelAck records an acknowledgment on a channel
+func (c *Collector) RecordChannelAck(connName, vhost string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
+	cm.AckCount.Add(1)
+	unacked := cm.UnackedCount.Load()
+	if unacked > 0 {
+		cm.UnackedCount.Add(-1)
+	}
+}
+
+func (c *Collector) RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
+	if flowActive {
+		cm.State = "flow"
+	} else {
+		cm.State = "idle"
+	}
+	// Potentially track flow state per channel if needed
+}
+
+// GetChannelMetrics retrieves metrics for a specific channel
+func (c *Collector) GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
+	channelName := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(channelName); ok {
+		return value.(*ChannelMetrics)
+	}
+	return nil
+}
+
+// GetChannelMetricsByName retrieves metrics for a specific channel by its composite name
+func (c *Collector) GetChannelMetricsByName(channelName string) *ChannelMetrics {
+	if value, ok := c.channelMetrics.Load(channelName); ok {
+		return value.(*ChannelMetrics)
+	}
+	return nil
+}
+
+// GetAllChannelMetrics returns metrics for all channels
+func (c *Collector) GetAllChannelMetrics() []*ChannelMetrics {
+	result := make([]*ChannelMetrics, 0)
+	c.channelMetrics.Range(func(key, value interface{}) bool {
+		result = append(result, value.(*ChannelMetrics))
+		return true
+	})
+	return result
+}
+
+func buildChannelName(connName string, channelNumber uint16) string {
+	channelName := fmt.Sprintf("%s(%d)", connName, channelNumber)
+	return channelName
 }
 
 // ========================================
@@ -389,8 +574,7 @@ func (c *Collector) RecordConnection() {
 		return
 	}
 
-	count := c.connectionCount.Add(1)
-	c.connectionRate.Record(count)
+	c.connectionCount.Add(1)
 }
 
 // RecordConnectionClose records a connection closing
@@ -403,51 +587,169 @@ func (c *Collector) RecordConnectionClose() {
 }
 
 // RecordChannelOpen records a new channel opening
-func (c *Collector) RecordChannelOpen() {
+func (c *Collector) RecordChannelOpen(connName, vhost, user string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
-	count := c.channelCount.Add(1)
-	c.channelRate.Record(count)
+	c.channelCount.Add(1)
+	c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
 }
 
 // RecordChannelClose records a channel closing
-func (c *Collector) RecordChannelClose() {
+func (c *Collector) RecordChannelClose(channelName string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
 	c.channelCount.Add(-1)
+	c.channelMetrics.Delete(buildChannelName(channelName, channelNumber))
 }
 
 // GetBrokerMetrics returns current broker-level metrics
 func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
 	return &BrokerMetrics{
-		totalPublishes:  c.totalPublishes,
-		totalDeliveries: c.totalDeliveries,
-		totalAcks:       c.totalAcks,
-		totalNacks:      c.totalNacks,
-		connectionRate:  c.connectionRate,
-		channelRate:     c.channelRate,
-		messageCount:    c.messageCount.Load(),
-		consumerCount:   c.consumerCount.Load(),
-		connectionCount: c.connectionCount.Load(),
-		channelCount:    c.channelCount.Load(),
-		queueCount:      c.queueCount.Load(),
-		exchangeCount:   c.exchangeCount.Load(),
+		totalPublishesRate:           c.totalPublishesRate,
+		totalDeliveriesAutoAckRate:   c.totalDeliveriesAutoAckRate,
+		totalDeliveriesManualAckRate: c.totalDeliveriesManualAckRate,
+		totalAcksRate:                c.totalAcksRate,
+		totalNacksRate:               c.totalNacksRate,
+		connectionRate:               c.connectionRate,
+		channelRate:                  c.channelRate,
+		totalReadyRate:               c.totalReadyRate,
+		totalUnackedRate:             c.totalUnackedRate,
+		totalRate:                    c.totalRate,
+		messageCount:                 c.messageCount.Load(),
+		consumerCount:                c.consumerCount.Load(),
+		connectionCount:              c.connectionCount.Load(),
+		channelCount:                 c.channelCount.Load(),
+		queueCount:                   c.queueCount.Load(),
+		exchangeCount:                c.exchangeCount.Load(),
+		readyDepth:                   c.readyDepth.Load(),
+		unackedDepth:                 c.unackedDepth.Load(),
+		totalDeliverAutoAckCount:     c.totalDeliverAutoAckCount.Load(),
+		totalDeliverManualAckCount:   c.totalDeliverManualAckCount.Load(),
 	}
 }
 
+// StartPeriodicSampling starts a background ticker that samples metrics
+// This should be called ONCE when the broker starts
+// Recommended interval: 5 seconds (gives 60 samples over 5 minutes)
+func (c *Collector) StartPeriodicSampling() {
+	interval := time.Duration(c.config.SamplesInterval) * time.Second
+	if !c.config.Enabled {
+		return
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		for range ticker.C {
+			select {
+			case <-c.ctx.Done():
+				ticker.Stop()
+				return
+			default:
+				c.sampleBrokerMetrics()
+			}
+		}
+	}()
+}
+
+// sampleBrokerMetrics samples all current counters and records to time-series
+func (c *Collector) sampleBrokerMetrics() {
+	// Sample broker-wide depths (cumulative)
+	ready := c.readyDepth.Load()
+	unacked := c.unackedDepth.Load()
+	c.totalReadyRate.Record(ready)
+	c.totalUnackedRate.Record(unacked)
+	c.totalRate.Record(ready + unacked)
+
+	// Sample broker-wide counters (reset after sampling)
+	c.totalPublishesRate.Record(c.totalPublishCount.Load())
+	c.totalDeliveriesAutoAckRate.Record(c.totalDeliverAutoAckCount.Load())
+	c.totalDeliveriesManualAckRate.Record(c.totalDeliverManualAckCount.Load())
+	c.totalAcksRate.Record(c.totalAckCount.Load())
+	c.totalNacksRate.Record(c.totalNackCount.Load())
+
+	c.connectionRate.Record(c.connectionCount.Load())
+	c.channelRate.Record(c.channelCount.Load())
+
+	// Sample each queue (for per-queue charts)
+	c.queueMetrics.Range(func(key, value interface{}) bool {
+		queueName := key.(string)
+		c.sampleQueueMetrics(queueName)
+		return true
+	})
+
+	// Sample each exchange (for per-exchange charts)
+	c.exchangeMetrics.Range(func(key, value interface{}) bool {
+		exchangeName := key.(string)
+		c.sampleExchangeMetrics(exchangeName)
+		return true
+	})
+
+	// Sample each channel (for per-channel charts)
+	c.channelMetrics.Range(func(key, value interface{}) bool {
+		channelName := key.(string)
+		c.sampleChannelMetrics(channelName)
+		return true
+	})
+
+}
+
 // ========================================
-// Snapshot for API Responses
+// SNAPSHOTS & TIME-SERIES ACCESS
 // ========================================
 
-// BrokerSnapshot represents a point-in-time view of all broker metrics
+type BrokerMetrics struct {
+	totalPublishesRate           *RateTracker
+	totalDeliveriesAutoAckRate   *RateTracker
+	totalDeliveriesManualAckRate *RateTracker
+	totalAcksRate                *RateTracker
+	totalNacksRate               *RateTracker
+	connectionRate               *RateTracker
+	channelRate                  *RateTracker
+	totalReadyRate               *RateTracker
+	totalUnackedRate             *RateTracker
+	totalRate                    *RateTracker
+
+	// Connection
+
+	messageCount               int64
+	consumerCount              int64
+	connectionCount            int64
+	channelCount               int64
+	queueCount                 int64
+	exchangeCount              int64
+	readyDepth                 int64
+	unackedDepth               int64
+	totalDeliverAutoAckCount   int64
+	totalDeliverManualAckCount int64
+}
+
+// Getters for BrokerMetrics
+func (bm *BrokerMetrics) TotalPublishes() *RateTracker    { return bm.totalPublishesRate }
+func (bm *BrokerMetrics) TotalDeliveries() *RateTracker   { return bm.totalDeliveriesAutoAckRate }
+func (bm *BrokerMetrics) TotalAcks() *RateTracker         { return bm.totalAcksRate }
+func (bm *BrokerMetrics) TotalNacks() *RateTracker        { return bm.totalNacksRate }
+func (bm *BrokerMetrics) ConnectionRate() *RateTracker    { return bm.connectionRate }
+func (bm *BrokerMetrics) ChannelRate() *RateTracker       { return bm.channelRate }
+func (bm *BrokerMetrics) TotalReadyDepth() *RateTracker   { return bm.totalReadyRate }
+func (bm *BrokerMetrics) TotalUnackedDepth() *RateTracker { return bm.totalUnackedRate }
+func (bm *BrokerMetrics) TotalDepth() *RateTracker        { return bm.totalRate }
+
+func (bm *BrokerMetrics) MessageCount() int64    { return bm.messageCount }
+func (bm *BrokerMetrics) ConsumerCount() int64   { return bm.consumerCount }
+func (bm *BrokerMetrics) ConnectionCount() int64 { return bm.connectionCount }
+func (bm *BrokerMetrics) ChannelCount() int64    { return bm.channelCount }
+func (bm *BrokerMetrics) QueueCount() int64      { return bm.queueCount }
+func (bm *BrokerMetrics) ExchangeCount() int64   { return bm.exchangeCount }
+
+// BrokerSnapshot represents current broker state (for Overview page)
 type BrokerSnapshot struct {
 	Timestamp time.Time `json:"timestamp"`
 
-	// Broker-wide rates (current)
+	// Current rates (single values for display cards)
 	PublishRate    float64 `json:"publish_rate"`
 	DeliveryRate   float64 `json:"delivery_rate"`
 	AckRate        float64 `json:"ack_rate"`
@@ -455,7 +757,14 @@ type BrokerSnapshot struct {
 	ConnectionRate float64 `json:"connection_rate"`
 	ChannelRate    float64 `json:"channel_rate"`
 
-	// Broker-wide gauges
+	// RateTrackers (for accessing time-series samples)
+	// NOTE: These are pointers, not copies (useful for charts endpoint)
+
+	TotalReadyDepth   *RateTracker `json:"total_ready_depth"`
+	TotalUnackedDepth *RateTracker `json:"total_unacked_depth"`
+	TotalDepth        *RateTracker `json:"total_depth"`
+
+	// Current gauges
 	MessageCount    int64 `json:"message_count"`
 	ConsumerCount   int64 `json:"consumer_count"`
 	ConnectionCount int64 `json:"connection_count"`
@@ -464,34 +773,68 @@ type BrokerSnapshot struct {
 	ExchangeCount   int64 `json:"exchange_count"`
 }
 
-// GetBrokerSnapshot returns a snapshot of the current broker metrics
-// For convenience, this method provides a direct way to get a snapshot without manually calling GetBrokerMetrics and then Snapshot.
-// It is to make easier to mock the Collector in tests.
+// GetBrokerSnapshot returns a snapshot of current broker metrics
 func (c *Collector) GetBrokerSnapshot() *BrokerSnapshot {
 	return c.GetBrokerMetrics().Snapshot()
 }
 
-// Snapshot returns a point-in-time snapshot of all broker metrics
+// Snapshot creates a BrokerSnapshot from the current BrokerMetrics
 func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 	return &BrokerSnapshot{
-		Timestamp: time.Now(),
-
-		// Rates
-		PublishRate:    bm.totalPublishes.Rate(),
-		DeliveryRate:   bm.totalDeliveries.Rate(),
-		AckRate:        bm.totalAcks.Rate(),
-		NackRate:       bm.totalNacks.Rate(),
-		ConnectionRate: bm.connectionRate.Rate(),
-		ChannelRate:    bm.channelRate.Rate(),
-
-		// Gauges
-		MessageCount:    bm.messageCount,
-		ConsumerCount:   bm.consumerCount,
-		ConnectionCount: bm.connectionCount,
-		ChannelCount:    bm.channelCount,
-		QueueCount:      bm.queueCount,
-		ExchangeCount:   bm.exchangeCount,
+		Timestamp:         time.Now(),
+		PublishRate:       bm.totalPublishesRate.Rate(),
+		DeliveryRate:      bm.totalDeliveriesAutoAckRate.Rate(),
+		AckRate:           bm.totalAcksRate.Rate(),
+		NackRate:          bm.totalNacksRate.Rate(),
+		ConnectionRate:    bm.connectionRate.Rate(),
+		ChannelRate:       bm.channelRate.Rate(),
+		TotalReadyDepth:   bm.totalReadyRate,
+		TotalUnackedDepth: bm.totalUnackedRate,
+		TotalDepth:        bm.totalRate,
+		MessageCount:      bm.messageCount,
+		ConsumerCount:     bm.consumerCount,
+		ConnectionCount:   bm.connectionCount,
+		ChannelCount:      bm.channelCount,
+		QueueCount:        bm.queueCount,
+		ExchangeCount:     bm.exchangeCount,
 	}
+}
+
+// GetTimeSeries returns historical samples for a specific metric
+func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalPublishesRate.GetSamplesForDuration(duration)
+}
+
+func (c *Collector) GetDeliveryAutoAckRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalDeliveriesAutoAckRate.GetSamplesForDuration(duration)
+}
+
+func (c *Collector) GetDeliveryManualAckRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalDeliveriesManualAckRate.GetSamplesForDuration(duration)
+}
+
+func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
+	return c.totalAcksRate.GetSamplesForDuration(duration)
+}
+
+func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
+	return c.connectionRate.GetSamplesForDuration(duration)
+}
+
+func (c *Collector) GetPublishRate() float64 {
+	return c.totalPublishesRate.Rate()
+}
+
+func (c *Collector) GetDeliveryRate() float64 {
+	return c.totalDeliveriesAutoAckRate.Rate()
+}
+
+func (c *Collector) GetDeliveryManualAckRate() float64 {
+	return c.totalDeliveriesManualAckRate.Rate()
+}
+
+func (c *Collector) GetTotalAcksRate() float64 {
+	return c.totalAcksRate.Rate()
 }
 
 // ExchangeSnapshot returns a snapshot of exchange metrics
@@ -570,17 +913,46 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 	}
 }
 
-// GetTimeSeries returns historical samples for a specific metric
-func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalPublishes.GetSamples()
+type ChannelSnapshot struct {
+	ConnectionName string    `json:"connection_name"`
+	ChannelNumber  uint16    `json:"channel_number"`
+	VHostName      string    `json:"vhost_name"`
+	User           string    `json:"user"`
+	State          string    `json:"state"`
+	PublishRate    float64   `json:"publish_rate"`
+	ConfirmRate    float64   `json:"confirm_rate"`
+	UnroutableRate float64   `json:"unroutable_rate"`
+	DeliverRate    float64   `json:"deliver_rate"`
+	AckRate        float64   `json:"ack_rate"`
+	UnackedCount   int64     `json:"unacked_count"`
+	PrefetchCount  int64     `json:"prefetch_count"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
-func (c *Collector) GetDeliveryRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalDeliveries.GetSamples()
+func (c *Collector) GetChannelSnapshot(connName, vhost string, channelNumber uint16) *ChannelSnapshot {
+	if cm, ok := c.getChannelMetrics(connName, vhost, channelNumber); ok {
+		return cm.Snapshot()
+	}
+	return nil
 }
 
-func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
-	return c.connectionRate.GetSamples()
+// Snapshot returns a snapshot of this channel's metrics
+func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
+	return &ChannelSnapshot{
+		ConnectionName: cm.ConnectionName,
+		ChannelNumber:  cm.ChannelNumber,
+		VHostName:      cm.VHostName,
+		User:           cm.User,
+		State:          cm.State,
+		PublishRate:    cm.PublishRate.Rate(),
+		ConfirmRate:    cm.ConfirmRate.Rate(),
+		UnroutableRate: cm.UnroutableRate.Rate(),
+		DeliverRate:    cm.DeliverRate.Rate(),
+		AckRate:        cm.AckRate.Rate(),
+		UnackedCount:   cm.UnackedCount.Load(),
+		PrefetchCount:  cm.PrefetchCount.Load(),
+		CreatedAt:      cm.CreatedAt,
+	}
 }
 
 // ========================================
@@ -591,12 +963,16 @@ func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample
 func (c *Collector) Clear() {
 	c.exchangeMetrics = sync.Map{}
 	c.queueMetrics = sync.Map{}
-	c.totalPublishes.Clear()
-	c.totalDeliveries.Clear()
-	c.totalAcks.Clear()
-	c.totalNacks.Clear()
+	c.totalPublishesRate.Clear()
+	c.totalDeliveriesAutoAckRate.Clear()
+	c.totalDeliveriesManualAckRate.Clear()
+	c.totalAcksRate.Clear()
+	c.totalNacksRate.Clear()
 	c.connectionRate.Clear()
 	c.channelRate.Clear()
+	c.totalReadyRate.Clear()
+	c.totalUnackedRate.Clear()
+	c.totalRate.Clear()
 
 	c.messageCount.Store(0)
 	c.consumerCount.Store(0)

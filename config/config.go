@@ -49,9 +49,10 @@ type Config struct {
 
 	// Metrics
 
-	EnableMetrics bool          // Enable or disable metrics collection
-	WindowSize    time.Duration // Time window for rate calculations
-	MaxSamples    int           // Maximum number of samples to retain
+	EnableMetrics   bool          // Enable or disable metrics collection
+	WindowSize      time.Duration // Time window for rate calculations
+	MaxSamples      int           // Maximum number of samples to retain
+	SamplesInterval uint8         // Interval between samples (in seconds) default 5s
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -91,9 +92,10 @@ func LoadConfig(version string) *Config {
 
 		LogLevel: getEnv("LOG_LEVEL", "info"),
 
-		EnableMetrics: getEnvAsBool("OTTERMQ_ENABLE_METRICS", true),
-		WindowSize:    getEnvAsDuration("OTTERMQ_METRICS_WINDOW_SIZE", 5*time.Minute),
-		MaxSamples:    getEnvAsInt("OTTERMQ_METRICS_MAX_SAMPLES", 60),
+		EnableMetrics:   getEnvAsBool("OTTERMQ_ENABLE_METRICS", true),
+		WindowSize:      getEnvAsDuration("OTTERMQ_METRICS_WINDOW_SIZE", 5*time.Minute),
+		MaxSamples:      getEnvAsInt("OTTERMQ_METRICS_MAX_SAMPLES", 60),
+		SamplesInterval: getEnvAsUint8("OTTERMQ_METRICS_SAMPLES_INTERVAL", 5), // seconds
 	}
 }
 

@@ -7,6 +7,33 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/metrics"
 )
 
+// TimeSeriesDTO represents time-series data for charting
+type TimeSeriesDTO struct {
+	Timestamp time.Time `json:"timestamp"`
+	Value     float64   `json:"value"`
+}
+
+// MessageStatsTimeSeriesDTO contains historical message statistics for charting
+type MessageStatsTimeSeriesDTO struct {
+	Ready   []TimeSeriesDTO `json:"ready"`
+	Unacked []TimeSeriesDTO `json:"unacked"`
+	Total   []TimeSeriesDTO `json:"total"`
+}
+
+// MessageRatesTimeSeriesDTO contains historical message rate data for charting
+type MessageRatesTimeSeriesDTO struct {
+	Publish          []TimeSeriesDTO `json:"publish"`
+	DeliverAutoAck   []TimeSeriesDTO `json:"deliver_auto_ack"`
+	DeliverManualAck []TimeSeriesDTO `json:"deliver_manual_ack"`
+	Ack              []TimeSeriesDTO `json:"ack"`
+}
+
+// OverviewChartsDTO combines all chart data for the overview page
+type OverviewChartsDTO struct {
+	MessageStats MessageStatsTimeSeriesDTO `json:"message_stats"`
+	MessageRates MessageRatesTimeSeriesDTO `json:"message_rates"`
+}
+
 type ConnectionInfoDTO struct {
 	VHostName     string    `json:"vhost"`
 	Name          string    `json:"name"` // ip
@@ -151,10 +178,11 @@ type ChannelDetailDTO struct {
 	PrefetchCount    uint16 `json:"prefetch_count"`
 	UnackedCount     int    `json:"unacked_count"`
 	// Stats
-	PublishRate float64 `json:"publish_rate"`
-	ConfirmRate float64 `json:"confirm_rate"`
-	DeliverRate float64 `json:"deliver_rate"`
-	AckRate     float64 `json:"ack_rate"`
+	PublishRate    float64 `json:"publish_rate"`
+	ConfirmRate    float64 `json:"confirm_rate"`
+	UnroutableRate float64 `json:"unroutable_rate"`
+	DeliverRate    float64 `json:"deliver_rate"`
+	AckRate        float64 `json:"ack_rate"`
 }
 
 type BindingDTO struct {

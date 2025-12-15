@@ -54,8 +54,7 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 		if count != 1 {
 			t.Errorf("Queue %s expected 1 message, got %d", qName, count)
 		}
-
-		receivedMsg := vh.GetMessage(qName)
+		receivedMsg := vh.GetMessage(qName, false)
 		if receivedMsg == nil {
 			t.Errorf("Queue %s should have a message", qName)
 		} else if string(receivedMsg.Body) != "test message" {

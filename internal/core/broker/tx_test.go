@@ -8,14 +8,17 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/testutil"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // Helper function to create a test broker with transaction support
 func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VHost) {
 	mockFramer := &testutil.MockFramer{}
+	mockCollector := metrics.NewMockCollector(nil)
 	broker := &Broker{
 		framer:      mockFramer,
+		collector:   mockCollector,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
@@ -27,6 +30,7 @@ func createTestBrokerForTx() (*Broker, *testutil.MockFramer, net.Conn, *vhost.VH
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(mockCollector)
 
 	// Create a test queue
 	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100, vh)

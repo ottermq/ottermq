@@ -77,6 +77,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/overview", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetOverview(c, ws.Broker)
 	})
+	apiGrp.Get("/overview/charts", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetOverviewCharts(c, ws.Broker)
+	})
 
 	// Queue routes
 

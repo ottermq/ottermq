@@ -88,13 +88,19 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-	// Initialize metrics collector
 	b.framer = &amqp.DefaultFramer{}
-	b.collector = metrics.NewCollector(&metrics.Config{
-		Enabled:    config.EnableMetrics,
-		WindowSize: config.WindowSize,
-		MaxSamples: config.MaxSamples,
-	})
+	// Initialize metrics collector
+	if !config.EnableMetrics {
+		b.collector = metrics.NewMockCollector(nil)
+	} else {
+		b.collector = metrics.NewCollector(&metrics.Config{
+			Enabled:         config.EnableMetrics,
+			WindowSize:      config.WindowSize,
+			MaxSamples:      config.MaxSamples,
+			SamplesInterval: config.SamplesInterval,
+		}, b.rootCtx)
+		b.collector.StartPeriodicSampling()
+	}
 	log.Info().Msg("Metrics collection enabled")
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
@@ -219,13 +225,17 @@ func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClie
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
+	if request == nil {
+		// Incomplete frame state, should not happen in normal operation
+		log.Debug().Msg("processRequest called with nil MethodFrame")
+		return nil, nil
+	}
 	connInfo, exist := b.Connections[conn]
 	if !exist {
 		// connection terminated while processing the request
 		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 		return nil, nil
 	}
-	vh := b.VHosts[connInfo.VHostName]
 	isConnectionClosing, err := b.isConnectionClosing(conn)
 	if err != nil {
 		return nil, err
@@ -239,6 +249,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		}
 	}
+
+	// Get vhost after shutdown check to avoid nil pointer during cleanup
+	vh := b.VHosts[connInfo.VHostName]
+	if vh == nil {
+		log.Debug().Str("vhost", connInfo.VHostName).Msg("VHost not found or already cleaned up")
+		return nil, nil
+	}
+
 	// Check if the channel is in closing state (stored state, not incoming frame)
 	if request.Channel > 0 {
 		b.mu.Lock()
