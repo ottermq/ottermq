@@ -51,29 +51,12 @@ func (s *Service) ListConnectionChannels(name string) ([]models.ChannelDetailDTO
 	return channels, nil
 }
 
-// func mapChannelInfoToDTO(chInfo models.ChannelInfo) models.ChannelDetailDTO {
-// 	chDTO := models.ChannelDetailDTO{
-// 		Number:           chInfo.Number,
-// 		ConnectionName:   chInfo.ConnectionName,
-// 		VHost:            chInfo.VHost,
-// 		State:            chInfo.State,
-// 		UnconfirmedCount: chInfo.UnconfirmedCount,
-// 		PrefetchCount:    chInfo.PrefetchCount,
-// 		UnackedCount:     chInfo.UnackedCount,
-// 		PublishRate:      0, // TODO: implement publish rate calculation
-// 		DeliverRate:      0, // TODO: implement deliver rate calculation
-// 		UnroutableRate:   0, // TODO: implement unroutable rate calculation
-// 		AckRate:          0,
-// 	}
-// 	return chDTO
-// }
-
 func mapChannelSnapshotToDTO(chSnapshot *metrics.ChannelSnapshot) models.ChannelDetailDTO {
 	chDTO := models.ChannelDetailDTO{
 		Number:           chSnapshot.ChannelNumber,
 		ConnectionName:   chSnapshot.ConnectionName,
 		VHost:            chSnapshot.VHostName,
-		State:            chSnapshot.State, // TODO: determine actual state
+		State:            chSnapshot.State,
 		UnconfirmedCount: 0,
 		PrefetchCount:    uint16(chSnapshot.PrefetchCount),
 		UnackedCount:     int(chSnapshot.UnackedCount),
