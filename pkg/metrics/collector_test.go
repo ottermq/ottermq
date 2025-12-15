@@ -136,12 +136,16 @@ func TestExchangeMetricsSnapshot(t *testing.T) {
 	ctx := context.Background()
 	c := NewCollector(nil, ctx)
 
-	// Record publishes over time
+	// Record publishes over time and sample them
 	c.RecordExchangePublish("test.exchange", "topic")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("test.exchange", "topic")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("test.exchange", "topic")
+	c.sampleExchangeMetrics("test.exchange")
+	time.Sleep(50 * time.Millisecond)
 
 	em := c.GetExchangeMetrics("test.exchange")
 	if em == nil {
@@ -466,12 +470,16 @@ func TestQueueMetricsSnapshot(t *testing.T) {
 	ctx := context.Background()
 	c := NewCollector(nil, ctx)
 
-	// Setup queue with messages
+	// Setup queue with messages and sample them
 	c.RecordQueuePublish("testq")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordQueuePublish("testq")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 	c.RecordQueuePublish("testq")
+	c.sampleQueueMetrics("testq")
+	time.Sleep(50 * time.Millisecond)
 
 	c.RecordConsumerAdded("testq")
 	c.RecordConsumerAdded("testq")
@@ -570,10 +578,16 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 	ctx := context.Background()
 	c := NewCollector(nil, ctx)
 
-	// Publish to different exchanges
+	// Publish to different exchanges with delays and sample them
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex2", "fanout")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
 	// Verify broker-level count
 	if c.messageCount.Load() != 3 {
@@ -581,7 +595,6 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 	}
 
 	// Verify rate tracker recorded
-	time.Sleep(10 * time.Millisecond)
 	rate := c.totalPublishesRate.Rate()
 	if rate <= 0 {
 		t.Error("totalPublishes rate should be positive")
@@ -681,29 +694,44 @@ func TestGetTimeSeriesMethods(t *testing.T) {
 	ctx := context.Background()
 	c := NewCollector(nil, ctx)
 
-	// Record some data
+	// Record some data with delays and sample them to populate rate trackers
 	c.RecordExchangePublish("ex1", "direct")
-	time.Sleep(10 * time.Millisecond)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 	c.RecordExchangePublish("ex1", "direct")
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
 	c.RecordQueueDelivery("q1", false)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+	c.RecordQueueDelivery("q1", false)
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+
 	c.RecordConnection()
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
+	c.RecordConnection()
+	c.sampleBrokerMetrics()
+	time.Sleep(50 * time.Millisecond)
 
 	// Get time series
 	publishSamples := c.GetPublishRateTimeSeries(5 * time.Minute)
 	deliverySamples := c.GetDeliveryAutoAckRateTimeSeries(5 * time.Minute)
 	connSamples := c.GetConnectionRateTimeSeries(0)
 
-	if len(publishSamples) == 0 {
-		t.Error("expected at least one publish sample")
+	// Need at least 2 samples for rate calculation
+	if len(publishSamples) < 2 {
+		t.Errorf("expected at least 2 publish samples, got %d", len(publishSamples))
 	}
 
-	if len(deliverySamples) == 0 {
-		t.Error("expected at least one delivery sample")
+	if len(deliverySamples) < 2 {
+		t.Errorf("expected at least 2 delivery samples, got %d", len(deliverySamples))
 	}
 
-	if len(connSamples) == 0 {
-		t.Error("expected at least one connection sample")
+	if len(connSamples) < 2 {
+		t.Errorf("expected at least 2 connection samples, got %d", len(connSamples))
 	}
 }
 
