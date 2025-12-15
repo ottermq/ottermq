@@ -202,7 +202,8 @@ func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage
 	log.Debug().Uint16("channel", frame.Channel).Msg("New channel added")
 	connName := conn.RemoteAddr().String()
 	conInfo := b.Connections[conn]
-	b.collector.RecordChannelOpen(connName, conInfo.VHostName, frame.Channel)
+	user := conInfo.Client.Config.Username
+	b.collector.RecordChannelOpen(connName, conInfo.VHostName, user, frame.Channel)
 }
 
 // removeChannel removes a channel from the connection
