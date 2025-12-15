@@ -1,7 +1,6 @@
 package broker
 
 import (
-	"context"
 	"net"
 	"strings"
 	"testing"
@@ -41,7 +40,7 @@ func (m *MockAddr) String() string  { return m.address }
 
 func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	mockFramer := &testutil.MockFramer{}
-	mockCollector := metrics.NewCollector(nil, context.Background())
+	mockCollector := metrics.NewMockCollector(nil)
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
@@ -72,10 +71,15 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 		remoteAddr: &MockAddr{"tcp", "127.0.0.1:12345"},
 	}
 
-	// Initialize connection state
+	// Initialize connection state with Client info (needed for metrics)
 	broker.Connections[conn] = &amqp.ConnectionInfo{
 		VHostName: "test-vhost",
 		Channels:  make(map[uint16]*amqp.ChannelState),
+		Client: &amqp.AmqpClient{
+			Config: &amqp.AmqpClientConfig{
+				Username: "test-user",
+			},
+		},
 	}
 	broker.Connections[conn].Channels[1] = &amqp.ChannelState{}
 

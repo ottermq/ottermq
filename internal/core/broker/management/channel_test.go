@@ -5,6 +5,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,6 +84,45 @@ func setupTestBrokerWithChannels(t *testing.T) *enhancedFakeBroker {
 		"conn1": {channels[0], channels[1]},
 		"conn2": {channels[2]},
 	}
+
+	// Set up mock collector with channel snapshots to match channel infos
+	mockCollector := base.collector.(*metrics.MockCollector)
+	mockCollector.SetChannelMetrics("conn1(1)", metrics.ChannelSnapshot{
+		ChannelNumber:  1,
+		ConnectionName: "conn1",
+		VHostName:      "/",
+		State:          "running",
+		UnackedCount:   5,
+		PrefetchCount:  10,
+		PublishRate:    0,
+		DeliverRate:    0,
+		UnroutableRate: 0,
+		AckRate:        0,
+	})
+	mockCollector.SetChannelMetrics("conn1(2)", metrics.ChannelSnapshot{
+		ChannelNumber:  2,
+		ConnectionName: "conn1",
+		VHostName:      "/",
+		State:          "running",
+		UnackedCount:   0,
+		PrefetchCount:  0,
+		PublishRate:    0,
+		DeliverRate:    0,
+		UnroutableRate: 0,
+		AckRate:        0,
+	})
+	mockCollector.SetChannelMetrics("conn2(1)", metrics.ChannelSnapshot{
+		ChannelNumber:  1,
+		ConnectionName: "conn2",
+		VHostName:      "/",
+		State:          "flow",
+		UnackedCount:   15,
+		PrefetchCount:  20,
+		PublishRate:    0,
+		DeliverRate:    0,
+		UnroutableRate: 0,
+		AckRate:        0,
+	})
 
 	return &enhancedFakeBroker{
 		fakeBroker:         base,

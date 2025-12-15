@@ -370,3 +370,9 @@ func (m *MockCollector) SetBrokerMetrics(snapshot *BrokerSnapshot) {
 	defer m.mu.Unlock()
 	m.brokerSnapshot = snapshot
 }
+
+func (m *MockCollector) SetChannelMetrics(channelName string, snapshot ChannelSnapshot) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.channelSnapshots[channelName] = snapshot
+}
