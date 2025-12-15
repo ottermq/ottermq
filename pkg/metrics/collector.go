@@ -485,7 +485,10 @@ func (c *Collector) RecordChannelDeliver(connName, vhost string, channelNumber u
 	}
 
 	// The user is empty because, at this point, the channel was already created
-	cm, _ := c.getChannelMetrics(connName, vhost, channelNumber)
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
 	cm.DeliverCount.Add(1)
 	if autoAck {
 		cm.AckCount.Add(1)
