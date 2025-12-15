@@ -52,7 +52,7 @@ export const useExchangesStore = defineStore('exchanges', {
       const encodedVhost = encodeURIComponent(vhost)
       const encodedName = encodeURIComponent(exchangeData.name)
       
-      await api.post(`/api/exchanges/${encodedVhost}/${encodedName}`, payload)
+      await api.post(`/exchanges/${encodedVhost}/${encodedName}`, payload)
       await this.fetch()
     },
     async deleteExchange(name) {
