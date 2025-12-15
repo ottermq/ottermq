@@ -402,10 +402,12 @@ func (c *Collector) sampleChannelMetrics(channelName string) {
 	cm.DeliverRate.Record(cm.DeliverCount.Load())
 	cm.AckRate.Record(cm.AckCount.Load())
 
-	if cm.PublishRate.Rate() > 0 || cm.DeliverRate.Rate() > 0 {
-		cm.State = "running"
-	} else {
-		cm.State = "idle"
+	if cm.State != "flow" {
+		if cm.PublishRate.Rate() > 0 || cm.DeliverRate.Rate() > 0 {
+			cm.State = "running"
+		} else {
+			cm.State = "idle"
+		}
 	}
 	// TODO: handle "flow" and "closing" states based on channel state in broker
 }
@@ -508,6 +510,23 @@ func (c *Collector) RecordChannelAck(connName, vhost string, channelNumber uint1
 	if unacked > 0 {
 		cm.UnackedCount.Add(-1)
 	}
+}
+
+func (c *Collector) RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
+	if flowActive {
+		cm.State = "flow"
+	} else {
+		cm.State = "idle"
+	}
+	// Potentially track flow state per channel if needed
 }
 
 // GetChannelMetrics retrieves metrics for a specific channel

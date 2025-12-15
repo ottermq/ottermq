@@ -192,6 +192,9 @@ func (m *MockCollector) RecordChannelDeliver(connName, vhost string, channelNumb
 
 func (m *MockCollector) RecordChannelAck(connName, vhost string, channelNumber uint16) {}
 
+func (m *MockCollector) RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool) {
+}
+
 func (m *MockCollector) GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

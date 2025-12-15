@@ -31,6 +31,7 @@ type MetricsCollector interface {
 	RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16)
 	RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool)
 	RecordChannelAck(connName, vhost string, channelNumber uint16)
+	RecordChannelFlow(connName, vhost string, channelNumber uint16, flowActive bool)
 	GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics
 	GetChannelMetricsByName(channelName string) *ChannelMetrics
 	GetAllChannelMetrics() []*ChannelMetrics

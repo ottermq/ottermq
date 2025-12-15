@@ -70,7 +70,8 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 		return nil, amqpErr
 	}
 	flowActive := content.Active
-
+	// Record channel flow change
+	b.collector.RecordChannelFlow(conn.RemoteAddr().String(), vh.Name, channel, flowActive)
 	b.mu.Lock()
 	_, exists := b.Connections[conn].Channels[channel]
 	b.mu.Unlock()
