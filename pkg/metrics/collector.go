@@ -80,8 +80,11 @@ type QueueMetrics struct {
 
 type ChannelMetrics struct {
 	ConnectionName string
-	ChannelNumber  uint16
 	VHostName      string
+	ChannelNumber  uint16
+	User           string
+	State          string // e.g., "running", "flow", "closing"
+
 	PublishRate    *RateTracker
 	ConfirmRate    *RateTracker
 	UnroutableRate *RateTracker
@@ -97,7 +100,6 @@ type ChannelMetrics struct {
 
 	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	PrefetchCount atomic.Int64 // Current prefetch count
-	State         string       // e.g., "running", "flow", "closing"
 	CreatedAt     time.Time
 }
 
@@ -399,10 +401,17 @@ func (c *Collector) sampleChannelMetrics(channelName string) {
 	cm.UnroutableRate.Record(cm.UnroutableCount.Load())
 	cm.DeliverRate.Record(cm.DeliverCount.Load())
 	cm.AckRate.Record(cm.AckCount.Load())
+
+	if cm.PublishRate.Rate() > 0 || cm.DeliverRate.Rate() > 0 {
+		cm.State = "running"
+	} else {
+		cm.State = "idle"
+	}
+	// TODO: handle "flow" and "closing" states based on channel state in broker
 }
 
 // getOrCreateChannelMetrics gets existing or creates new channel metrics
-func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
+func (c *Collector) getOrCreateChannelMetrics(connName, vhost, user string, channelNumber uint16) *ChannelMetrics {
 	name := buildChannelName(connName, channelNumber)
 	if value, ok := c.channelMetrics.Load(name); ok {
 		return value.(*ChannelMetrics)
@@ -411,6 +420,7 @@ func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNum
 	cm := &ChannelMetrics{
 		ConnectionName: connName,
 		VHostName:      vhost,
+		User:           user,
 		ChannelNumber:  channelNumber,
 		PublishRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		ConfirmRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
@@ -419,7 +429,7 @@ func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNum
 		AckRate:        NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		UnackedCount:   atomic.Int64{},
 		PrefetchCount:  atomic.Int64{},
-		State:          "running", // default state, can be updated later
+		State:          "idle", // default state, can be updated later
 		CreatedAt:      time.Now(),
 	}
 
@@ -427,33 +437,53 @@ func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNum
 	return actual.(*ChannelMetrics)
 }
 
-// RecordChannelPublish records a message enqueued to a channel
-func (c *Collector) RecordChannelPublish(connName string, vhost string, channelNumber uint16) {
+func (c *Collector) getChannelMetrics(connName, vhost string, channelNumber uint16) (*ChannelMetrics, bool) {
+	name := buildChannelName(connName, channelNumber)
+	if value, ok := c.channelMetrics.Load(name); ok {
+		return value.(*ChannelMetrics), true
+	}
+
+	return nil, false
+}
+
+// RecordChannelConsumer records a new consumer registration on a channel
+func (c *Collector) RecordChannelConsumer(connName, vhost, user string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
-	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
+	// Potentially track consumer count per channel if needed
+}
+
+// RecordChannelPublish records a message enqueued to a channel
+func (c *Collector) RecordChannelPublish(connName, vhost, user string, channelNumber uint16) {
+	if !c.config.Enabled {
+		return
+	}
+
+	cm := c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
 	cm.PublishCount.Add(1)
 }
 
 // RecordChannelUnroutable records an unroutable message on a channel
-func (c *Collector) RecordChannelUnroutable(connName string, vhost string, channelNumber uint16) {
+func (c *Collector) RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
-	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm := c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
 	cm.UnroutableCount.Add(1)
 }
 
 // RecordChannelDeliver records a message delivered from a channel
-func (c *Collector) RecordChannelDeliver(connName string, vhost string, channelNumber uint16, autoAck bool) {
+func (c *Collector) RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool) {
 	if !c.config.Enabled {
 		return
 	}
 
-	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	// The user is empty because, at this point, the channel was already created
+	cm, _ := c.getChannelMetrics(connName, vhost, channelNumber)
 	cm.DeliverCount.Add(1)
 	if autoAck {
 		cm.AckCount.Add(1)
@@ -464,12 +494,15 @@ func (c *Collector) RecordChannelDeliver(connName string, vhost string, channelN
 }
 
 // RecordChannelAck records an acknowledgment on a channel
-func (c *Collector) RecordChannelAck(connName string, vhost string, channelNumber uint16) {
+func (c *Collector) RecordChannelAck(connName, vhost string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
-	cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	cm, ok := c.getChannelMetrics(connName, vhost, channelNumber)
+	if !ok {
+		return
+	}
 	cm.AckCount.Add(1)
 	unacked := cm.UnackedCount.Load()
 	if unacked > 0 {
@@ -478,7 +511,7 @@ func (c *Collector) RecordChannelAck(connName string, vhost string, channelNumbe
 }
 
 // GetChannelMetrics retrieves metrics for a specific channel
-func (c *Collector) GetChannelMetrics(connName string, vhost string, channelNumber uint16) *ChannelMetrics {
+func (c *Collector) GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
 	channelName := buildChannelName(connName, channelNumber)
 	if value, ok := c.channelMetrics.Load(channelName); ok {
 		return value.(*ChannelMetrics)
@@ -532,13 +565,13 @@ func (c *Collector) RecordConnectionClose() {
 }
 
 // RecordChannelOpen records a new channel opening
-func (c *Collector) RecordChannelOpen(connName string, vhost string, channelNumber uint16) {
+func (c *Collector) RecordChannelOpen(connName, vhost, user string, channelNumber uint16) {
 	if !c.config.Enabled {
 		return
 	}
 
 	c.channelCount.Add(1)
-	c.getOrCreateChannelMetrics(connName, vhost, channelNumber)
+	c.getOrCreateChannelMetrics(connName, vhost, user, channelNumber)
 }
 
 // RecordChannelClose records a channel closing
@@ -862,6 +895,8 @@ type ChannelSnapshot struct {
 	ConnectionName string    `json:"connection_name"`
 	ChannelNumber  uint16    `json:"channel_number"`
 	VHostName      string    `json:"vhost_name"`
+	User           string    `json:"user"`
+	State          string    `json:"state"`
 	PublishRate    float64   `json:"publish_rate"`
 	ConfirmRate    float64   `json:"confirm_rate"`
 	UnroutableRate float64   `json:"unroutable_rate"`
@@ -869,12 +904,11 @@ type ChannelSnapshot struct {
 	AckRate        float64   `json:"ack_rate"`
 	UnackedCount   int64     `json:"unacked_count"`
 	PrefetchCount  int64     `json:"prefetch_count"`
-	State          string    `json:"state"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-func (c *Collector) GetChannelSnapshot(connName string, vhost string, channelNumber uint16) *ChannelSnapshot {
-	if cm := c.getOrCreateChannelMetrics(connName, vhost, channelNumber); cm != nil {
+func (c *Collector) GetChannelSnapshot(connName, vhost string, channelNumber uint16) *ChannelSnapshot {
+	if cm, ok := c.getChannelMetrics(connName, vhost, channelNumber); ok {
 		return cm.Snapshot()
 	}
 	return nil
@@ -886,6 +920,8 @@ func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
 		ConnectionName: cm.ConnectionName,
 		ChannelNumber:  cm.ChannelNumber,
 		VHostName:      cm.VHostName,
+		User:           cm.User,
+		State:          cm.State,
 		PublishRate:    cm.PublishRate.Rate(),
 		ConfirmRate:    cm.ConfirmRate.Rate(),
 		UnroutableRate: cm.UnroutableRate.Rate(),
@@ -893,7 +929,6 @@ func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
 		AckRate:        cm.AckRate.Rate(),
 		UnackedCount:   cm.UnackedCount.Load(),
 		PrefetchCount:  cm.PrefetchCount.Load(),
-		State:          cm.State,
 		CreatedAt:      cm.CreatedAt,
 	}
 }

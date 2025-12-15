@@ -614,8 +614,8 @@ func TestBrokerLevelChannelMetrics(t *testing.T) {
 	c := NewCollector(nil, ctx)
 
 	// Open channels
-	c.RecordChannelOpen("conn1", "", 1)
-	c.RecordChannelOpen("conn1", "", 2)
+	c.RecordChannelOpen("conn1", "", "", 1)
+	c.RecordChannelOpen("conn1", "", "", 2)
 
 	if c.channelCount.Load() != 2 {
 		t.Errorf("channelCount = %d, want 2", c.channelCount.Load())
@@ -648,7 +648,7 @@ func TestBrokerSnapshot(t *testing.T) {
 	c.RecordQueueAck("q1")
 
 	c.RecordConnection()
-	c.RecordChannelOpen("conn1", "", 1)
+	c.RecordChannelOpen("conn1", "", "", 1)
 
 	// Get snapshot
 	bm := c.GetBrokerMetrics()
@@ -863,7 +863,7 @@ func TestClearMetrics(t *testing.T) {
 	c.RecordExchangePublish("ex1", "direct")
 	c.RecordQueuePublish("q1")
 	c.RecordConnection()
-	c.RecordChannelOpen("conn1", "", 1)
+	c.RecordChannelOpen("conn1", "", "", 1)
 
 	// Verify data exists
 	if c.GetExchangeMetrics("ex1") == nil {

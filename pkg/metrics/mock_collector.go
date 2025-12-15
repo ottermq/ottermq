@@ -180,17 +180,19 @@ func (m *MockCollector) RemoveQueue(queueName string) {
 
 // Channel metrics
 
-func (m *MockCollector) RecordChannelPublish(connName string, vhost string, channelNumber uint16) {}
+func (m *MockCollector) RecordChannelConsumer(connName, vhost, user string, channelNumber uint16) {}
 
-func (m *MockCollector) RecordChannelUnroutable(connName string, vhost string, channelNumber uint16) {
+func (m *MockCollector) RecordChannelPublish(connName, vhost, user string, channelNumber uint16) {}
+
+func (m *MockCollector) RecordChannelUnroutable(connName, vhost, user string, channelNumber uint16) {
 }
 
-func (m *MockCollector) RecordChannelDeliver(connName string, vhost string, channelNumber uint16, autoAck bool) {
+func (m *MockCollector) RecordChannelDeliver(connName, vhost string, channelNumber uint16, autoAck bool) {
 }
 
-func (m *MockCollector) RecordChannelAck(connName string, vhost string, channelNumber uint16) {}
+func (m *MockCollector) RecordChannelAck(connName, vhost string, channelNumber uint16) {}
 
-func (m *MockCollector) GetChannelMetrics(connName string, vhost string, channelNumber uint16) *ChannelMetrics {
+func (m *MockCollector) GetChannelMetrics(connName, vhost string, channelNumber uint16) *ChannelMetrics {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	channelName := fmt.Sprintf("%s(%d)", connName, channelNumber)
@@ -252,7 +254,7 @@ func (m *MockCollector) RecordConnection() {}
 
 func (m *MockCollector) RecordConnectionClose() {}
 
-func (m *MockCollector) RecordChannelOpen(connName, vhost string, channelNumber uint16) {}
+func (m *MockCollector) RecordChannelOpen(connName, vhost, user string, channelNumber uint16) {}
 
 func (m *MockCollector) RecordChannelClose(connName string, channelNumber uint16) {}
 
