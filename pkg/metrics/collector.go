@@ -80,7 +80,7 @@ type QueueMetrics struct {
 
 type ChannelMetrics struct {
 	ConnectionName string
-	Number         uint16
+	ChannelNumber  uint16
 	VHostName      string
 	PublishRate    *RateTracker
 	ConfirmRate    *RateTracker
@@ -411,7 +411,7 @@ func (c *Collector) getOrCreateChannelMetrics(connName, vhost string, channelNum
 	cm := &ChannelMetrics{
 		ConnectionName: connName,
 		VHostName:      vhost,
-		Number:         channelNumber,
+		ChannelNumber:  channelNumber,
 		PublishRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		ConfirmRate:    NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		UnroutableRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
@@ -485,6 +485,7 @@ func (c *Collector) GetChannelMetrics(connName string, vhost string, channelNumb
 	}
 	return nil
 }
+
 // GetChannelMetricsByName retrieves metrics for a specific channel by its composite name
 func (c *Collector) GetChannelMetricsByName(channelName string) *ChannelMetrics {
 	if value, ok := c.channelMetrics.Load(channelName); ok {
@@ -492,6 +493,7 @@ func (c *Collector) GetChannelMetricsByName(channelName string) *ChannelMetrics 
 	}
 	return nil
 }
+
 // GetAllChannelMetrics returns metrics for all channels
 func (c *Collector) GetAllChannelMetrics() []*ChannelMetrics {
 	result := make([]*ChannelMetrics, 0)
@@ -882,7 +884,7 @@ func (c *Collector) GetChannelSnapshot(connName string, vhost string, channelNum
 func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
 	return &ChannelSnapshot{
 		ConnectionName: cm.ConnectionName,
-		ChannelNumber:  cm.Number,
+		ChannelNumber:  cm.ChannelNumber,
 		VHostName:      cm.VHostName,
 		PublishRate:    cm.PublishRate.Rate(),
 		ConfirmRate:    cm.ConfirmRate.Rate(),

@@ -221,7 +221,7 @@ func (m *MockCollector) GetChannelMetricsByName(channelName string) *ChannelMetr
 	// Convert snapshot back to ChannelMetrics for compatibility
 	cm := &ChannelMetrics{
 		ConnectionName: snapshot.ConnectionName,
-		Number:         snapshot.ChannelNumber,
+		ChannelNumber:  snapshot.ChannelNumber,
 		VHostName:      snapshot.VHostName,
 		CreatedAt:      snapshot.CreatedAt,
 	}
@@ -237,7 +237,7 @@ func (m *MockCollector) GetAllChannelMetrics() []*ChannelMetrics {
 	for _, snapshot := range m.channelSnapshots {
 		cm := &ChannelMetrics{
 			ConnectionName: snapshot.ConnectionName,
-			Number:         snapshot.ChannelNumber,
+			ChannelNumber:  snapshot.ChannelNumber,
 			VHostName:      snapshot.VHostName,
 			CreatedAt:      snapshot.CreatedAt,
 		}
