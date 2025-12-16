@@ -53,6 +53,12 @@ type Config struct {
 	WindowSize      time.Duration // Time window for rate calculations
 	MaxSamples      int           // Maximum number of samples to retain
 	SamplesInterval uint8         // Interval between samples (in seconds) default 5s
+
+	// Prometheus
+	EnablePrometheus         bool
+	PrometheusPort           string
+	PrometheusPath           string
+	PrometheusUpdateInterval time.Duration
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -96,6 +102,11 @@ func LoadConfig(version string) *Config {
 		WindowSize:      getEnvAsDuration("OTTERMQ_METRICS_WINDOW_SIZE", 5*time.Minute),
 		MaxSamples:      getEnvAsInt("OTTERMQ_METRICS_MAX_SAMPLES", 60),
 		SamplesInterval: getEnvAsUint8("OTTERMQ_METRICS_SAMPLES_INTERVAL", 5), // seconds
+
+		EnablePrometheus:         getEnvAsBool("OTTERMQ_ENABLE_PROMETHEUS", false),
+		PrometheusPort:           getEnv("OTTERMQ_PROMETHEUS_PORT", "9090"),
+		PrometheusPath:           getEnv("OTTERMQ_PROMETHEUS_PATH", "/metrics"),
+		PrometheusUpdateInterval: getEnvAsDuration("OTTERMQ_PROMETHEUS_UPDATE_INTERVAL", 5*time.Second),
 	}
 }
 
