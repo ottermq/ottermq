@@ -57,65 +57,52 @@ func NewExporter(collector *metrics.Collector, config *Config) *Exporter {
 }
 
 func (e *Exporter) registerMetrics() {
-	// Register counters with Prometheus
-	prometheus.MustRegister(e.publishedTotal)
-	prometheus.MustRegister(e.deliveredTotal)
-	prometheus.MustRegister(e.ackedTotal)
-	prometheus.MustRegister(e.nackedTotal)
-	prometheus.MustRegister(e.publishedRate)
-	prometheus.MustRegister(e.deliveredRate)
-	prometheus.MustRegister(e.messageCount)
-	prometheus.MustRegister(e.queueCount)
-	prometheus.MustRegister(e.connectionCount)
-	prometheus.MustRegister(e.publishLatency)
-	prometheus.MustRegister(e.deliverLatency)
-
-	e.publishedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	e.publishedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ottermq_messages_published_total",
 		Help: "Total number of messages published",
 	})
-	e.deliveredTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	e.deliveredTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ottermq_messages_delivered_total",
 		Help: "Total number of messages delivered",
 	})
-	e.ackedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	e.ackedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ottermq_messages_acked_total",
 		Help: "Total number of messages acknowledged",
 	})
-	e.nackedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	e.nackedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ottermq_messages_nacked_total",
 		Help: "Total number of messages not acknowledged",
 	})
 
-	e.publishedRate = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.publishedRate = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_messages_publish_rate",
 		Help: "Rate of messages published per second",
 	})
-	e.deliveredRate = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.deliveredRate = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_messages_deliver_rate",
 		Help: "Rate of messages delivered per second",
 	})
 
-	e.messageCount = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.messageCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_message_count",
 		Help: "Current number of messages in the broker",
 	})
-	e.queueCount = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.queueCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_queue_count",
 		Help: "Current number of queues in the broker",
 	})
-	e.connectionCount = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.connectionCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_connection_count",
 		Help: "Current number of connections to the broker",
 	})
 
-	e.publishLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+	e.publishLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "ottermq_publish_latency_milliseconds",
 		Help:    "Latency of message publishing in milliseconds",
 		Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 	})
 
-	e.deliverLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+	e.deliverLatency = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "ottermq_deliver_latency_milliseconds",
 		Help:    "Latency of message delivery in milliseconds",
 		Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
