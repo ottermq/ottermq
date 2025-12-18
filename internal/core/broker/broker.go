@@ -89,24 +89,19 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableQLL:       config.EnableQLL,
 	}
 	b.framer = &amqp.DefaultFramer{}
-	// Initialize metrics collector
-	if !config.EnableMetrics {
-		b.collector = metrics.NewMockCollector(nil)
-	} else {
-		b.collector = metrics.NewCollector(&metrics.Config{
-			Enabled:         config.EnableMetrics,
-			WindowSize:      config.WindowSize,
-			MaxSamples:      config.MaxSamples,
-			SamplesInterval: config.SamplesInterval,
-		}, b.rootCtx)
-		b.collector.StartPeriodicSampling()
-	}
-	log.Info().Msg("Metrics collection enabled")
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
 	b.Management = management.NewService(b)
 	return b
+}
+
+// SetupMetricsCollector sets up the metrics collector for the broker.
+func (b *Broker) SetupMetricsCollector(collector metrics.MetricsCollector, startSampling bool) {
+	b.collector = collector
+	if startSampling {
+		b.collector.StartPeriodicSampling()
+	}
 }
 
 func initializeVHost(vhostName string, options vhost.VHostOptions, b *Broker) *vhost.VHost {
