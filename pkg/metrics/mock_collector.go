@@ -145,7 +145,7 @@ func (m *MockCollector) GetQueueMetrics(queueName string) *QueueMetrics {
 		Name:      snapshot.Name,
 		CreatedAt: snapshot.CreatedAt,
 	}
-	qm.MessageCount.Store(snapshot.MessageCount)
+	qm.Depth.Store(snapshot.MessageCount)
 	qm.UnackedCount.Store(snapshot.UnackedCount)
 	qm.ConsumerCount.Store(snapshot.ConsumerCount)
 	qm.AckCount.Store(snapshot.AckCount)
@@ -163,7 +163,7 @@ func (m *MockCollector) GetAllQueueMetrics() []*QueueMetrics {
 			Name:      snapshot.Name,
 			CreatedAt: snapshot.CreatedAt,
 		}
-		qm.MessageCount.Store(snapshot.MessageCount)
+		qm.Depth.Store(snapshot.MessageCount)
 		qm.UnackedCount.Store(snapshot.UnackedCount)
 		qm.ConsumerCount.Store(snapshot.ConsumerCount)
 		qm.AckCount.Store(snapshot.AckCount)

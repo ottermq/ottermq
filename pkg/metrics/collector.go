@@ -16,16 +16,16 @@ type Collector struct {
 	channelMetrics  sync.Map
 
 	// Broker-wide rate metrics
-	totalPublishesRate           *RateTracker
-	totalDeliveriesAutoAckRate   *RateTracker
-	totalDeliveriesManualAckRate *RateTracker
-	totalAcksRate                *RateTracker
-	totalNacksRate               *RateTracker
-	connectionRate               *RateTracker
-	channelRate                  *RateTracker
-	totalReadyRate               *RateTracker
-	totalUnackedRate             *RateTracker
-	totalRate                    *RateTracker
+	publishRate           *RateTracker
+	deliveryAutoAckRate   *RateTracker
+	deliveryManualAckRate *RateTracker
+	acksRate              *RateTracker
+	nacksRate             *RateTracker
+	connectionRate        *RateTracker
+	channelRate           *RateTracker
+	totalReadyRate        *RateTracker
+	totalUnackedRate      *RateTracker
+	totalRate             *RateTracker
 
 	messageCount    atomic.Int64
 	consumerCount   atomic.Int64
@@ -35,14 +35,12 @@ type Collector struct {
 	exchangeCount   atomic.Int64
 	readyDepth      atomic.Int64
 	unackedDepth    atomic.Int64
-	totalNackCount  atomic.Int64
 
-	// RateCounters -- reset periodically
 	totalPublishCount          atomic.Int64
 	totalDeliverAutoAckCount   atomic.Int64
 	totalDeliverManualAckCount atomic.Int64
-	// TODO: add Get Count (auto & manual)
-	totalAckCount atomic.Int64
+	totalAckCount              atomic.Int64
+	totalNackCount             atomic.Int64
 
 	config *Config
 
@@ -65,10 +63,10 @@ type ExchangeMetrics struct {
 // QueueMetrics tracks statistics for a single queue
 type QueueMetrics struct {
 	Name         string
-	MessageRate  *RateTracker // Messages enqueued per second
+	PublishRate  *RateTracker // Messages enqueued per second
 	DeliveryRate *RateTracker // Messages delivered per second
 	AckRate      *RateTracker // ACKs per second
-	MessageCount atomic.Int64 // Current queue depth
+	Depth        atomic.Int64 // Current queue depth
 	// Todo: add DeliveryCount atomic.Int64 // Total messages delivered
 	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	ConsumerCount atomic.Int64 // Current consumer count
@@ -128,13 +126,13 @@ func NewCollector(config *Config, ctx context.Context) *Collector {
 	}
 
 	return &Collector{
-		totalPublishesRate:           NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalDeliveriesAutoAckRate:   NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalDeliveriesManualAckRate: NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalAcksRate:                NewRateTracker(config.WindowSize, config.MaxSamples),
-		totalNacksRate:               NewRateTracker(config.WindowSize, config.MaxSamples),
-		connectionRate:               NewRateTracker(config.WindowSize, config.MaxSamples),
-		channelRate:                  NewRateTracker(config.WindowSize, config.MaxSamples),
+		publishRate:           NewRateTracker(config.WindowSize, config.MaxSamples),
+		deliveryAutoAckRate:   NewRateTracker(config.WindowSize, config.MaxSamples),
+		deliveryManualAckRate: NewRateTracker(config.WindowSize, config.MaxSamples),
+		acksRate:              NewRateTracker(config.WindowSize, config.MaxSamples),
+		nacksRate:             NewRateTracker(config.WindowSize, config.MaxSamples),
+		connectionRate:        NewRateTracker(config.WindowSize, config.MaxSamples),
+		channelRate:           NewRateTracker(config.WindowSize, config.MaxSamples),
 
 		totalReadyRate:   NewRateTracker(config.WindowSize, config.MaxSamples),
 		totalUnackedRate: NewRateTracker(config.WindowSize, config.MaxSamples),
@@ -238,7 +236,7 @@ func (c *Collector) RecordQueuePublish(queueName string) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	qm.MessageCount.Add(1)
+	qm.Depth.Add(1)
 	c.readyDepth.Add(1)
 }
 
@@ -255,7 +253,7 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	qm.MessageCount.Add(-1)
+	qm.Depth.Add(-1)
 	c.readyDepth.Add(-1)
 
 	if autoAck {
@@ -303,7 +301,7 @@ func (c *Collector) SetQueueDepth(queueName string, depth int64) {
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
-	qm.MessageCount.Store(depth)
+	qm.Depth.Store(depth)
 }
 
 // RecordConsumerAdded records a new consumer on the queue
@@ -354,7 +352,7 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 
 	qm := &QueueMetrics{
 		Name:         name,
-		MessageRate:  NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
+		PublishRate:  NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		DeliveryRate: NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		AckRate:      NewRateTracker(c.config.WindowSize, c.config.MaxSamples),
 		CreatedAt:    time.Now(),
@@ -367,7 +365,7 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 // RemoveQueue removes metrics tracking for a queue
 func (c *Collector) RemoveQueue(queueName string) {
 	if qm := c.GetQueueMetrics(queueName); qm != nil {
-		c.messageCount.Add(-qm.MessageCount.Load())
+		c.messageCount.Add(-qm.Depth.Load())
 		c.consumerCount.Add(-qm.ConsumerCount.Load())
 	}
 	c.queueMetrics.Delete(queueName)
@@ -381,8 +379,8 @@ func (c *Collector) sampleQueueMetrics(queueName string) {
 	}
 	qm.mu.RLock()
 	defer qm.mu.RUnlock()
-	qm.MessageRate.Record(qm.MessageCount.Load())
-	qm.DeliveryRate.Record(qm.MessageCount.Load()) // TODO: change to DeliveryCount when implemented
+	qm.PublishRate.Record(qm.Depth.Load())
+	qm.DeliveryRate.Record(qm.Depth.Load()) // TODO: change to DeliveryCount when implemented
 	qm.AckRate.Record(qm.AckCount.Load())
 }
 
@@ -609,11 +607,11 @@ func (c *Collector) RecordChannelClose(channelName string, channelNumber uint16)
 // GetBrokerMetrics returns current broker-level metrics
 func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
 	return &BrokerMetrics{
-		totalPublishesRate:           c.totalPublishesRate,
-		totalDeliveriesAutoAckRate:   c.totalDeliveriesAutoAckRate,
-		totalDeliveriesManualAckRate: c.totalDeliveriesManualAckRate,
-		totalAcksRate:                c.totalAcksRate,
-		totalNacksRate:               c.totalNacksRate,
+		totalPublishesRate:           c.publishRate,
+		totalDeliveriesAutoAckRate:   c.deliveryAutoAckRate,
+		totalDeliveriesManualAckRate: c.deliveryManualAckRate,
+		totalAcksRate:                c.acksRate,
+		totalNacksRate:               c.nacksRate,
 		connectionRate:               c.connectionRate,
 		channelRate:                  c.channelRate,
 		totalReadyRate:               c.totalReadyRate,
@@ -627,8 +625,12 @@ func (c *Collector) GetBrokerMetrics() *BrokerMetrics {
 		exchangeCount:                c.exchangeCount.Load(),
 		readyDepth:                   c.readyDepth.Load(),
 		unackedDepth:                 c.unackedDepth.Load(),
-		totalDeliverAutoAckCount:     c.totalDeliverAutoAckCount.Load(),
-		totalDeliverManualAckCount:   c.totalDeliverManualAckCount.Load(),
+
+		publishedTotal:          c.totalPublishCount.Load(),
+		deliveredAutoAckTotal:   c.totalDeliverAutoAckCount.Load(),
+		deliveredManualAckTotal: c.totalDeliverManualAckCount.Load(),
+		ackedTotal:              c.totalAckCount.Load(),
+		nackedTotal:             c.totalNackCount.Load(),
 	}
 }
 
@@ -665,11 +667,11 @@ func (c *Collector) sampleBrokerMetrics() {
 	c.totalRate.Record(ready + unacked)
 
 	// Sample broker-wide counters (reset after sampling)
-	c.totalPublishesRate.Record(c.totalPublishCount.Load())
-	c.totalDeliveriesAutoAckRate.Record(c.totalDeliverAutoAckCount.Load())
-	c.totalDeliveriesManualAckRate.Record(c.totalDeliverManualAckCount.Load())
-	c.totalAcksRate.Record(c.totalAckCount.Load())
-	c.totalNacksRate.Record(c.totalNackCount.Load())
+	c.publishRate.Record(c.totalPublishCount.Load())
+	c.deliveryAutoAckRate.Record(c.totalDeliverAutoAckCount.Load())
+	c.deliveryManualAckRate.Record(c.totalDeliverManualAckCount.Load())
+	c.acksRate.Record(c.totalAckCount.Load())
+	c.nacksRate.Record(c.totalNackCount.Load())
 
 	c.connectionRate.Record(c.connectionCount.Load())
 	c.channelRate.Record(c.channelCount.Load())
@@ -715,16 +717,20 @@ type BrokerMetrics struct {
 
 	// Connection
 
-	messageCount               int64
-	consumerCount              int64
-	connectionCount            int64
-	channelCount               int64
-	queueCount                 int64
-	exchangeCount              int64
-	readyDepth                 int64
-	unackedDepth               int64
-	totalDeliverAutoAckCount   int64
-	totalDeliverManualAckCount int64
+	messageCount    int64
+	consumerCount   int64
+	connectionCount int64
+	channelCount    int64
+	queueCount      int64
+	exchangeCount   int64
+	readyDepth      int64
+	unackedDepth    int64
+
+	publishedTotal          int64
+	deliveredAutoAckTotal   int64
+	deliveredManualAckTotal int64
+	ackedTotal              int64
+	nackedTotal             int64
 }
 
 // Getters for BrokerMetrics
@@ -771,6 +777,13 @@ type BrokerSnapshot struct {
 	ChannelCount    int64 `json:"channel_count"`
 	QueueCount      int64 `json:"queue_count"`
 	ExchangeCount   int64 `json:"exchange_count"`
+
+	PublishedTotal             int64
+	TotalDeliverAutoAckCount   int64
+	TotalDeliverManualAckCount int64
+	DeliveredTotal             int64 // Sum of AutoAck + ManualAck
+	AckedTotal                 int64
+	NackedTotal                int64
 }
 
 // GetBrokerSnapshot returns a snapshot of current broker metrics
@@ -791,30 +804,38 @@ func (bm *BrokerMetrics) Snapshot() *BrokerSnapshot {
 		TotalReadyDepth:   bm.totalReadyRate,
 		TotalUnackedDepth: bm.totalUnackedRate,
 		TotalDepth:        bm.totalRate,
-		MessageCount:      bm.messageCount,
-		ConsumerCount:     bm.consumerCount,
-		ConnectionCount:   bm.connectionCount,
-		ChannelCount:      bm.channelCount,
-		QueueCount:        bm.queueCount,
-		ExchangeCount:     bm.exchangeCount,
+		// gauges
+		MessageCount:    bm.messageCount,
+		ConsumerCount:   bm.consumerCount,
+		ConnectionCount: bm.connectionCount,
+		ChannelCount:    bm.channelCount,
+		QueueCount:      bm.queueCount,
+		ExchangeCount:   bm.exchangeCount,
+
+		PublishedTotal:             bm.publishedTotal,
+		TotalDeliverAutoAckCount:   bm.deliveredAutoAckTotal,
+		TotalDeliverManualAckCount: bm.deliveredManualAckTotal,
+		DeliveredTotal:             bm.deliveredAutoAckTotal + bm.deliveredManualAckTotal,
+		AckedTotal:                 bm.ackedTotal,
+		NackedTotal:                bm.nackedTotal,
 	}
 }
 
 // GetTimeSeries returns historical samples for a specific metric
 func (c *Collector) GetPublishRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalPublishesRate.GetSamplesForDuration(duration)
+	return c.publishRate.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetDeliveryAutoAckRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalDeliveriesAutoAckRate.GetSamplesForDuration(duration)
+	return c.deliveryAutoAckRate.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetDeliveryManualAckRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalDeliveriesManualAckRate.GetSamplesForDuration(duration)
+	return c.deliveryManualAckRate.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetAckRateTimeSeries(duration time.Duration) []Sample {
-	return c.totalAcksRate.GetSamplesForDuration(duration)
+	return c.acksRate.GetSamplesForDuration(duration)
 }
 
 func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample {
@@ -822,19 +843,19 @@ func (c *Collector) GetConnectionRateTimeSeries(duration time.Duration) []Sample
 }
 
 func (c *Collector) GetPublishRate() float64 {
-	return c.totalPublishesRate.Rate()
+	return c.publishRate.Rate()
 }
 
 func (c *Collector) GetDeliveryRate() float64 {
-	return c.totalDeliveriesAutoAckRate.Rate()
+	return c.deliveryAutoAckRate.Rate()
 }
 
 func (c *Collector) GetDeliveryManualAckRate() float64 {
-	return c.totalDeliveriesManualAckRate.Rate()
+	return c.deliveryManualAckRate.Rate()
 }
 
 func (c *Collector) GetTotalAcksRate() float64 {
-	return c.totalAcksRate.Rate()
+	return c.acksRate.Rate()
 }
 
 // ExchangeSnapshot returns a snapshot of exchange metrics
@@ -901,12 +922,12 @@ func (qm *QueueMetrics) Snapshot() *QueueSnapshot {
 
 	return &QueueSnapshot{
 		Name:          qm.Name,
-		MessageRate:   qm.MessageRate.Rate(),
+		MessageRate:   qm.PublishRate.Rate(),
 		DeliveryRate:  qm.DeliveryRate.Rate(),
 		AckRate:       qm.AckRate.Rate(),
 		AckCount:      qm.AckCount.Load(),
 		UnackedCount:  qm.UnackedCount.Load(),
-		MessageCount:  qm.MessageCount.Load(),
+		MessageCount:  qm.Depth.Load(),
 		ConsumerCount: qm.ConsumerCount.Load(),
 		Uptime:        time.Since(qm.CreatedAt).Seconds(),
 		CreatedAt:     qm.CreatedAt,
@@ -963,11 +984,11 @@ func (cm *ChannelMetrics) Snapshot() *ChannelSnapshot {
 func (c *Collector) Clear() {
 	c.exchangeMetrics = sync.Map{}
 	c.queueMetrics = sync.Map{}
-	c.totalPublishesRate.Clear()
-	c.totalDeliveriesAutoAckRate.Clear()
-	c.totalDeliveriesManualAckRate.Clear()
-	c.totalAcksRate.Clear()
-	c.totalNacksRate.Clear()
+	c.publishRate.Clear()
+	c.deliveryAutoAckRate.Clear()
+	c.deliveryManualAckRate.Clear()
+	c.acksRate.Clear()
+	c.nacksRate.Clear()
 	c.connectionRate.Clear()
 	c.channelRate.Clear()
 	c.totalReadyRate.Clear()
