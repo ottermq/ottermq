@@ -13,7 +13,9 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/logger"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	"github.com/andrelcunha/ottermq/web"
+	"github.com/andrelcunha/ottermq/web/prometheus"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -45,6 +47,13 @@ func main() {
 	//Get or create the user in the database
 	user, err := setupUserDatabase(dataDir, cfg)
 	b.VHosts["/"].Users[user.Username] = &user
+
+	// Initialize metrics collector
+	mtrx := initializeMetricsCollector(cfg, b, ctx)
+	var promServer *prometheus.Server = nil
+	if mtrx != nil {
+		promServer = initializePrometheusServer(cfg, mtrx.(*metrics.Collector))
+	}
 
 	// Start the broker in a goroutine
 	go func() {
@@ -98,6 +107,12 @@ func main() {
 		log.Info().Msg("Web server gracefully stopped")
 	}
 	log.Info().Msg("Server gracefully stopped")
+
+	defer func() {
+		if promServer != nil {
+			promServer.Shutdown()
+		}
+	}()
 	os.Exit(0) // if came so far it means the server has stopped gracefully
 }
 
@@ -122,6 +137,27 @@ func initializeMetricsCollector(cfg *config.Config, b *broker.Broker, ctx contex
 
 	return metricsCollector
 
+}
+
+func initializePrometheusServer(cfg *config.Config, metricsCollector *metrics.Collector) *prometheus.Server {
+	if !cfg.EnablePrometheus {
+		return nil
+	}
+	log.Info().Msg("Prometheus metrics server enabled - initializing...")
+	promConfig := &prometheus.Config{
+		Enabled:        true,
+		Port:           cfg.PrometheusPort,
+		UpdateInterval: cfg.PrometheusUpdateInterval,
+	}
+	exporter := prometheus.NewExporter(metricsCollector, promConfig)
+	promServer := prometheus.NewServer(promConfig, exporter)
+
+	go func() {
+		if err := promServer.Start(); err != nil {
+			log.Fatal().Err(err).Msg("Prometheus server error")
+		}
+	}()
+	return promServer
 }
 
 func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (interface{ ShutdownWithContext(context.Context) error }, *os.File) {
