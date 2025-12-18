@@ -37,46 +37,13 @@ func main() {
 	// Initialize logger with configured log level
 	logger.Init(cfg.LogLevel)
 
-	// Determine the directory of the running binary
-	dataDir := filepath.Join("data")
-
-	// Ensure the data directory exists
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		log.Info().Msg("Data directory not found. Creating a new one...")
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatal().Err(err).Msg("Failed to create data directory")
-		}
-	}
+	dataDir := getOrCreateDataDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	b := broker.NewBroker(cfg, ctx, cancel)
 
-	// Verify if the database file exists
-	log.Info().Msg("Searching for database...")
-	dbPath := filepath.Join(dataDir, "ottermq.db")
-	persistdb.SetDbPath(dbPath)
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Info().Msg("Database file not found. Creating a new one...")
-		persistdb.InitDB()
-		persistdb.AddDefaultRoles()
-		persistdb.AddDefaultPermissions()
-		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
-		if err := persistdb.AddUser(user); err != nil {
-			log.Error().Err(err).Msg("Failed to add user")
-		}
-		persistdb.CloseDB()
-	}
-	if err := persistdb.OpenDB(); err != nil {
-		log.Error().Err(err).Msg("Failed to open database")
-	}
-	user, err := persistdb.GetUserByUsername(cfg.Username)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to get user")
-	}
-	if user.RoleID != 1 {
-		log.Fatal().Msg("User is not an admin")
-	}
-	persistdb.CloseDB()
+	//Get or create the user in the database
+	user, err := setupUserDatabase(dataDir, cfg)
 	b.VHosts["/"].Users[user.Username] = &user
 
 	// Start the broker in a goroutine
@@ -87,57 +54,9 @@ func main() {
 		}
 	}()
 
-	// Conditionally start web server based on EnableWebAPI flag
-	var webServer *web.WebServer
-	var app interface{ ShutdownWithContext(context.Context) error }
-	var logfile *os.File
-
-	<-b.Ready
-	if cfg.EnableWebAPI {
-		log.Info().Msg("Web API enabled - initializing web server...")
-
-		// // Wait for broker to be ready before initializing web server
-		// log.Info().Msg("Broker ready signal received, initializing web server...")
-
-		// Initialize the web admin server
-		webConfig := &web.Config{
-			BrokerHost:    cfg.BrokerHost,
-			BrokerPort:    cfg.BrokerPort,
-			Username:      cfg.Username,
-			Password:      cfg.Password,
-			JwtKey:        cfg.JwtSecret,
-			WebServerPort: cfg.WebPort,
-			EnableUI:      cfg.EnableUI,
-			EnableSwagger: cfg.EnableSwagger,
-			SwaggerPrefix: cfg.SwaggerPath,
-			ApiPrefix:     cfg.WebAPIPath,
-		}
-
-		webServer, err = web.NewWebServer(webConfig, b)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create web server")
-		}
-
-		// open "server.log" for appending
-		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to open log file")
-		}
+	app, logfile := initializeWebServer(b, cfg, err)
+	if logfile != nil {
 		defer logfile.Close()
-
-		app = webServer.SetupApp(logfile)
-
-		// Start the web admin server in a goroutine
-		go func() {
-			addr := fmt.Sprintf(":%s", cfg.WebPort)
-			log.Info().Str("addr", addr).Msg("Starting web server")
-			err := app.(*fiber.App).Listen(addr)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Web server error")
-			}
-		}()
-	} else {
-		log.Info().Msg("Web API disabled - skipping web server initialization")
 	}
 
 	// Handle OS signals for graceful shutdown
@@ -180,4 +99,123 @@ func main() {
 	}
 	log.Info().Msg("Server gracefully stopped")
 	os.Exit(0) // if came so far it means the server has stopped gracefully
+}
+
+// initializeMetricsCollector sets up the metrics collector for the broker.
+func initializeMetricsCollector(cfg *config.Config, b *broker.Broker, ctx context.Context) metrics.MetricsCollector {
+	var metricsCollector metrics.MetricsCollector
+	if !cfg.EnableMetrics {
+		collector := metrics.NewMockCollector(nil)
+		b.SetupMetricsCollector(collector, false)
+		log.Info().Msg("Metrics collection disabled")
+		return metricsCollector
+	}
+	log.Info().Msg("Metrics collection enabled")
+
+	metricsCollector = metrics.NewCollector(&metrics.Config{
+		Enabled:         cfg.EnableMetrics,
+		WindowSize:      cfg.WindowSize,
+		MaxSamples:      cfg.MaxSamples,
+		SamplesInterval: cfg.SamplesInterval,
+	}, ctx)
+	b.SetupMetricsCollector(metricsCollector, true)
+
+	return metricsCollector
+
+}
+
+func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (interface{ ShutdownWithContext(context.Context) error }, *os.File) {
+	var webServer *web.WebServer
+	var app interface{ ShutdownWithContext(context.Context) error }
+	var logfile *os.File
+
+	<-b.Ready
+	// Conditionally start web server based on EnableWebAPI flag
+	if cfg.EnableWebAPI {
+		log.Info().Msg("Web API enabled - initializing web server...")
+
+		// Initialize the web admin server
+		webConfig := &web.Config{
+			BrokerHost:    cfg.BrokerHost,
+			BrokerPort:    cfg.BrokerPort,
+			Username:      cfg.Username,
+			Password:      cfg.Password,
+			JwtKey:        cfg.JwtSecret,
+			WebServerPort: cfg.WebPort,
+			EnableUI:      cfg.EnableUI,
+			EnableSwagger: cfg.EnableSwagger,
+			SwaggerPrefix: cfg.SwaggerPath,
+			ApiPrefix:     cfg.WebAPIPath,
+		}
+
+		webServer, err = web.NewWebServer(webConfig, b)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to create web server")
+		}
+
+		// open "server.log" for appending
+		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to open log file")
+		}
+
+		app = webServer.SetupApp(logfile)
+
+		// Start the web admin server in a goroutine
+		go func() {
+			addr := fmt.Sprintf(":%s", cfg.WebPort)
+			log.Info().Str("addr", addr).Msg("Starting web server")
+			err := app.(*fiber.App).Listen(addr)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Web server error")
+			}
+		}()
+	} else {
+		log.Info().Msg("Web API disabled - skipping web server initialization")
+	}
+	return app, logfile
+}
+
+func getOrCreateDataDir() string {
+	// Determine the directory of the running binary
+	dataDir := filepath.Join("data")
+
+	// Ensure the data directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		log.Info().Msg("Data directory not found. Creating a new one...")
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			log.Fatal().Err(err).Msg("Failed to create data directory")
+		}
+	}
+	return dataDir
+}
+
+func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, error) {
+	// Verify if the database file exists
+	log.Info().Msg("Searching for database...")
+	dbPath := filepath.Join(dataDir, "ottermq.db")
+	persistdb.SetDbPath(dbPath)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		log.Info().Msg("Database file not found. Creating a new one...")
+		persistdb.InitDB()
+		persistdb.AddDefaultRoles()
+		persistdb.AddDefaultPermissions()
+		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
+		if err := persistdb.AddUser(user); err != nil {
+			log.Error().Err(err).Msg("Failed to add user")
+		}
+		persistdb.CloseDB()
+	}
+	if err := persistdb.OpenDB(); err != nil {
+		log.Error().Err(err).Msg("Failed to open database")
+	}
+	user, err := persistdb.GetUserByUsername(cfg.Username)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to get user")
+	}
+	if user.RoleID != 1 {
+		log.Fatal().Msg("User is not an admin")
+	}
+	persistdb.CloseDB()
+	return user, err
 }
