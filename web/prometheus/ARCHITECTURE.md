@@ -6,17 +6,17 @@ The broker code should **never** call Prometheus exporter methods directly. The 
 
 ## Data Flow
 
-```
+```code
 ┌─────────────────────────────────────────────────────────┐
-│                    Broker Code                           │
-│                                                          │
-│  On message publish:                                     │
+│                    Broker Code                          │
+│                                                         │
+│  On message publish:                                    │
 │    collector.RecordPublish(size)  ← ONLY THIS           │
-│                                                          │
-│  On message delivery:                                    │
+│                                                         │
+│  On message delivery:                                   │
 │    collector.RecordDelivery(latency)                    │
-│                                                          │
-│  On ack:                                                 │
+│                                                         │
+│  On ack:                                                │
 │    collector.RecordAck()                                │
 └─────────────────┬───────────────────────────────────────┘
                   │
@@ -25,14 +25,14 @@ The broker code should **never** call Prometheus exporter methods directly. The 
                   ▼
 ┌─────────────────────────────────────────────────────────┐
 │           pkg/metrics/Collector                         │
-│                                                          │
+│                                                         │
 │  publishedTotal    = 15,234  (atomic counter)           │
 │  deliveredTotal    = 15,100  (atomic counter)           │
 │  ackedTotal        = 14,950  (atomic counter)           │
 │  publishRate       = 125.3   (current rate)             │
 │  messageCount      = 284     (current depth)            │
-│                                                          │
-│  Methods:                                                │
+│                                                         │
+│  Methods:                                               │
 │  • RecordPublish()   - increments publishedTotal        │
 │  • RecordDelivery()  - increments deliveredTotal        │
 │  • GetBrokerSnapshot() - returns current state          │
@@ -41,15 +41,15 @@ The broker code should **never** call Prometheus exporter methods directly. The 
                   │ Exporter polls every 5 seconds
                   │
                   ▼
-┌─────────────────────────────────────────────────────────┐
-│        web/prometheus/Exporter                          │
-│                                                          │
-│  updateLoop() runs every 5s:                            │
-│    1. snapshot := collector.GetBrokerSnapshot()         │
-│    2. Calculate deltas for counters                     │
-│    3. Update Prometheus metrics                         │
-│                                                          │
-│  Delta Tracking Example:                                │
+┌────────────────────────────────────────────────────────┐
+│        web/prometheus/Exporter                         │
+│                                                        │
+│  updateLoop() runs every 5s:                           │
+│    1. snapshot := collector.GetBrokerSnapshot()        │
+│    2. Calculate deltas for counters                    │
+│    3. Update Prometheus metrics                        │
+│                                                        │
+│  Delta Tracking Example:                               │
 │  ┌────────────────────────────────────────────────┐    │
 │  │ Update #1 (t=0s):                              │    │
 │  │   snapshot.PublishedTotal = 15,234             │    │
@@ -66,23 +66,23 @@ The broker code should **never** call Prometheus exporter methods directly. The 
 │  │   prometheusCounter.Add(555)                   │    │
 │  │   lastPublished = 15,789                       │    │
 │  └────────────────────────────────────────────────┘    │
-│                                                          │
-│  Gauges (no delta needed):                              │
-│    publishRate.Set(125.3)  ← Direct assignment          │
-│    messageCount.Set(284)   ← Direct assignment          │
-└─────────────────┬───────────────────────────────────────┘
+│                                                        │
+│  Gauges (no delta needed):                             │
+│    publishRate.Set(125.3)  ← Direct assignment         │
+│    messageCount.Set(284)   ← Direct assignment         │
+└─────────────────┬──────────────────────────────────────┘
                   │
                   │ Prometheus scrapes /metrics
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────┐
-│               Prometheus Server                          │
-│                                                          │
+│               Prometheus Server                         │
+│                                                         │
 │  Scrapes http://localhost:9090/metrics every 15s        │
-│                                                          │
+│                                                         │
 │  # TYPE ottermq_messages_published_total counter        │
 │  ottermq_messages_published_total 15789                 │
-│                                                          │
+│                                                         │
 │  # TYPE ottermq_messages_publish_rate gauge             │
 │  ottermq_messages_publish_rate 125.3                    │
 └─────────────────────────────────────────────────────────┘
