@@ -148,6 +148,7 @@ func initializePrometheusServer(cfg *config.Config, metricsCollector *metrics.Co
 		Enabled:        true,
 		Port:           cfg.PrometheusPort,
 		UpdateInterval: cfg.PrometheusUpdateInterval,
+		Path:           cfg.PrometheusPath,
 	}
 	exporter := prometheus.NewExporter(metricsCollector, promConfig)
 	promServer := prometheus.NewServer(promConfig, exporter)

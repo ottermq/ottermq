@@ -1,14 +1,26 @@
+include:
+  - ./prometheus/docker-compose.yml
+  - ./grafana/docker-compose.yml
 
 services:
   ottermq:
     build: .
     ports:
-      - "3000:3000"
-      - "5672:5672"
+      - "3000:3000"  # Web UI
+      - "5672:5672"  # AMQP
+      - "9090:9090"  # Prometheus metrics
     volumes:
       - data:/app/data
     environment:
       - GO_ENV=production
+    env_file:
+      - .env # load all variables into container environment
+    networks:
+      - ottermq_network
 
 volumes:
   data:
+
+networks:
+  ottermq_network:
+    driver: bridge
