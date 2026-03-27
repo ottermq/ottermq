@@ -527,6 +527,135 @@ The CLI itself becomes a manual validation tool for future broker features:
 
 ---
 
+## Implementation Slices Checklist
+
+This section breaks the work into small, reviewable slices so implementation and commits can stay easy to follow.
+
+### Slice 1 - Foundation
+
+- [ ] Add `cmd/ottermqadmin/main.go`
+- [ ] Add `cobra` dependency
+- [ ] Create root command
+- [ ] Add shared root flags:
+  - [ ] `--url`
+  - [ ] `--username`
+  - [ ] `--password`
+  - [ ] `--token`
+  - [ ] `--json`
+- [ ] Create initial internal CLI package structure
+- [ ] Add initial CLI unit test layout
+
+**Commit goal**: CLI starts, shows help, and has a stable command tree.
+
+### Slice 2 - HTTP Client
+
+- [ ] Create `pkg/adminapi/client`
+- [ ] Add base URL handling
+- [ ] Add bearer token injection
+- [ ] Add shared request helpers
+- [ ] Implement first typed client methods:
+  - [ ] `Login`
+  - [ ] `GetOverview`
+  - [ ] `ListQueues`
+  - [ ] `GetQueue`
+  - [ ] `ListExchanges`
+  - [ ] `GetExchange`
+  - [ ] `ListBindings`
+- [ ] Add unit tests for client request construction and response parsing
+
+**Commit goal**: reusable management API client exists and can be tested independently from Cobra.
+
+### Slice 3 - Authentication
+
+- [ ] Add `ottermqadmin login`
+- [ ] Support `--token`
+- [ ] Support `--username` + `--password`
+- [ ] Keep auth process-local for v1
+- [ ] Add clear auth error messaging
+- [ ] Add unit tests for auth flag resolution and login flow behavior
+
+**Commit goal**: CLI can authenticate cleanly against a running broker.
+
+### Slice 4 - Read-Only Commands
+
+- [ ] Add `overview`
+- [ ] Add `queues list`
+- [ ] Add `queues get`
+- [ ] Add `exchanges list`
+- [ ] Add `exchanges get`
+- [ ] Add `bindings list`
+- [ ] Optionally add `connections list` if it stays small and low-risk
+- [ ] Add command-level unit tests for argument validation and happy-path rendering
+
+**Commit goal**: first useful inspection-only CLI for development and debugging.
+
+### Slice 5 - Output Layer
+
+- [ ] Centralize output formatting
+- [ ] Add default human-readable output
+- [ ] Add `--json` output mode
+- [ ] Make list output consistent across commands
+- [ ] Avoid duplicating formatting logic in command handlers
+- [ ] Add unit tests for JSON and human-readable output formatting
+
+**Commit goal**: commands are pleasant for humans and scriptable for automation.
+
+### Slice 6 - Core Mutations
+
+- [ ] Add `queues create`
+- [ ] Add `queues delete`
+- [ ] Add `queues purge`
+- [ ] Add `exchanges create`
+- [ ] Add `exchanges delete`
+- [ ] Add `bindings create`
+- [ ] Add `bindings delete`
+- [ ] Add `publish`
+- [ ] Add `queues get-messages`
+- [ ] Add unit tests for mutation command validation and request mapping
+
+**Commit goal**: first truly useful admin tool for feature validation and routine broker operations.
+
+### Slice 7 - Operational Introspection
+
+- [ ] Add `connections get`
+- [ ] Add `connections close`
+- [ ] Add `channels list`
+- [ ] Add `channels get`
+- [ ] Add `consumers list`
+- [ ] Reuse richer broker metrics where useful
+- [ ] Add unit tests for operational inspection commands
+
+**Commit goal**: stronger observability-oriented CLI for live broker inspection.
+
+### Slice 8 - Polish
+
+- [ ] Improve help text and examples
+- [ ] Add client tests
+- [ ] Add command validation tests
+- [ ] Update `makefile`
+- [ ] Add `makefile` targets for:
+  - [ ] building `ottermqadmin`
+  - [ ] installing `ottermqadmin`
+  - [ ] running focused CLI tests
+- [ ] Update `README.md`
+- [ ] Add changelog entry
+
+**Commit goal**: project-ready first release of `ottermqadmin`.
+
+### Suggested Commit Sequence
+
+- [ ] `feat(cli): scaffold ottermqadmin root command with cobra`
+- [ ] `feat(cli): add shared management API client`
+- [ ] `feat(cli): implement login and auth plumbing`
+- [ ] `feat(cli): add read-only overview queues exchanges bindings commands`
+- [ ] `feat(cli): add json and human-readable output formatting`
+- [ ] `feat(cli): add queue exchange binding and publish mutation commands`
+- [ ] `feat(cli): add connection channel and consumer inspection commands`
+- [ ] `test(cli): add unit tests for client commands and formatting`
+- [ ] `docs(cli): document ottermqadmin usage and add build targets`
+
+---
+
 ## Progress Checklist
 
 ### Foundation
@@ -536,6 +665,7 @@ The CLI itself becomes a manual validation tool for future broker features:
 - [ ] Create root command
 - [ ] Add shared config flags
 - [ ] Add HTTP client package
+- [ ] Add CLI unit test scaffolding
 
 ### Authentication
 
@@ -565,12 +695,14 @@ The CLI itself becomes a manual validation tool for future broker features:
 - [ ] Add JSON output mode
 - [ ] Improve error messages
 - [ ] Add help examples
+- [ ] Add CLI output/command unit tests
 
 ### Docs
 
 - [ ] Update roadmap
 - [ ] Update README after initial commands are ready
 - [ ] Add changelog entry on first release
+- [ ] Update `makefile` with CLI build/install/test targets
 
 ---
 
