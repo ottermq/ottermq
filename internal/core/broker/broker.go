@@ -56,7 +56,7 @@ type Broker struct {
 	collector metrics.MetricsCollector
 }
 
-func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
+func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc, collector metrics.MetricsCollector) *Broker {
 	// Create persistence layer based on config
 	persistConfig := &persistence.Config{
 		Type:    "json", // from config or env var
@@ -79,6 +79,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		persist:     persist,
 		Ready:       make(chan struct{}),
 		startedAt:   time.Now(),
+		collector:   collector,
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
@@ -89,24 +90,20 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableQLL:       config.EnableQLL,
 	}
 	b.framer = &amqp.DefaultFramer{}
-	// Initialize metrics collector
-	if !config.EnableMetrics {
-		b.collector = metrics.NewMockCollector(nil)
-	} else {
-		b.collector = metrics.NewCollector(&metrics.Config{
-			Enabled:         config.EnableMetrics,
-			WindowSize:      config.WindowSize,
-			MaxSamples:      config.MaxSamples,
-			SamplesInterval: config.SamplesInterval,
-		}, b.rootCtx)
-		b.collector.StartPeriodicSampling()
-	}
-	log.Info().Msg("Metrics collection enabled")
+	b.SetupMetricsCollector(collector, config.EnableMetrics)
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
 	b.Management = management.NewService(b)
 	return b
+}
+
+// SetupMetricsCollector sets up the metrics collector for the broker.
+func (b *Broker) SetupMetricsCollector(collector metrics.MetricsCollector, startSampling bool) {
+	b.collector = collector
+	if startSampling && b.collector != nil {
+		b.collector.StartPeriodicSampling()
+	}
 }
 
 func initializeVHost(vhostName string, options vhost.VHostOptions, b *Broker) *vhost.VHost {

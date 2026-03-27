@@ -201,7 +201,6 @@ func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 
 		Prefork:               false,
 		AppName:               "ottermq-management-ui",
-		ViewsLayout:           "layout",
 		DisableStartupMessage: true,
 	}
 	app := fiber.New(config)
