@@ -56,7 +56,7 @@ type Broker struct {
 	collector metrics.MetricsCollector
 }
 
-func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
+func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc, collector metrics.MetricsCollector) *Broker {
 	// Create persistence layer based on config
 	persistConfig := &persistence.Config{
 		Type:    "json", // from config or env var
@@ -79,6 +79,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		persist:     persist,
 		Ready:       make(chan struct{}),
 		startedAt:   time.Now(),
+		collector:   collector,
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
@@ -89,6 +90,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		EnableQLL:       config.EnableQLL,
 	}
 	b.framer = &amqp.DefaultFramer{}
+	b.SetupMetricsCollector(collector, config.EnableMetrics)
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
@@ -99,7 +101,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 // SetupMetricsCollector sets up the metrics collector for the broker.
 func (b *Broker) SetupMetricsCollector(collector metrics.MetricsCollector, startSampling bool) {
 	b.collector = collector
-	if startSampling {
+	if startSampling && b.collector != nil {
 		b.collector.StartPeriodicSampling()
 	}
 }

@@ -202,7 +202,10 @@ func (c *Collector) getOrCreateExchangeMetrics(name, exchangeType string) *Excha
 		CreatedAt:    time.Now(),
 	}
 
-	actual, _ := c.exchangeMetrics.LoadOrStore(name, em)
+	actual, loaded := c.exchangeMetrics.LoadOrStore(name, em)
+	if !loaded {
+		c.exchangeCount.Add(1)
+	}
 	return actual.(*ExchangeMetrics)
 }
 
@@ -358,7 +361,10 @@ func (c *Collector) getOrCreateQueueMetrics(name string) *QueueMetrics {
 		CreatedAt:    time.Now(),
 	}
 
-	actual, _ := c.queueMetrics.LoadOrStore(name, qm)
+	actual, loaded := c.queueMetrics.LoadOrStore(name, qm)
+	if !loaded {
+		c.queueCount.Add(1)
+	}
 	return actual.(*QueueMetrics)
 }
 

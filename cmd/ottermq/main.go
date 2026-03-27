@@ -42,16 +42,18 @@ func main() {
 	dataDir := getOrCreateDataDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	b := broker.NewBroker(cfg, ctx, cancel)
+
+	// Initialize metrics collector before broker setup to ensure vhosts receive it.
+	mtrx := initializeMetricsCollector(cfg, ctx)
+
+	b := broker.NewBroker(cfg, ctx, cancel, mtrx)
 
 	//Get or create the user in the database
 	user, err := setupUserDatabase(dataDir, cfg)
 	b.VHosts["/"].Users[user.Username] = &user
 
-	// Initialize metrics collector
-	mtrx := initializeMetricsCollector(cfg, b, ctx)
 	var promServer *prometheus.Server = nil
-	if mtrx != nil {
+	if cfg.EnableMetrics && mtrx != nil {
 		promServer = initializePrometheusServer(cfg, mtrx.(*metrics.Collector))
 	}
 
@@ -117,23 +119,20 @@ func main() {
 }
 
 // initializeMetricsCollector sets up the metrics collector for the broker.
-func initializeMetricsCollector(cfg *config.Config, b *broker.Broker, ctx context.Context) metrics.MetricsCollector {
-	var metricsCollector metrics.MetricsCollector
+func initializeMetricsCollector(cfg *config.Config, ctx context.Context) metrics.MetricsCollector {
 	if !cfg.EnableMetrics {
 		collector := metrics.NewMockCollector(nil)
-		b.SetupMetricsCollector(collector, false)
 		log.Info().Msg("Metrics collection disabled")
-		return metricsCollector
+		return collector
 	}
 	log.Info().Msg("Metrics collection enabled")
 
-	metricsCollector = metrics.NewCollector(&metrics.Config{
+	metricsCollector := metrics.NewCollector(&metrics.Config{
 		Enabled:         cfg.EnableMetrics,
 		WindowSize:      cfg.WindowSize,
 		MaxSamples:      cfg.MaxSamples,
 		SamplesInterval: cfg.SamplesInterval,
 	}, ctx)
-	b.SetupMetricsCollector(metricsCollector, true)
 
 	return metricsCollector
 
