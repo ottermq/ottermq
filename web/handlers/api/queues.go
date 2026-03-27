@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/core/models"
 
 	"github.com/gofiber/fiber/v2"
 )

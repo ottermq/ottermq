@@ -3,8 +3,8 @@ package management
 import (
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/pkg/metrics"
 	"github.com/rs/zerolog/log"
 )
 

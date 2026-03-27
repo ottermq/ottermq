@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
 	"github.com/rs/zerolog/log"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/metrics"
 	"github.com/google/uuid"
 )
 

@@ -10,19 +10,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/management"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/memento"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/management"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/json"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/memento"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/andrelcunha/ottermq/internal/persistdb"
+	_ "github.com/ottermq/ottermq/internal/persistdb"
 )
 
 const (

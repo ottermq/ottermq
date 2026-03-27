@@ -3,12 +3,12 @@ package web
 import (
 	"os"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/web/docs"
-	_ "github.com/andrelcunha/ottermq/web/docs"
-	"github.com/andrelcunha/ottermq/web/handlers/api"
-	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
-	"github.com/andrelcunha/ottermq/web/middleware"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/web/docs"
+	_ "github.com/ottermq/ottermq/web/docs"
+	"github.com/ottermq/ottermq/web/handlers/api"
+	"github.com/ottermq/ottermq/web/handlers/api_admin"
+	"github.com/ottermq/ottermq/web/middleware"
 
 	"github.com/gofiber/swagger"
 

@@ -3,7 +3,7 @@ package management
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/models"
 )
 
 func (s *Service) ListConnections() ([]models.ConnectionInfoDTO, error) {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/andrelcunha/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/internal/persistdb"
 )
 
 func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Context) (*ConnectionInfo, error) {

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/pkg/metrics"
 )
 
 // TestMaxLengthIntegration tests the full flow of enforcing max-length before pushing

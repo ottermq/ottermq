@@ -1,7 +1,7 @@
 package vhost
 
 import (
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence"
 )
 
 func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties, bindings []persistence.BindingData) {

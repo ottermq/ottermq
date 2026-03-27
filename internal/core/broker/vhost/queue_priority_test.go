@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp"
 )
 
 func TestPriorityQueue_PushPop_Order(t *testing.T) {

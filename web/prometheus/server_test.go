@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

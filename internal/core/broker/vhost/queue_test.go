@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 func TestQueueCapacityExceeds1000(t *testing.T) {

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/models"
 	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 )

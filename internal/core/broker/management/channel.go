@@ -3,8 +3,8 @@ package management
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/pkg/metrics"
 )
 
 // ListChannels returns all channels across all connections.

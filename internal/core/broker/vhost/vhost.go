@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )

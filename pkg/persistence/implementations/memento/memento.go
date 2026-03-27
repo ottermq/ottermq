@@ -1,6 +1,6 @@
 package memento
 
-import "github.com/andrelcunha/ottermq/pkg/persistence"
+import "github.com/ottermq/ottermq/pkg/persistence"
 
 // MementoPersistence implements persistence.Persistence with no-ops for placeholders.
 type MementoPersistence struct {

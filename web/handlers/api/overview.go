@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/core/broker"
 	"github.com/gofiber/fiber/v2"
 )
 
