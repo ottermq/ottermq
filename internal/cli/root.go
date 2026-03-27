@@ -43,6 +43,7 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	cmd.AddCommand(NewQueuesCmd(rt))
 	cmd.AddCommand(NewExchangesCmd(rt))
 	cmd.AddCommand(NewBindingsCmd(rt))
+	cmd.AddCommand(NewPublishCmd(rt))
 
 	return cmd
 }

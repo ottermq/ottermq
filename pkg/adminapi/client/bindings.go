@@ -26,3 +26,26 @@ func (c *Client) ListBindings(ctx context.Context, vhost string) ([]models.Bindi
 
 	return resp.Bindings, nil
 }
+
+func (c *Client) CreateBinding(ctx context.Context, reqBody models.CreateBindingRequest) (*models.SuccessResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodPost, "/bindings", reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.SuccessResponse
+	if err := c.do(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (c *Client) DeleteBinding(ctx context.Context, reqBody models.DeleteBindingRequest) error {
+	req, err := c.newRequest(ctx, http.MethodDelete, "/bindings", reqBody)
+	if err != nil {
+		return err
+	}
+
+	return c.do(req, nil)
+}

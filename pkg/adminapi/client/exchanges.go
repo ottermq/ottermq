@@ -36,3 +36,43 @@ func (c *Client) GetExchange(ctx context.Context, vhost, exchange string) (*mode
 
 	return &resp, nil
 }
+
+func (c *Client) CreateExchange(ctx context.Context, vhost, exchange string, reqBody models.CreateExchangeRequest) (*models.SuccessResponse, error) {
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange)
+	req, err := c.newRequest(ctx, http.MethodPost, path, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.SuccessResponse
+	if err := c.do(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (c *Client) DeleteExchange(ctx context.Context, vhost, exchange string) error {
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange)
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+
+	return c.do(req, nil)
+}
+
+func (c *Client) PublishMessage(ctx context.Context, vhost, exchange string, reqBody models.PublishMessageRequest) (*models.SuccessResponse, error) {
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange) + "/publish"
+	req, err := c.newRequest(ctx, http.MethodPost, path, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.SuccessResponse
+	if err := c.do(req, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
