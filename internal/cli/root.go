@@ -1,0 +1,41 @@
+package cli
+
+import "github.com/spf13/cobra"
+
+const (
+	DefaultBaseURL = "http://localhost:3000"
+)
+
+type RootOptions struct {
+	BaseURL  string
+	Username string
+	Password string
+	Token    string
+	JSON     bool
+}
+
+func NewRootCmd(opts *RootOptions) *cobra.Command {
+	if opts == nil {
+		opts = &RootOptions{}
+	}
+
+	cmd := &cobra.Command{
+		Use:           "ottermqadmin",
+		Short:         "Admin CLI for OtterMQ",
+		Long:          "ottermqadmin is a command-line administration tool for OtterMQ.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+
+	flags := cmd.PersistentFlags()
+	flags.StringVar(&opts.BaseURL, "url", DefaultBaseURL, "Base URL for the OtterMQ management API")
+	flags.StringVar(&opts.Username, "username", "", "Username for login-based authentication")
+	flags.StringVar(&opts.Password, "password", "", "Password for login-based authentication")
+	flags.StringVar(&opts.Token, "token", "", "JWT token for authenticated requests")
+	flags.BoolVar(&opts.JSON, "json", false, "Output results as JSON")
+
+	return cmd
+}
