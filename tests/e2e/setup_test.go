@@ -12,6 +12,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/logger"
+	"github.com/andrelcunha/ottermq/pkg/metrics"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -114,7 +115,8 @@ func setupBroker() error {
 
 	// Create broker
 	testBrokerCtx, testBrokerStop = context.WithCancel(context.Background())
-	testBroker = broker.NewBroker(cfg, testBrokerCtx, testBrokerStop)
+	collector := metrics.NewMockCollector(nil)
+	testBroker = broker.NewBroker(cfg, testBrokerCtx, testBrokerStop, collector)
 	testBroker.VHosts["/"].Users[dbUser.Username] = &dbUser
 
 	// Start broker in background

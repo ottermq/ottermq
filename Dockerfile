@@ -47,9 +47,10 @@ WORKDIR /app
 # Copy the built binaries from the builder stage
 COPY --from=go-builder /app/bin/ottermq .
 COPY --from=node-builder /ui/dist/spa ./ui/
-# Expose ports 3000 for the web admin and 5672 for the broker
+# Expose ports 3000 for the web admin, 5672 for the broker and 9090 for prometheus exporter
 EXPOSE 3000
 EXPOSE 5672
+EXPOSE 9090
 
 # Command to run both broker and web admin binaries
 CMD ["./ottermq"]

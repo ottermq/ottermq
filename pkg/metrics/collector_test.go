@@ -61,10 +61,10 @@ func TestNewCollector(t *testing.T) {
 			}
 
 			// Verify rate trackers initialized
-			if c.totalPublishesRate == nil {
+			if c.publishRate == nil {
 				t.Error("totalPublishesRate not initialized")
 			}
-			if c.totalDeliveriesAutoAckRate == nil {
+			if c.deliveryAutoAckRate == nil {
 				t.Error("totalDeliveriesAutoAckRate not initialized")
 			}
 			if c.connectionRate == nil {
@@ -244,8 +244,8 @@ func TestQueueMetricsBasic(t *testing.T) {
 		t.Fatal("expected queue1 metrics to exist")
 	}
 
-	if qm1.MessageCount.Load() != 2 {
-		t.Errorf("MessageCount = %d, want 2", qm1.MessageCount.Load())
+	if qm1.Depth.Load() != 2 {
+		t.Errorf("MessageCount = %d, want 2", qm1.Depth.Load())
 	}
 
 	qm2 := c.GetQueueMetrics("queue2")
@@ -253,8 +253,8 @@ func TestQueueMetricsBasic(t *testing.T) {
 		t.Fatal("expected queue2 metrics to exist")
 	}
 
-	if qm2.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount = %d, want 1", qm2.MessageCount.Load())
+	if qm2.Depth.Load() != 1 {
+		t.Errorf("MessageCount = %d, want 1", qm2.Depth.Load())
 	}
 }
 
@@ -268,8 +268,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	c.RecordQueuePublish("testq")
 
 	qm := c.GetQueueMetrics("testq")
-	if qm.MessageCount.Load() != 3 {
-		t.Fatalf("MessageCount = %d, want 3", qm.MessageCount.Load())
+	if qm.Depth.Load() != 3 {
+		t.Fatalf("MessageCount = %d, want 3", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Fatalf("UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -279,8 +279,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	c.RecordQueueDelivery("testq", false)
 	time.Sleep(5 * time.Millisecond)
 
-	if qm.MessageCount.Load() != 2 {
-		t.Errorf("MessageCount after delivery = %d, want 2", qm.MessageCount.Load())
+	if qm.Depth.Load() != 2 {
+		t.Errorf("MessageCount after delivery = %d, want 2", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
@@ -289,8 +289,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	// Ack it (removes from unacked)
 	c.RecordQueueAck("testq")
 
-	if qm.MessageCount.Load() != 2 {
-		t.Errorf("MessageCount after ack = %d, want 2", qm.MessageCount.Load())
+	if qm.Depth.Load() != 2 {
+		t.Errorf("MessageCount after ack = %d, want 2", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("UnackedCount after ack = %d, want 0", qm.UnackedCount.Load())
@@ -302,8 +302,8 @@ func TestQueueDeliveryAndAck(t *testing.T) {
 	c.RecordQueueDelivery("testq", false)
 	c.RecordQueueAck("testq")
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("MessageCount after all acks = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("MessageCount after all acks = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("UnackedCount after all acks = %d, want 0", qm.UnackedCount.Load())
@@ -319,15 +319,15 @@ func TestQueueNackWithRequeue(t *testing.T) {
 	c.RecordQueuePublish("testq")
 
 	qm := c.GetQueueMetrics("testq")
-	if qm.MessageCount.Load() != 2 {
-		t.Fatalf("MessageCount = %d, want 2", qm.MessageCount.Load())
+	if qm.Depth.Load() != 2 {
+		t.Fatalf("MessageCount = %d, want 2", qm.Depth.Load())
 	}
 
 	// Deliver 1 message (moves from ready to unacked)
 	c.RecordQueueDelivery("testq", false)
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("MessageCount after delivery = %d, want 1", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
@@ -337,8 +337,8 @@ func TestQueueNackWithRequeue(t *testing.T) {
 	c.RecordQueueNack("testq")    // Remove from unacked
 	c.RecordQueueRequeue("testq") // Add back to ready
 
-	if qm.MessageCount.Load() != 2 {
-		t.Errorf("MessageCount after nack+requeue = %d, want 2", qm.MessageCount.Load())
+	if qm.Depth.Load() != 2 {
+		t.Errorf("MessageCount after nack+requeue = %d, want 2", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("UnackedCount after nack+requeue = %d, want 0", qm.UnackedCount.Load())
@@ -358,8 +358,8 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 	// Deliver 1 message
 	c.RecordQueueDelivery("testq", false)
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount after delivery = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("MessageCount after delivery = %d, want 1", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
@@ -368,8 +368,8 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 	// NACK without requeue (message is dead-lettered or discarded)
 	c.RecordQueueNack("testq")
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount after nack = %d, want 1 (only ready messages)", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("MessageCount after nack = %d, want 1 (only ready messages)", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("UnackedCount after nack = %d, want 0 (removed from unacked)", qm.UnackedCount.Load())
@@ -386,8 +386,8 @@ func TestQueueRequeue(t *testing.T) {
 
 	qm := c.GetQueueMetrics("testq")
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("MessageCount after delivery = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("MessageCount after delivery = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("UnackedCount after delivery = %d, want 1", qm.UnackedCount.Load())
@@ -398,8 +398,8 @@ func TestQueueRequeue(t *testing.T) {
 	c.RecordQueueNack("testq")    // Remove from unacked
 	c.RecordQueueRequeue("testq") // Add back to ready
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount after requeue = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("MessageCount after requeue = %d, want 1", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("UnackedCount after requeue = %d, want 0", qm.UnackedCount.Load())
@@ -416,8 +416,8 @@ func TestSetQueueDepth(t *testing.T) {
 	c.SetQueueDepth("testq", 100)
 
 	qm := c.GetQueueMetrics("testq")
-	if qm.MessageCount.Load() != 100 {
-		t.Errorf("MessageCount = %d, want 100", qm.MessageCount.Load())
+	if qm.Depth.Load() != 100 {
+		t.Errorf("MessageCount = %d, want 100", qm.Depth.Load())
 	}
 }
 
@@ -595,7 +595,7 @@ func TestBrokerLevelPublishMetrics(t *testing.T) {
 	}
 
 	// Verify rate tracker recorded
-	rate := c.totalPublishesRate.Rate()
+	rate := c.publishRate.Rate()
 	if rate <= 0 {
 		t.Error("totalPublishes rate should be positive")
 	}
@@ -814,7 +814,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 	}
 
 	// All messages should be ack'd (count = 0)
-	finalCount := qm.MessageCount.Load()
+	finalCount := qm.Depth.Load()
 	if finalCount != 0 {
 		t.Errorf("MessageCount = %d, want 0 (all ack'd)", finalCount)
 	}
@@ -935,8 +935,8 @@ func TestEmptyQueueName(t *testing.T) {
 		t.Fatal("should create metrics even for empty name")
 	}
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("MessageCount = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("MessageCount = %d, want 1", qm.Depth.Load())
 	}
 }
 
@@ -955,15 +955,15 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 	c.RecordQueuePublish("my.queue")
 
 	qm := c.GetQueueMetrics("my.queue")
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("After publish: MessageCount = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("After publish: MessageCount = %d, want 1", qm.Depth.Load())
 	}
 
 	// 3. Consumer receives message
 	c.RecordQueueDelivery("my.queue", false)
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
@@ -972,8 +972,8 @@ func TestFullMessageLifecycle_Success(t *testing.T) {
 	// 4. Consumer acknowledges
 	c.RecordQueueAck("my.queue")
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After ack: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After ack: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("After ack: UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -998,8 +998,8 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	// 2. Deliver to consumer
 	c.RecordQueueDelivery("my.queue", false)
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
@@ -1009,8 +1009,8 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	c.RecordQueueNack("my.queue")
 	c.RecordQueueRequeue("my.queue")
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("After nack+requeue: MessageCount = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("After nack+requeue: MessageCount = %d, want 1", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("After nack+requeue: UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -1022,8 +1022,8 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	// 5. ACK this time
 	c.RecordQueueAck("my.queue")
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("Final: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("Final: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("Final: UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -1043,8 +1043,8 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 	// 2. Deliver to consumer
 	c.RecordQueueDelivery("my.queue", false)
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
@@ -1053,8 +1053,8 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 	// 3. Consumer NACKs with requeue=false (dead-letter or discard)
 	c.RecordQueueNack("my.queue")
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After nack (no requeue): MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After nack (no requeue): MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("After nack (no requeue): UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -1076,8 +1076,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 	// Deliver message
 	c.RecordQueueDelivery("my.queue", false)
 
-	if qm.MessageCount.Load() != 0 {
-		t.Errorf("After delivery: MessageCount = %d, want 0", qm.MessageCount.Load())
+	if qm.Depth.Load() != 0 {
+		t.Errorf("After delivery: MessageCount = %d, want 0", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 1 {
 		t.Errorf("After delivery: UnackedCount = %d, want 1", qm.UnackedCount.Load())
@@ -1088,8 +1088,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 	c.RecordQueueNack("my.queue")    // Remove from unacked
 	c.RecordQueueRequeue("my.queue") // Back to ready
 
-	if qm.MessageCount.Load() != 1 {
-		t.Errorf("After consumer cancel: MessageCount = %d, want 1", qm.MessageCount.Load())
+	if qm.Depth.Load() != 1 {
+		t.Errorf("After consumer cancel: MessageCount = %d, want 1", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("After consumer cancel: UnackedCount = %d, want 0", qm.UnackedCount.Load())
@@ -1110,8 +1110,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 	}
 
 	qm := c.GetQueueMetrics("my.queue")
-	if qm.MessageCount.Load() != 10 {
-		t.Fatalf("After publish: MessageCount = %d, want 10", qm.MessageCount.Load())
+	if qm.Depth.Load() != 10 {
+		t.Fatalf("After publish: MessageCount = %d, want 10", qm.Depth.Load())
 	}
 
 	// Deliver 5 messages
@@ -1119,8 +1119,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 		c.RecordQueueDelivery("my.queue", false)
 	}
 
-	if qm.MessageCount.Load() != 5 {
-		t.Errorf("After 5 deliveries: MessageCount = %d, want 5", qm.MessageCount.Load())
+	if qm.Depth.Load() != 5 {
+		t.Errorf("After 5 deliveries: MessageCount = %d, want 5", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 5 {
 		t.Errorf("After 5 deliveries: UnackedCount = %d, want 5", qm.UnackedCount.Load())
@@ -1131,8 +1131,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 		c.RecordQueueAck("my.queue")
 	}
 
-	if qm.MessageCount.Load() != 5 {
-		t.Errorf("After 3 acks: MessageCount = %d, want 5", qm.MessageCount.Load())
+	if qm.Depth.Load() != 5 {
+		t.Errorf("After 3 acks: MessageCount = %d, want 5", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 2 {
 		t.Errorf("After 3 acks: UnackedCount = %d, want 2", qm.UnackedCount.Load())
@@ -1144,8 +1144,8 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 		c.RecordQueueRequeue("my.queue")
 	}
 
-	if qm.MessageCount.Load() != 7 {
-		t.Errorf("After 2 nack+requeue: MessageCount = %d, want 7", qm.MessageCount.Load())
+	if qm.Depth.Load() != 7 {
+		t.Errorf("After 2 nack+requeue: MessageCount = %d, want 7", qm.Depth.Load())
 	}
 	if qm.UnackedCount.Load() != 0 {
 		t.Errorf("After 2 nack+requeue: UnackedCount = %d, want 0", qm.UnackedCount.Load())
