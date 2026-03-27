@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -30,22 +32,20 @@ func newQueuesListCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			for _, queue := range resp {
-				if err := rt.Printf("%s/%s messages=%d consumers=%d durable=%s\n",
-					queue.VHost,
-					queue.Name,
-					queue.Messages,
-					queue.Consumers,
-					formatBool(queue.Durable),
-				); err != nil {
-					return err
+			return rt.WriteOutput(resp, func() error {
+				lines := make([]string, 0, len(resp))
+				for _, queue := range resp {
+					lines = append(lines, formatSummaryLine(
+						fmt.Sprintf("%s/%s", queue.VHost, queue.Name),
+						[]Field{
+							{Label: "messages", Value: fmt.Sprintf("%d", queue.Messages)},
+							{Label: "consumers", Value: fmt.Sprintf("%d", queue.Consumers)},
+							{Label: "durable", Value: formatBool(queue.Durable)},
+						},
+					))
 				}
-			}
-			return nil
+				return rt.PrintSummaryList(lines, "No queues found")
+			})
 		},
 	}
 }
@@ -66,23 +66,20 @@ func newQueuesGetCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			return rt.Printf(
-				"Queue: %s/%s\nMessages: %d\nConsumers: %d\nDurable: %s\nAuto Delete: %s\nDLX: %s\nMessage TTL: %s\nMax Length: %s\n",
-				resp.VHost,
-				resp.Name,
-				resp.Messages,
-				resp.Consumers,
-				formatBool(resp.Durable),
-				formatBool(resp.AutoDelete),
-				formatMaybeString(resp.DeadLetterExchange),
-				formatMaybeInt64(resp.MessageTTL),
-				formatMaybeInt32(resp.MaxLength),
-			)
+			return rt.WriteOutput(resp, func() error {
+				return rt.PrintFields(
+					fmt.Sprintf("Queue: %s/%s", resp.VHost, resp.Name),
+					[]Field{
+						{Label: "Messages", Value: fmt.Sprintf("%d", resp.Messages)},
+						{Label: "Consumers", Value: fmt.Sprintf("%d", resp.Consumers)},
+						{Label: "Durable", Value: formatBool(resp.Durable)},
+						{Label: "Auto Delete", Value: formatBool(resp.AutoDelete)},
+						{Label: "DLX", Value: formatMaybeString(resp.DeadLetterExchange)},
+						{Label: "Message TTL", Value: formatMaybeInt64(resp.MessageTTL)},
+						{Label: "Max Length", Value: formatMaybeInt32(resp.MaxLength)},
+					},
+				)
+			})
 		},
 	}
 }
-

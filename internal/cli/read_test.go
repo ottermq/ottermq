@@ -82,6 +82,23 @@ func TestQueuesListCommand_JSONOutput(t *testing.T) {
 	assert.Contains(t, stdout.String(), `"name": "jobs"`)
 }
 
+func TestQueuesListCommand_TextOutputShowsEmptyState(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newReadRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "http://example.test/api/queues", req.URL.String())
+		return readJSONResponse(t, http.StatusOK, models.QueueListResponse{}), nil
+	}, &stdout)
+
+	cmd := NewQueuesCmd(rt)
+	cmd.SetArgs([]string{"list"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "No queues found\n", stdout.String())
+}
+
 func TestQueuesGetCommand_RequiresArgs(t *testing.T) {
 	rt := newReadRuntime(&RootOptions{Token: "jwt-token"}, func(req *http.Request) (*http.Response, error) {
 		t.Fatal("unexpected http request")
@@ -131,7 +148,8 @@ func TestBindingsListCommand_UsesVHostFlag(t *testing.T) {
 	cmd.SetArgs([]string{"list", "--vhost", "/"})
 	err := cmd.Execute()
 	require.NoError(t, err)
-	assert.Contains(t, stdout.String(), "amq.direct -> jobs")
+	assert.Contains(t, stdout.String(), "source=amq.direct")
+	assert.Contains(t, stdout.String(), "destination=jobs")
 }
 
 func TestReadCommands_LoginWithUsernamePasswordWhenTokenMissing(t *testing.T) {

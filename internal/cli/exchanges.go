@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
 
 func NewExchangesCmd(rt *Runtime) *cobra.Command {
 	cmd := &cobra.Command{
@@ -28,22 +32,20 @@ func newExchangesListCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			for _, exchange := range resp {
-				if err := rt.Printf("%s/%s type=%s durable=%s internal=%s\n",
-					exchange.VHost,
-					exchange.Name,
-					exchange.Type,
-					formatBool(exchange.Durable),
-					formatBool(exchange.Internal),
-				); err != nil {
-					return err
+			return rt.WriteOutput(resp, func() error {
+				lines := make([]string, 0, len(resp))
+				for _, exchange := range resp {
+					lines = append(lines, formatSummaryLine(
+						fmt.Sprintf("%s/%s", exchange.VHost, exchange.Name),
+						[]Field{
+							{Label: "type", Value: exchange.Type},
+							{Label: "durable", Value: formatBool(exchange.Durable)},
+							{Label: "internal", Value: formatBool(exchange.Internal)},
+						},
+					))
 				}
-			}
-			return nil
+				return rt.PrintSummaryList(lines, "No exchanges found")
+			})
 		},
 	}
 }
@@ -64,20 +66,17 @@ func newExchangesGetCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			return rt.Printf(
-				"Exchange: %s/%s\nType: %s\nDurable: %s\nAuto Delete: %s\nInternal: %s\n",
-				resp.VHost,
-				resp.Name,
-				resp.Type,
-				formatBool(resp.Durable),
-				formatBool(resp.AutoDelete),
-				formatBool(resp.Internal),
-			)
+			return rt.WriteOutput(resp, func() error {
+				return rt.PrintFields(
+					fmt.Sprintf("Exchange: %s/%s", resp.VHost, resp.Name),
+					[]Field{
+						{Label: "Type", Value: resp.Type},
+						{Label: "Durable", Value: formatBool(resp.Durable)},
+						{Label: "Auto Delete", Value: formatBool(resp.AutoDelete)},
+						{Label: "Internal", Value: formatBool(resp.Internal)},
+					},
+				)
+			})
 		},
 	}
 }
-

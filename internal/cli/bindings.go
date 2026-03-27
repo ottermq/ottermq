@@ -29,25 +29,23 @@ func newBindingsListCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			for _, binding := range resp {
-				if err := rt.Printf("%s %s -> %s routing_key=%s\n",
-					binding.VHost,
-					binding.Source,
-					binding.Destination,
-					binding.RoutingKey,
-				); err != nil {
-					return err
+			return rt.WriteOutput(resp, func() error {
+				lines := make([]string, 0, len(resp))
+				for _, binding := range resp {
+					lines = append(lines, formatSummaryLine(
+						binding.VHost,
+						[]Field{
+							{Label: "source", Value: binding.Source},
+							{Label: "destination", Value: binding.Destination},
+							{Label: "routing_key", Value: binding.RoutingKey},
+						},
+					))
 				}
-			}
-			return nil
+				return rt.PrintSummaryList(lines, "No bindings found")
+			})
 		},
 	}
 
 	cmd.Flags().StringVar(&vhost, "vhost", "", "Filter bindings by vhost")
 	return cmd
 }
-

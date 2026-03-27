@@ -21,21 +21,19 @@ func NewOverviewCmd(rt *Runtime) *cobra.Command {
 				return err
 			}
 
-			if rt.Options.JSON {
-				return rt.PrintJSON(resp)
-			}
-
-			return rt.Printf(
-				"Broker: %s %s\nConnections: %d\nChannels: %d\nQueues: %d\nConsumers: %d\nMessages Ready: %d\nMessages Unacked: %d\n",
-				resp.BrokerDetails.Product,
-				resp.BrokerDetails.Version,
-				resp.ObjectTotals.Connections,
-				resp.ObjectTotals.Channels,
-				resp.ObjectTotals.Queues,
-				resp.ObjectTotals.Consumers,
-				resp.MessageStats.MessagesReady,
-				resp.MessageStats.MessagesUnacked,
-			)
+			return rt.WriteOutput(resp, func() error {
+				return rt.PrintFields(
+					fmt.Sprintf("Broker: %s %s", resp.BrokerDetails.Product, resp.BrokerDetails.Version),
+					[]Field{
+						{Label: "Connections", Value: fmt.Sprintf("%d", resp.ObjectTotals.Connections)},
+						{Label: "Channels", Value: fmt.Sprintf("%d", resp.ObjectTotals.Channels)},
+						{Label: "Queues", Value: fmt.Sprintf("%d", resp.ObjectTotals.Queues)},
+						{Label: "Consumers", Value: fmt.Sprintf("%d", resp.ObjectTotals.Consumers)},
+						{Label: "Messages Ready", Value: fmt.Sprintf("%d", resp.MessageStats.MessagesReady)},
+						{Label: "Messages Unacked", Value: fmt.Sprintf("%d", resp.MessageStats.MessagesUnacked)},
+					},
+				)
+			})
 		},
 	}
 }
@@ -67,4 +65,3 @@ func formatMaybeInt64(value *int64) string {
 	}
 	return fmt.Sprintf("%d", *value)
 }
-
