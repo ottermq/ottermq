@@ -18,6 +18,7 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
 		opts = &RootOptions{}
 	}
+	rt := NewRuntime(opts)
 
 	cmd := &cobra.Command{
 		Use:           "ottermqadmin",
@@ -36,6 +37,8 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	flags.StringVar(&opts.Password, "password", "", "Password for login-based authentication")
 	flags.StringVar(&opts.Token, "token", "", "JWT token for authenticated requests")
 	flags.BoolVar(&opts.JSON, "json", false, "Output results as JSON")
+
+	cmd.AddCommand(NewLoginCmd(rt))
 
 	return cmd
 }

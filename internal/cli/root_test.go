@@ -29,6 +29,7 @@ func TestNewRootCmd_Help(t *testing.T) {
 	assert.Contains(t, output, "--password")
 	assert.Contains(t, output, "--token")
 	assert.Contains(t, output, "--json")
+	assert.Contains(t, output, "login")
 	assert.Empty(t, stderr.String())
 }
 
@@ -66,4 +67,14 @@ func TestNewRootCmd_UsesDefaultBaseURL(t *testing.T) {
 	assert.Empty(t, opts.Password)
 	assert.Empty(t, opts.Token)
 	assert.False(t, opts.JSON)
+}
+
+func TestNewRootCmd_RegistersLoginCommand(t *testing.T) {
+	opts := &RootOptions{}
+	cmd := NewRootCmd(opts)
+
+	loginCmd, _, err := cmd.Find([]string{"login"})
+	require.NoError(t, err)
+	require.NotNil(t, loginCmd)
+	assert.Equal(t, "login", loginCmd.Name())
 }
