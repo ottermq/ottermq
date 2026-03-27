@@ -279,6 +279,200 @@ This prevents CLI-only hacks and keeps the platform coherent.
 
 ---
 
+## API Coverage Audit
+
+This section compares the planned CLI surface against the current HTTP management API.
+
+### Summary
+
+The current API is already strong enough to support a meaningful first version of `ottermqadmin`.
+
+The biggest issues are not broad missing functionality, but a few HTTP-layer mismatches:
+
+- exchange creation appears miswired at the route layer
+- vhost-filtered binding listing is registered but not actually filtered
+- queue message retrieval is exposed in a UI-oriented way, not a CLI-friendly one
+- vhost service methods exist internally but are not exposed over HTTP
+
+### Coverage Matrix
+
+| CLI Area | Current HTTP Coverage | Status | Notes |
+|---------|------------------------|--------|------|
+| login | `POST /api/login` | ✅ Ready | Good starting point for CLI auth |
+| overview | `GET /api/overview`, `GET /api/overview/broker`, `GET /api/overview/charts` | ✅ Ready | Enough for `overview` and future metrics commands |
+| queues list/get | `GET /api/queues`, `GET /api/queues/:vhost/:queue` | ✅ Ready | Good coverage |
+| queues create/delete/purge | `POST /api/queues/:vhost/:queue`, `POST /api/queues/:vhost/`, `DELETE /api/queues/:vhost/:queue`, `DELETE /api/queues/:vhost/:queue/content` | ✅ Ready | Good for first CLI iteration |
+| queue bindings | `GET /api/queues/:vhost/:queue/bindings` | ✅ Ready | Useful for inspection commands |
+| queue consumers | `GET /api/queues/:vhost/:queueName/consumers` | ✅ Ready | Nice extra capability |
+| exchanges list/get/delete | `GET /api/exchanges`, `GET /api/exchanges/:vhost/:exchange`, `DELETE /api/exchanges/:vhost/:exchange` | ✅ Ready | Good coverage |
+| exchange create | Handler exists, but route is `POST /api/exchanges` while handler expects path params | ❌ Blocked by bug | Must be fixed before CLI create command |
+| exchange source bindings | `GET /api/exchanges/:vhost/:exchange/bindings/source` | ✅ Ready | Good coverage |
+| bindings list/create/delete | `GET /api/bindings`, `POST /api/bindings`, `DELETE /api/bindings` | ✅ Ready | Good for first CLI iteration |
+| bindings list by vhost | Route exists: `GET /api/bindings/:vhost` | ⚠️ Broken | Currently wired to unfiltered list handler |
+| publish message | `POST /api/exchanges/:vhost/:exchange/publish` | ✅ Ready | Best route for CLI publish |
+| generic publish | `POST /api/messages` | ⚠️ Ambiguous | Handler expects path params and defaults silently |
+| get messages from queue | `POST /api/queues/:vhost/:queue/get` | ⚠️ Partial | Service returns structured messages, handler only returns first payload string |
+| consumers list/by-vhost/by-queue | `GET /api/consumers`, `GET /api/consumers/:vhost`, `GET /api/queues/:vhost/:queueName/consumers` | ✅ Ready | Good optional CLI support |
+| channels list/by-vhost/by-connection/get | `GET /api/channels`, `GET /api/channels/:vhost`, `GET /api/connections/:name/channels`, `GET /api/connections/:name/channels/:channel` | ✅ Mostly Ready | Detail endpoint needs a multi-vhost sanity check |
+| connections list/get/close | `GET /api/connections`, `GET /api/connections/:name`, `DELETE /api/connections/:name` | ✅ Ready | Good operational CLI fit |
+| vhosts list/get | Service exists, no HTTP route exposed | ❌ Missing API | Needed if we want first-class CLI vhost commands |
+| admin users list/create | `GET /api/admin/users`, `POST /api/admin/users` | ✅ Available | Out of current CLI v1 scope |
+
+### Concrete Findings
+
+#### 1. Exchange creation route is currently broken
+
+The server registers:
+
+- `POST /api/exchanges`
+
+But the handler expects:
+
+- `:vhost`
+- `:exchange`
+
+Relevant files:
+
+- [web/server.go](/home/andre/src/tests_and_examples/golang/ottermq/web/server.go#L123)
+- [web/handlers/api/exchanges.go](/home/andre/src/tests_and_examples/golang/ottermq/web/handlers/api/exchanges.go#L89)
+
+That means the current `CreateExchange` handler cannot receive the required exchange name from the route as registered today.
+
+**Impact**:
+
+- blocks `ottermqadmin exchanges create`
+- should be fixed before CLI implementation starts
+
+#### 2. Vhost-filtered bindings route is registered incorrectly
+
+The server exposes:
+
+- `GET /api/bindings/:vhost`
+
+But it is wired to `api.ListBindings`, not a vhost-specific handler.
+
+Relevant file:
+
+- [web/server.go](/home/andre/src/tests_and_examples/golang/ottermq/web/server.go#L140)
+
+**Impact**:
+
+- a future `ottermqadmin bindings list --vhost /foo` command would return all bindings instead of filtered results
+
+#### 3. Queue message retrieval is not CLI-friendly yet
+
+At the service layer, `GetMessages` already returns structured `[]models.MessageDTO`.
+
+But the HTTP handler:
+
+- fetches up to `message_count`
+- discards all but the first message
+- returns only the payload as `models.SuccessResponse`
+
+Relevant files:
+
+- [internal/core/broker/management/message.go](/home/andre/src/tests_and_examples/golang/ottermq/internal/core/broker/management/message.go#L41)
+- [web/handlers/api/messages.go](/home/andre/src/tests_and_examples/golang/ottermq/web/handlers/api/messages.go#L71)
+
+**Impact**:
+
+- blocks a good `ottermqadmin queues get-messages` experience
+- loses message metadata, delivery tags, redelivery flag, and batch semantics
+
+This should be upgraded to return structured message DTOs.
+
+#### 4. VHost service support exists, but HTTP routes do not
+
+The management service already supports:
+
+- `ListVHosts()`
+- `GetVHost(name)`
+
+Relevant file:
+
+- [internal/core/broker/management/vhost.go](/home/andre/src/tests_and_examples/golang/ottermq/internal/core/broker/management/vhost.go#L5)
+
+But there are no matching web handlers/routes today.
+
+**Impact**:
+
+- prevents a proper `ottermqadmin vhosts list` / `get`
+- not required for CLI v1, but clearly a useful next API addition
+
+#### 5. Generic publish route is ambiguous
+
+The API exposes both:
+
+- `POST /api/exchanges/:vhost/:exchange/publish`
+- `POST /api/messages`
+
+The handler behind both expects route params for `vhost` and `exchange`.
+
+Relevant files:
+
+- [web/server.go](/home/andre/src/tests_and_examples/golang/ottermq/web/server.go#L111)
+- [web/server.go](/home/andre/src/tests_and_examples/golang/ottermq/web/server.go#L132)
+- [web/handlers/api/messages.go](/home/andre/src/tests_and_examples/golang/ottermq/web/handlers/api/messages.go#L26)
+
+This means `/api/messages` behaves implicitly rather than explicitly, likely falling back to default vhost and empty exchange semantics.
+
+**Impact**:
+
+- not a blocker if the CLI uses the exchange-scoped publish route
+- should be clarified or removed later to reduce ambiguity
+
+#### 6. Channel detail lookup deserves a multi-vhost sanity check
+
+`GetChannel(connectionName, channelNumber)` currently resolves snapshots using the default vhost `/`.
+
+Relevant file:
+
+- [internal/core/broker/management/channel.go](/home/andre/src/tests_and_examples/golang/ottermq/internal/core/broker/management/channel.go#L71)
+
+**Impact**:
+
+- likely fine today if the broker mostly operates on `/`
+- may become incorrect as soon as multi-vhost usage becomes real
+
+This is not a CLI blocker, but it is worth fixing before relying heavily on per-channel inspection.
+
+### Recommended API Work Before CLI Implementation
+
+#### Must fix before CLI v1
+
+- [ ] Fix exchange creation route/handler mismatch
+- [ ] Fix `GET /bindings/:vhost` to call a vhost-aware handler
+- [ ] Make queue message retrieval return structured message DTOs, not just one payload string
+
+#### Strongly recommended soon after
+
+- [ ] Add `GET /vhosts`
+- [ ] Add `GET /vhosts/:name`
+- [ ] Clarify or remove ambiguous `POST /messages`
+
+#### Can wait
+
+- [ ] Improve channel detail lookup for multi-vhost correctness
+- [ ] Expand admin user endpoints if CLI admin-user commands become desirable
+
+### Conclusion
+
+The API is already sufficient for a strong first `ottermqadmin` release.
+
+If we fix the three blocking issues above, we will have a solid base for:
+
+- login
+- overview
+- queues list/get/create/delete/purge
+- exchanges list/get/create/delete
+- bindings list/create/delete
+- publish
+- structured queue message retrieval
+
+That means the CLI can start soon without large architectural changes.
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -389,4 +583,3 @@ For now, the implementation should assume:
 - binary name: `ottermqadmin`
 - no persisted auth state in v1
 - default vhost may later become `/`, but explicit is safer during early development
-
