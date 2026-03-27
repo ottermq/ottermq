@@ -1,6 +1,5 @@
 include:
   - ./prometheus/docker-compose.yml
-  - ./grafana/docker-compose.yml
 
 services:
   ottermq:
