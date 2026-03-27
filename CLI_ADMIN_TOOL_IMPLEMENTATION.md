@@ -287,11 +287,14 @@ This section compares the planned CLI surface against the current HTTP managemen
 
 The current API is already strong enough to support a meaningful first version of `ottermqadmin`.
 
-The biggest issues are not broad missing functionality, but a few HTTP-layer mismatches:
+The original HTTP blockers identified during the audit have now been fixed:
 
-- exchange creation appears miswired at the route layer
-- vhost-filtered binding listing is registered but not actually filtered
-- queue message retrieval is exposed in a UI-oriented way, not a CLI-friendly one
+- exchange creation route now matches the handler contract
+- vhost-filtered binding listing is now actually vhost-aware
+- queue message retrieval now returns structured message DTOs
+
+The main remaining API gap for first-class CLI coverage is:
+
 - vhost service methods exist internally but are not exposed over HTTP
 
 ### Coverage Matrix
@@ -305,13 +308,13 @@ The biggest issues are not broad missing functionality, but a few HTTP-layer mis
 | queue bindings | `GET /api/queues/:vhost/:queue/bindings` | ✅ Ready | Useful for inspection commands |
 | queue consumers | `GET /api/queues/:vhost/:queueName/consumers` | ✅ Ready | Nice extra capability |
 | exchanges list/get/delete | `GET /api/exchanges`, `GET /api/exchanges/:vhost/:exchange`, `DELETE /api/exchanges/:vhost/:exchange` | ✅ Ready | Good coverage |
-| exchange create | Handler exists, but route is `POST /api/exchanges` while handler expects path params | ❌ Blocked by bug | Must be fixed before CLI create command |
+| exchange create | `POST /api/exchanges/:vhost/:exchange` | ✅ Ready | Fixed during CLI pre-work |
 | exchange source bindings | `GET /api/exchanges/:vhost/:exchange/bindings/source` | ✅ Ready | Good coverage |
 | bindings list/create/delete | `GET /api/bindings`, `POST /api/bindings`, `DELETE /api/bindings` | ✅ Ready | Good for first CLI iteration |
-| bindings list by vhost | Route exists: `GET /api/bindings/:vhost` | ⚠️ Broken | Currently wired to unfiltered list handler |
+| bindings list by vhost | `GET /api/bindings/:vhost` | ✅ Ready | Fixed during CLI pre-work |
 | publish message | `POST /api/exchanges/:vhost/:exchange/publish` | ✅ Ready | Best route for CLI publish |
 | generic publish | `POST /api/messages` | ⚠️ Ambiguous | Handler expects path params and defaults silently |
-| get messages from queue | `POST /api/queues/:vhost/:queue/get` | ⚠️ Partial | Service returns structured messages, handler only returns first payload string |
+| get messages from queue | `POST /api/queues/:vhost/:queue/get` | ✅ Ready | Now returns structured `MessageListResponse` |
 | consumers list/by-vhost/by-queue | `GET /api/consumers`, `GET /api/consumers/:vhost`, `GET /api/queues/:vhost/:queueName/consumers` | ✅ Ready | Good optional CLI support |
 | channels list/by-vhost/by-connection/get | `GET /api/channels`, `GET /api/channels/:vhost`, `GET /api/connections/:name/channels`, `GET /api/connections/:name/channels/:channel` | ✅ Mostly Ready | Detail endpoint needs a multi-vhost sanity check |
 | connections list/get/close | `GET /api/connections`, `GET /api/connections/:name`, `DELETE /api/connections/:name` | ✅ Ready | Good operational CLI fit |
@@ -320,7 +323,7 @@ The biggest issues are not broad missing functionality, but a few HTTP-layer mis
 
 ### Concrete Findings
 
-#### 1. Exchange creation route is currently broken
+#### 1. Exchange creation route mismatch
 
 The server registers:
 
@@ -338,12 +341,11 @@ Relevant files:
 
 That means the current `CreateExchange` handler cannot receive the required exchange name from the route as registered today.
 
-**Impact**:
+**Status**:
 
-- blocks `ottermqadmin exchanges create`
-- should be fixed before CLI implementation starts
+- fixed during CLI pre-work
 
-#### 2. Vhost-filtered bindings route is registered incorrectly
+#### 2. Vhost-filtered bindings route
 
 The server exposes:
 
@@ -355,11 +357,11 @@ Relevant file:
 
 - [web/server.go](/home/andre/src/tests_and_examples/golang/ottermq/web/server.go#L140)
 
-**Impact**:
+**Status**:
 
-- a future `ottermqadmin bindings list --vhost /foo` command would return all bindings instead of filtered results
+- fixed during CLI pre-work
 
-#### 3. Queue message retrieval is not CLI-friendly yet
+#### 3. Queue message retrieval response shape
 
 At the service layer, `GetMessages` already returns structured `[]models.MessageDTO`.
 
@@ -374,12 +376,10 @@ Relevant files:
 - [internal/core/broker/management/message.go](/home/andre/src/tests_and_examples/golang/ottermq/internal/core/broker/management/message.go#L41)
 - [web/handlers/api/messages.go](/home/andre/src/tests_and_examples/golang/ottermq/web/handlers/api/messages.go#L71)
 
-**Impact**:
+**Status**:
 
-- blocks a good `ottermqadmin queues get-messages` experience
-- loses message metadata, delivery tags, redelivery flag, and batch semantics
-
-This should be upgraded to return structured message DTOs.
+- fixed during CLI pre-work
+- endpoint now returns structured message DTOs suitable for automation and CLI output
 
 #### 4. VHost service support exists, but HTTP routes do not
 
@@ -438,13 +438,7 @@ This is not a CLI blocker, but it is worth fixing before relying heavily on per-
 
 ### Recommended API Work Before CLI Implementation
 
-#### Must fix before CLI v1
-
-- [ ] Fix exchange creation route/handler mismatch
-- [ ] Fix `GET /bindings/:vhost` to call a vhost-aware handler
-- [ ] Make queue message retrieval return structured message DTOs, not just one payload string
-
-#### Strongly recommended soon after
+#### Still strongly recommended soon after
 
 - [ ] Add `GET /vhosts`
 - [ ] Add `GET /vhosts/:name`
@@ -455,11 +449,28 @@ This is not a CLI blocker, but it is worth fixing before relying heavily on per-
 - [ ] Improve channel detail lookup for multi-vhost correctness
 - [ ] Expand admin user endpoints if CLI admin-user commands become desirable
 
+### Observability Update
+
+Recent merged work added meaningful observability capabilities that improve the CLI outlook:
+
+- broker startup now initializes a metrics collector
+- management overview includes broker snapshot metrics and chart data
+- Prometheus export support exists as a separate server
+- channel and broker-level rate information is richer than before
+
+This does not change the Cobra + HTTP-client architecture decision, but it makes the following future CLI commands more attractive:
+
+- richer `overview`
+- `channels list` / `channels get` with live rates
+- future optional metrics-oriented commands
+
+Prometheus should remain out of CLI v1 scope; the immediate CLI should still target the management API first.
+
 ### Conclusion
 
-The API is already sufficient for a strong first `ottermqadmin` release.
+The API is now sufficient for a strong first `ottermqadmin` release.
 
-If we fix the three blocking issues above, we will have a solid base for:
+With the pre-work fixes already completed, we have a solid base for:
 
 - login
 - overview
