@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/url"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -58,6 +60,48 @@ func BindQueue(c *fiber.Ctx, b *broker.Broker) error {
 func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 	bindings, err := b.Management.ListBindings()
 	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "failed to list bindings: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(models.BindingListResponse{
+		Bindings: bindings,
+	})
+}
+
+// ListVhostBindings godoc
+// @Summary List all bindings for a vhost
+// @Description Get a list of all bindings for the specified vhost
+// @Tags bindings
+// @Accept json
+// @Produce json
+// @Param vhost path string true "VHost name" default(/)
+// @Success 200 {object} models.BindingListResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "VHost not found"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /bindings/{vhost} [get]
+// @Security BearerAuth
+func ListVhostBindings(c *fiber.Ctx, b *broker.Broker) error {
+	vhost := c.Params("vhost")
+	if vhost == "" {
+		vhost = "/"
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
+	}
+
+	bindings, err := b.Management.ListVhostBindings(vhost)
+	if err != nil {
+		if err.Error() == "vhost '"+vhost+"' not found" {
+			return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+				Error: err.Error(),
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: "failed to list bindings: " + err.Error(),
 		})

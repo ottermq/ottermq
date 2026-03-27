@@ -138,7 +138,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListBindings(c, ws.Broker)
 	})
 	apiGrp.Get("/bindings/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.ListBindings(c, ws.Broker)
+		return api.ListVhostBindings(c, ws.Broker)
 	})
 	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.BindQueue(c, ws.Broker)
