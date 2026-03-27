@@ -86,6 +86,7 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 		dto := models.MessageDTO{
 			ID:          msg.ID,
 			Payload:     msg.Body,
+			PayloadText: string(msg.Body),
 			Properties:  propertiesToMap(msg.Properties),
 			DeliveryTag: deliveryTag,
 			Redelivered: redelivered,

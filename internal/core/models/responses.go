@@ -39,3 +39,7 @@ type BindingListResponse struct {
 type ConsumerListResponse struct {
 	Consumers []ConsumerDTO `json:"consumers"`
 }
+
+type MessageListResponse struct {
+	Messages []MessageDTO `json:"messages"`
+}

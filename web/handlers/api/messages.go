@@ -61,7 +61,7 @@ func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 // @Produce json
 // @Param queue path string true "Queue name"
 // @Param vhost path string false "VHost name" default(/)
-// @Success 200 {object} models.SuccessResponse
+// @Success 200 {object} models.MessageListResponse
 // @Failure 400 {object} models.ErrorResponse "Queue name is required"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 404 {object} models.ErrorResponse "No messages in queue"
@@ -104,8 +104,8 @@ func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
 			Error: "No messages in queue",
 		})
 	}
-	msg := msgs[0]
-	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: string(msg.Payload),
+
+	return c.Status(fiber.StatusOK).JSON(models.MessageListResponse{
+		Messages: msgs,
 	})
 }
