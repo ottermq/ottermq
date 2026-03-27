@@ -39,6 +39,10 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	flags.BoolVar(&opts.JSON, "json", false, "Output results as JSON")
 
 	cmd.AddCommand(NewLoginCmd(rt))
+	cmd.AddCommand(NewOverviewCmd(rt))
+	cmd.AddCommand(NewQueuesCmd(rt))
+	cmd.AddCommand(NewExchangesCmd(rt))
+	cmd.AddCommand(NewBindingsCmd(rt))
 
 	return cmd
 }

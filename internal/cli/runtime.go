@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,28 @@ func (rt *Runtime) Context() context.Context {
 	return context.Background()
 }
 
+func (rt *Runtime) AuthenticatedClient(ctx context.Context) (*adminclient.Client, error) {
+	client := rt.Client()
+	if strings.TrimSpace(client.Token()) != "" {
+		return client, nil
+	}
+
+	username := strings.TrimSpace(rt.Options.Username)
+	password := strings.TrimSpace(rt.Options.Password)
+	if username == "" || password == "" {
+		return nil, errors.New("authentication required: provide --token or both --username and --password")
+	}
+
+	resp, err := client.Login(ctx, username, password)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.Options.Token = resp.Token
+	client.SetToken(resp.Token)
+	return client, nil
+}
+
 func (rt *Runtime) PrintJSON(v any) error {
 	target := rt.Stdout
 	if target == nil {
@@ -55,3 +78,11 @@ func (rt *Runtime) Println(msg string) error {
 	return err
 }
 
+func (rt *Runtime) Printf(format string, args ...any) error {
+	target := rt.Stdout
+	if target == nil {
+		target = io.Discard
+	}
+	_, err := fmt.Fprintf(target, format, args...)
+	return err
+}
