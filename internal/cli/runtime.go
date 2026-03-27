@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	adminclient "github.com/ottermq/ottermq/pkg/adminapi/client"
@@ -23,7 +24,11 @@ func NewRuntime(opts *RootOptions) *Runtime {
 	if opts == nil {
 		opts = &RootOptions{}
 	}
-	return &Runtime{Options: opts}
+	return &Runtime{
+		Options: opts,
+		Stdout:  os.Stdout,
+		Stderr:  os.Stderr,
+	}
 }
 
 func (rt *Runtime) Client() *adminclient.Client {
