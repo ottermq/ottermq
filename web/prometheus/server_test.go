@@ -47,7 +47,7 @@ func TestPrometheusServer(t *testing.T) {
 	// Verify Prometheus format
 	bodyStr := string(body)
 	assert.Contains(t, bodyStr, "ottermq_messages_published_total")
-	assert.Contains(t, bodyStr, "ottermq_connections_total")
+	assert.Contains(t, bodyStr, "ottermq_connection_count")
 }
 
 // func TestExporterRecording(t *testing.T) {
