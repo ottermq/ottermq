@@ -17,6 +17,7 @@ func NewPublishCmd(rt *Runtime) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "publish <vhost> <exchange>",
 		Short: "Publish a message to an exchange",
+		Long:  "Publish a message to an exchange. Use an empty string or '(AMQP default)' for the default exchange.",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if body == "" {

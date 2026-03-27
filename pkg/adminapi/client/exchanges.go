@@ -4,9 +4,20 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/ottermq/ottermq/internal/core/models"
 )
+
+const DefaultExchangeAlias = "(AMQP default)"
+
+func encodeExchangeSegment(exchange string) string {
+	name := strings.TrimSpace(exchange)
+	if name == "" {
+		name = DefaultExchangeAlias
+	}
+	return url.PathEscape(name)
+}
 
 func (c *Client) ListExchanges(ctx context.Context) ([]models.ExchangeDTO, error) {
 	req, err := c.newRequest(ctx, http.MethodGet, "/exchanges", nil)
@@ -23,7 +34,7 @@ func (c *Client) ListExchanges(ctx context.Context) ([]models.ExchangeDTO, error
 }
 
 func (c *Client) GetExchange(ctx context.Context, vhost, exchange string) (*models.ExchangeDTO, error) {
-	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange)
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + encodeExchangeSegment(exchange)
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -38,7 +49,7 @@ func (c *Client) GetExchange(ctx context.Context, vhost, exchange string) (*mode
 }
 
 func (c *Client) CreateExchange(ctx context.Context, vhost, exchange string, reqBody models.CreateExchangeRequest) (*models.SuccessResponse, error) {
-	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange)
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + encodeExchangeSegment(exchange)
 	req, err := c.newRequest(ctx, http.MethodPost, path, reqBody)
 	if err != nil {
 		return nil, err
@@ -53,7 +64,7 @@ func (c *Client) CreateExchange(ctx context.Context, vhost, exchange string, req
 }
 
 func (c *Client) DeleteExchange(ctx context.Context, vhost, exchange string) error {
-	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange)
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + encodeExchangeSegment(exchange)
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return err
@@ -63,7 +74,7 @@ func (c *Client) DeleteExchange(ctx context.Context, vhost, exchange string) err
 }
 
 func (c *Client) PublishMessage(ctx context.Context, vhost, exchange string, reqBody models.PublishMessageRequest) (*models.SuccessResponse, error) {
-	path := "/exchanges/" + url.PathEscape(vhost) + "/" + url.PathEscape(exchange) + "/publish"
+	path := "/exchanges/" + url.PathEscape(vhost) + "/" + encodeExchangeSegment(exchange) + "/publish"
 	req, err := c.newRequest(ctx, http.MethodPost, path, reqBody)
 	if err != nil {
 		return nil, err

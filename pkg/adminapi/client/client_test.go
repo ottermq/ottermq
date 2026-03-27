@@ -242,6 +242,28 @@ func TestPublishMessage_UsesExchangePublishRoute(t *testing.T) {
 	assert.Equal(t, "Message published", resp.Message)
 }
 
+func TestPublishMessage_UsesDefaultExchangeAliasWhenExchangeEmpty(t *testing.T) {
+	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "http://example.test/api/exchanges/%2F/%28AMQP%20default%29/publish", r.URL.String())
+
+		var req models.PublishMessageRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		assert.Equal(t, "bonjour", req.RoutingKey)
+		assert.Equal(t, "hello", req.Payload)
+
+		return jsonResponse(t, http.StatusOK, models.SuccessResponse{Message: "Message published"}), nil
+	})
+
+	resp, err := c.PublishMessage(context.Background(), "/", "", models.PublishMessageRequest{
+		RoutingKey: "bonjour",
+		Payload:    "hello",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "Message published", resp.Message)
+}
+
 func TestGetMessages_UsesQueueGetRoute(t *testing.T) {
 	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
 		require.Equal(t, http.MethodPost, r.Method)
