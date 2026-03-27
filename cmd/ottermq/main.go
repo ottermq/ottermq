@@ -39,7 +39,7 @@ func main() {
 	// Initialize logger with configured log level
 	logger.Init(cfg.LogLevel)
 
-	dataDir := getOrCreateDataDir()
+	dataDir := getOrCreateDataDir(cfg.DataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -212,10 +212,10 @@ func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (inter
 	return app, logfile
 }
 
-func getOrCreateDataDir() string {
-	// Determine the directory of the running binary
-	dataDir := filepath.Join("data")
-
+func getOrCreateDataDir(dataDir string) string {
+	if dataDir == "" {
+		dataDir = filepath.Join("data")
+	}
 	// Ensure the data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		log.Info().Msg("Data directory not found. Creating a new one...")
