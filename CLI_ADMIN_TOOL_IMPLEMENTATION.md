@@ -76,14 +76,17 @@ cmd/
 
 internal/cli/
 ├── root.go
-├── config.go
+├── runtime.go
 ├── output.go
 ├── auth.go
 ├── overview.go
 ├── queues.go
 ├── exchanges.go
 ├── bindings.go
-└── messages.go
+├── publish.go
+├── connections.go
+├── channels.go
+└── consumers.go
 
 pkg/adminapi/
 └── client/
@@ -93,7 +96,9 @@ pkg/adminapi/
     ├── queues.go
     ├── exchanges.go
     ├── bindings.go
-    └── messages.go
+    ├── connections.go
+    ├── channels.go
+    └── consumers.go
 ```
 
 ### Files to Modify
@@ -523,7 +528,8 @@ The CLI itself becomes a manual validation tool for future broker features:
 6. Implement read-only queue/exchange/binding commands
 7. Implement core mutation commands
 8. Improve output formatting
-9. Update README and changelog after initial usability milestone
+9. Implement operational inspection commands
+10. Update README, make targets, and changelog after initial usability milestone
 
 ---
 
@@ -533,112 +539,112 @@ This section breaks the work into small, reviewable slices so implementation and
 
 ### Slice 1 - Foundation
 
-- [ ] Add `cmd/ottermqadmin/main.go`
-- [ ] Add `cobra` dependency
-- [ ] Create root command
-- [ ] Add shared root flags:
-  - [ ] `--url`
-  - [ ] `--username`
-  - [ ] `--password`
-  - [ ] `--token`
-  - [ ] `--json`
-- [ ] Create initial internal CLI package structure
-- [ ] Add initial CLI unit test layout
+- [x] Add `cmd/ottermqadmin/main.go`
+- [x] Add `cobra` dependency
+- [x] Create root command
+- [x] Add shared root flags:
+  - [x] `--url`
+  - [x] `--username`
+  - [x] `--password`
+  - [x] `--token`
+  - [x] `--json`
+- [x] Create initial internal CLI package structure
+- [x] Add initial CLI unit test layout
 
 **Commit goal**: CLI starts, shows help, and has a stable command tree.
 
 ### Slice 2 - HTTP Client
 
-- [ ] Create `pkg/adminapi/client`
-- [ ] Add base URL handling
-- [ ] Add bearer token injection
-- [ ] Add shared request helpers
-- [ ] Implement first typed client methods:
-  - [ ] `Login`
-  - [ ] `GetOverview`
-  - [ ] `ListQueues`
-  - [ ] `GetQueue`
-  - [ ] `ListExchanges`
-  - [ ] `GetExchange`
-  - [ ] `ListBindings`
-- [ ] Add unit tests for client request construction and response parsing
+- [x] Create `pkg/adminapi/client`
+- [x] Add base URL handling
+- [x] Add bearer token injection
+- [x] Add shared request helpers
+- [x] Implement first typed client methods:
+  - [x] `Login`
+  - [x] `GetOverview`
+  - [x] `ListQueues`
+  - [x] `GetQueue`
+  - [x] `ListExchanges`
+  - [x] `GetExchange`
+  - [x] `ListBindings`
+- [x] Add unit tests for client request construction and response parsing
 
 **Commit goal**: reusable management API client exists and can be tested independently from Cobra.
 
 ### Slice 3 - Authentication
 
-- [ ] Add `ottermqadmin login`
-- [ ] Support `--token`
-- [ ] Support `--username` + `--password`
-- [ ] Keep auth process-local for v1
-- [ ] Add clear auth error messaging
-- [ ] Add unit tests for auth flag resolution and login flow behavior
+- [x] Add `ottermqadmin login`
+- [x] Support `--token`
+- [x] Support `--username` + `--password`
+- [x] Keep auth process-local for v1
+- [x] Add clear auth error messaging
+- [x] Add unit tests for auth flag resolution and login flow behavior
 
 **Commit goal**: CLI can authenticate cleanly against a running broker.
 
 ### Slice 4 - Read-Only Commands
 
-- [ ] Add `overview`
-- [ ] Add `queues list`
-- [ ] Add `queues get`
-- [ ] Add `exchanges list`
-- [ ] Add `exchanges get`
-- [ ] Add `bindings list`
-- [ ] Optionally add `connections list` if it stays small and low-risk
-- [ ] Add command-level unit tests for argument validation and happy-path rendering
+- [x] Add `overview`
+- [x] Add `queues list`
+- [x] Add `queues get`
+- [x] Add `exchanges list`
+- [x] Add `exchanges get`
+- [x] Add `bindings list`
+- [x] Optionally add `connections list` if it stays small and low-risk
+- [x] Add command-level unit tests for argument validation and happy-path rendering
 
 **Commit goal**: first useful inspection-only CLI for development and debugging.
 
 ### Slice 5 - Output Layer
 
-- [ ] Centralize output formatting
-- [ ] Add default human-readable output
-- [ ] Add `--json` output mode
-- [ ] Make list output consistent across commands
-- [ ] Avoid duplicating formatting logic in command handlers
-- [ ] Add unit tests for JSON and human-readable output formatting
+- [x] Centralize output formatting
+- [x] Add default human-readable output
+- [x] Add `--json` output mode
+- [x] Make list output consistent across commands
+- [x] Avoid duplicating formatting logic in command handlers
+- [x] Add unit tests for JSON and human-readable output formatting
 
 **Commit goal**: commands are pleasant for humans and scriptable for automation.
 
 ### Slice 6 - Core Mutations
 
-- [ ] Add `queues create`
-- [ ] Add `queues delete`
-- [ ] Add `queues purge`
-- [ ] Add `exchanges create`
-- [ ] Add `exchanges delete`
-- [ ] Add `bindings create`
-- [ ] Add `bindings delete`
-- [ ] Add `publish`
-- [ ] Add `queues get-messages`
-- [ ] Add unit tests for mutation command validation and request mapping
+- [x] Add `queues create`
+- [x] Add `queues delete`
+- [x] Add `queues purge`
+- [x] Add `exchanges create`
+- [x] Add `exchanges delete`
+- [x] Add `bindings create`
+- [x] Add `bindings delete`
+- [x] Add `publish`
+- [x] Add `queues get-messages`
+- [x] Add unit tests for mutation command validation and request mapping
 
 **Commit goal**: first truly useful admin tool for feature validation and routine broker operations.
 
 ### Slice 7 - Operational Introspection
 
-- [ ] Add `connections get`
-- [ ] Add `connections close`
-- [ ] Add `channels list`
-- [ ] Add `channels get`
-- [ ] Add `consumers list`
+- [x] Add `connections get`
+- [x] Add `connections close`
+- [x] Add `channels list`
+- [x] Add `channels get`
+- [x] Add `consumers list`
 - [ ] Reuse richer broker metrics where useful
-- [ ] Add unit tests for operational inspection commands
+- [x] Add unit tests for operational inspection commands
 
 **Commit goal**: stronger observability-oriented CLI for live broker inspection.
 
 ### Slice 8 - Polish
 
-- [ ] Improve help text and examples
-- [ ] Add client tests
-- [ ] Add command validation tests
-- [ ] Update `makefile`
-- [ ] Add `makefile` targets for:
-  - [ ] building `ottermqadmin`
-  - [ ] installing `ottermqadmin`
-  - [ ] running focused CLI tests
-- [ ] Update `README.md`
-- [ ] Add changelog entry
+- [x] Improve help text and examples
+- [x] Add client tests
+- [x] Add command validation tests
+- [x] Update `makefile`
+- [x] Add `makefile` targets for:
+  - [x] building `ottermqadmin`
+  - [x] installing `ottermqadmin`
+  - [x] running focused CLI tests
+- [x] Update `README.md`
+- [x] Add changelog entry
 
 **Commit goal**: project-ready first release of `ottermqadmin`.
 
@@ -660,49 +666,49 @@ This section breaks the work into small, reviewable slices so implementation and
 
 ### Foundation
 
-- [ ] Create CLI binary entrypoint
-- [ ] Add Cobra dependency
-- [ ] Create root command
-- [ ] Add shared config flags
-- [ ] Add HTTP client package
-- [ ] Add CLI unit test scaffolding
+- [x] Create CLI binary entrypoint
+- [x] Add Cobra dependency
+- [x] Create root command
+- [x] Add shared config flags
+- [x] Add HTTP client package
+- [x] Add CLI unit test scaffolding
 
 ### Authentication
 
-- [ ] Implement login command
-- [ ] Support JWT bearer auth in client
-- [ ] Support explicit token flag
+- [x] Implement login command
+- [x] Support JWT bearer auth in client
+- [x] Support explicit token flag
 
 ### Read Commands
 
-- [ ] Implement overview command
-- [ ] Implement queues list/get
-- [ ] Implement exchanges list/get
-- [ ] Implement bindings list
-- [ ] Implement connections list
+- [x] Implement overview command
+- [x] Implement queues list/get
+- [x] Implement exchanges list/get
+- [x] Implement bindings list
+- [x] Implement connections list
 
 ### Write Commands
 
-- [ ] Implement queue create/delete/purge
-- [ ] Implement exchange create/delete
-- [ ] Implement binding create/delete
-- [ ] Implement publish
-- [ ] Implement queue message retrieval
+- [x] Implement queue create/delete/purge
+- [x] Implement exchange create/delete
+- [x] Implement binding create/delete
+- [x] Implement publish
+- [x] Implement queue message retrieval
 
 ### UX
 
-- [ ] Add human-friendly output formatting
-- [ ] Add JSON output mode
-- [ ] Improve error messages
-- [ ] Add help examples
-- [ ] Add CLI output/command unit tests
+- [x] Add human-friendly output formatting
+- [x] Add JSON output mode
+- [x] Improve error messages
+- [x] Add help examples
+- [x] Add CLI output/command unit tests
 
 ### Docs
 
-- [ ] Update roadmap
-- [ ] Update README after initial commands are ready
-- [ ] Add changelog entry on first release
-- [ ] Update `makefile` with CLI build/install/test targets
+- [x] Update roadmap
+- [x] Update README after initial commands are ready
+- [x] Add changelog entry on first release
+- [x] Update `makefile` with CLI build/install/test targets
 
 ---
 
