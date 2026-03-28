@@ -3,9 +3,9 @@ package api
 import (
 	"net/url"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/ottermq/ottermq/internal/core/broker"
 	"github.com/ottermq/ottermq/internal/core/models"
-	"github.com/gofiber/fiber/v2"
 )
 
 // PublishMessage godoc
@@ -27,6 +27,11 @@ func PublishMessage(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
 	}
 	var request models.PublishMessageRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -72,6 +77,11 @@ func GetMessage(c *fiber.Ctx, b *broker.Broker) error {
 	vhost := c.Params("vhost")
 	if vhost == "" {
 		vhost = "/" // default vhost
+	} else {
+		decoded, err := url.PathUnescape(vhost)
+		if err == nil {
+			vhost = decoded
+		}
 	}
 	queueName := c.Params("queue")
 	if queueName == "" {
