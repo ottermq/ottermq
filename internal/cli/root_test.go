@@ -88,3 +88,15 @@ func TestNewRootCmd_RegistersPublishCommand(t *testing.T) {
 	require.NotNil(t, publishCmd)
 	assert.Equal(t, "publish", publishCmd.Name())
 }
+
+func TestNewRootCmd_RegistersOperationalCommands(t *testing.T) {
+	opts := &RootOptions{}
+	cmd := NewRootCmd(opts)
+
+	for _, name := range []string{"connections", "channels", "consumers"} {
+		found, _, err := cmd.Find([]string{name})
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, name, found.Name())
+	}
+}

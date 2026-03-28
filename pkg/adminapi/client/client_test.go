@@ -288,6 +288,49 @@ func TestGetMessages_UsesQueueGetRoute(t *testing.T) {
 	assert.Equal(t, "hello", resp[0].PayloadText)
 }
 
+func TestCloseConnection_UsesReasonQuery(t *testing.T) {
+	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "http://example.test/api/connections/127.0.0.1:5672?reason=Closed+by+CLI", r.URL.String())
+		return jsonResponse(t, http.StatusOK, models.SuccessResponse{Message: "Connection closed"}), nil
+	})
+
+	resp, err := c.CloseConnection(context.Background(), "127.0.0.1:5672", "Closed by CLI")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "Connection closed", resp.Message)
+}
+
+func TestListChannels_UsesConnectionScopedRouteWhenProvided(t *testing.T) {
+	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "http://example.test/api/connections/conn-1/channels", r.URL.String())
+		return jsonResponse(t, http.StatusOK, models.ChannelListResponse{
+			Channels: []models.ChannelDetailDTO{{ConnectionName: "conn-1", Number: 1}},
+		}), nil
+	})
+
+	resp, err := c.ListChannels(context.Background(), "", "conn-1")
+	require.NoError(t, err)
+	require.Len(t, resp, 1)
+	assert.Equal(t, uint16(1), resp[0].Number)
+}
+
+func TestListConsumers_UsesQueueScopedRouteWhenVHostAndQueueProvided(t *testing.T) {
+	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "http://example.test/api/queues/%2F/jobs/consumers", r.URL.String())
+		return jsonResponse(t, http.StatusOK, models.ConsumerListResponse{
+			Consumers: []models.ConsumerDTO{{ConsumerTag: "ctag-1"}},
+		}), nil
+	})
+
+	resp, err := c.ListConsumers(context.Background(), "/", "jobs")
+	require.NoError(t, err)
+	require.Len(t, resp, 1)
+	assert.Equal(t, "ctag-1", resp[0].ConsumerTag)
+}
+
 func TestAPIError_DecodesErrorResponse(t *testing.T) {
 	c := newTestClient(t, func(r *http.Request) (*http.Response, error) {
 		return jsonResponse(t, http.StatusUnauthorized, models.ErrorResponse{

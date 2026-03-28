@@ -44,6 +44,9 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	cmd.AddCommand(NewExchangesCmd(rt))
 	cmd.AddCommand(NewBindingsCmd(rt))
 	cmd.AddCommand(NewPublishCmd(rt))
+	cmd.AddCommand(NewConnectionsCmd(rt))
+	cmd.AddCommand(NewChannelsCmd(rt))
+	cmd.AddCommand(NewConsumersCmd(rt))
 
 	return cmd
 }
