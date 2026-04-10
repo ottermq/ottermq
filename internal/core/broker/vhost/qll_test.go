@@ -383,10 +383,8 @@ func (m *MockPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapsh
 	return nil, nil
 }
 
-func (m *MockPersistence) Initialize() error {
-	return nil
-}
-
-func (m *MockPersistence) Close() error {
-	return nil
-}
+func (m *MockPersistence) SaveVHostMetadata(name string) error  { return nil }
+func (m *MockPersistence) DeleteVHostMetadata(name string) error { return nil }
+func (m *MockPersistence) LoadAllVHosts() ([]string, error)      { return nil, nil }
+func (m *MockPersistence) Initialize() error                     { return nil }
+func (m *MockPersistence) Close() error                          { return nil }
