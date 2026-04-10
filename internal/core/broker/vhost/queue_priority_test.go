@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -185,5 +186,68 @@ func assertNextMessage(t *testing.T, queue *Queue, expectedBody string) {
 	}
 	if string(msg.Body) != expectedBody {
 		t.Errorf("Expected message body '%s', got '%s'", expectedBody, string(msg.Body))
+	}
+}
+
+// cancelledDeliveryCtx sets up a cancelled delivery context on a queue,
+// simulating the state the queue is in when shutdown is triggered.
+func cancelledDeliveryCtx(q *Queue) {
+	ctx, cancel := context.WithCancel(context.Background())
+	q.deliveryCtx = ctx
+	q.deliveryCancel = cancel
+	cancel() // immediately cancelled — simulates shutdown
+}
+
+// TestRequeueOnShutdown_PriorityQueue verifies that messages requeued during
+// shutdown land back in the priority queue (not the FIFO channel), so the
+// priority delivery loop can still see them after a restart.
+func TestRequeueOnShutdown_PriorityQueue(t *testing.T) {
+	vh := createTestVHostWithPriority(10)
+	queue := createTestQueueWithMaxPriority(vh, "prio-shutdown-queue", 10)
+	cancelledDeliveryCtx(queue)
+
+	pushMessageWithPriority(queue, "low", 1)
+	pushMessageWithPriority(queue, "high", 9)
+
+	if queue.Len() != 2 {
+		t.Fatalf("expected 2 messages before requeue, got %d", queue.Len())
+	}
+
+	// Simulate popping a message (as the delivery loop does) then requeueing on shutdown.
+	msg := queue.Pop()
+	if msg == nil {
+		t.Fatal("expected non-nil message from Pop")
+	}
+
+	requeueOnShutdown(queue, *msg)
+
+	// The message must be back in the priority queue, not lost.
+	if queue.Len() != 2 {
+		t.Fatalf("expected 2 messages after requeue, got %d", queue.Len())
+	}
+
+	// Priority order must still be correct — high priority comes first.
+	assertNextMessage(t, queue, "high")
+	assertNextMessage(t, queue, "low")
+}
+
+// TestRequeueOnShutdown_FIFOQueue verifies that FIFO queues are unaffected.
+func TestRequeueOnShutdown_FIFOQueue(t *testing.T) {
+	vh := createTestVHostWithPriority(10)
+	queue := createTestQueue(vh, "fifo-shutdown-queue")
+	cancelledDeliveryCtx(queue)
+
+	queue.push(Message{ID: generateID(), Body: []byte("first")})
+	queue.push(Message{ID: generateID(), Body: []byte("second")})
+
+	msg := queue.Pop()
+	if msg == nil {
+		t.Fatal("expected non-nil message from Pop")
+	}
+
+	requeueOnShutdown(queue, *msg)
+
+	if queue.Len() != 2 {
+		t.Fatalf("expected 2 messages after requeue, got %d", queue.Len())
 	}
 }

@@ -149,24 +149,12 @@ func (q *Queue) deliverFromFIFOQueue(vh *VHost) {
 // requeueOnShutdown checks if the delivery context is done and requeues the message if so.
 // It returns true if the delivery loop should stop.
 func requeueOnShutdown(q *Queue, msg Message) bool {
-	// Check if we're shutting down - if so, put message back and exit
-
 	select {
 	case <-q.deliveryCtx.Done():
 		log.Debug().Str("queue", q.Name).Msg("Delivery loop cancelled, requeuing message and stopping")
-		// Put the message back before exiting
-		q.mu.Lock()
-		q.count++
-		q.mu.Unlock()
-		// Use non-blocking send since channel might be closed
-		select {
-		case q.messages <- msg:
-		default:
-			log.Warn().Str("queue", q.Name).Msg("Could not requeue message on shutdown - channel full or closed")
-		}
-		return true // Indicate that delivery loop should stop
+		q.Push(msg)
+		return true
 	default:
-		// Continue with delivery
 	}
 	return false
 }
