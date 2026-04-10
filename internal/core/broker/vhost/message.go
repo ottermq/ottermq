@@ -282,9 +282,9 @@ func (vh *VHost) GetMessageCount(queueName string) (int, error) {
 	return queue.Len(), nil
 }
 
-// acknowledge removes the message with the given ID from the unackedMessages map.
+// Acknowledge removes the message with the given ID from the unackedMessages map.
 func (vh *VHost) Acknowledge(consumerID, msgID string) error {
-	panic("Not implemented")
+	return fmt.Errorf("not implemented")
 }
 
 func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
