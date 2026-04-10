@@ -171,7 +171,7 @@ package vhost
 
 import (
     "time"
-    "github.com/andrelcunha/ottermq/internal/core/amqp"
+    "github.com/ottermq/ottermq/internal/core/amqp"
 )
 
 type DeathRecord struct {

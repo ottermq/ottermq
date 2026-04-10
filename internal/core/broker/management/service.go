@@ -1,7 +1,7 @@
 package management
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/models"
 )
 
 // Service provides management operations for the broker.

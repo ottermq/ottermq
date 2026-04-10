@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
 )
 

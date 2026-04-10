@@ -1,6 +1,6 @@
 package dummy
 
-import "github.com/andrelcunha/ottermq/pkg/persistence"
+import "github.com/ottermq/ottermq/pkg/persistence"
 
 // DummyPersistence implements persistence.Persistence with no-ops for testing.
 // It can optionally track DeleteMessage calls for test assertions.

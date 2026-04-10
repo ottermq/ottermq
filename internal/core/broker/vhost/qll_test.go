@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/pkg/persistence"
 )
 
 func TestParseMaxLengthArgument_ValidInt64(t *testing.T) {

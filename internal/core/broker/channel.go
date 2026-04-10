@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -170,11 +170,11 @@ func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn ne
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	b.mu.Lock()
 	_, exists := b.Connections[conn].Channels[request.Channel]
+	b.mu.Unlock()
 	if !exists {
 		log.Debug().Uint16("channel", request.Channel).Msg("Channel already closed") // no need to rise an error here
 		return nil, nil
 	}
-	b.mu.Unlock()
 	// send channel close ok
 	frame := b.framer.CreateChannelCloseOkFrame(request.Channel)
 	err := b.framer.SendFrame(conn, frame)

@@ -351,7 +351,7 @@ The entire `GetOverview()` and `GetOverviewCharts()` rely on the metrics collect
 
 ```go
 import (
-    "github.com/andrelcunha/ottermq/internal/core/broker/management"
+    "github.com/ottermq/ottermq/internal/core/broker/management"
 )
 
 // broker implements BrokerProvider interface

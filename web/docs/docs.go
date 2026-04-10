@@ -266,6 +266,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/bindings/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all bindings for the specified vhost",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "List all bindings for a vhost",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "VHost not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/channels": {
             "get": {
                 "security": [
@@ -1766,7 +1828,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
+                            "$ref": "#/definitions/models.MessageListResponse"
                         }
                     },
                     "400": {
@@ -1984,6 +2046,10 @@ const docTemplate = `{
                 "ack_rate": {
                     "type": "number"
                 },
+                "ackedTotal": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "channel_count": {
                     "type": "integer"
                 },
@@ -1999,6 +2065,11 @@ const docTemplate = `{
                 "consumer_count": {
                     "type": "integer"
                 },
+                "deliveredTotal": {
+                    "description": "Sum of AutoAck + ManualAck",
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "delivery_rate": {
                     "type": "number"
                 },
@@ -2012,15 +2083,31 @@ const docTemplate = `{
                 "nack_rate": {
                     "type": "number"
                 },
+                "nackedTotal": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "publish_rate": {
                     "description": "Current rates (single values for display cards)",
                     "type": "number"
+                },
+                "publishedTotal": {
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "queue_count": {
                     "type": "integer"
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "totalDeliverAutoAckCount": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "totalDeliverManualAckCount": {
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "total_depth": {
                     "$ref": "#/definitions/metrics.RateTracker"
@@ -2501,6 +2588,44 @@ const docTemplate = `{
                 },
                 "ssl": {
                     "type": "boolean"
+                }
+            }
+        },
+        "models.MessageDTO": {
+            "type": "object",
+            "properties": {
+                "delivery_tag": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "payload_text": {
+                    "type": "string"
+                },
+                "properties": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "redelivered": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.MessageListResponse": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.MessageDTO"
+                    }
                 }
             }
         },

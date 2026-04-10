@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,6 +16,9 @@ func (s *Service) PublishMessage(vhostName, exchangeName string, req models.Publ
 		return fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 	exchange := vh.GetExchange(exchangeName)
+	if exchange == nil {
+		return fmt.Errorf("exchange '%s' not found in vhost '%s'", exchangeName, vhostName)
+	}
 	routingKey := req.RoutingKey
 
 	payload := []byte(req.Payload)
@@ -66,6 +69,12 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 		count = msgCount
 	}
 
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+		Channel:      0,
+	}
+	ch := vh.GetOrCreateChannelDelivery(channelKey)
+
 	for i := 0; i < count; i++ {
 		msg := vh.GetMessage(queue, noAck)
 
@@ -73,19 +82,29 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 			return []models.MessageDTO{}, nil
 		}
 
-		channelKey := vhost.ConnectionChannelKey{
-			ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
-			Channel:      0,
-		}
-		ch := vh.GetOrCreateChannelDelivery(channelKey)
-
 		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+		switch ackMode {
+		case models.Ack:
+			if err := vh.HandleBasicAck(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to ack management message")
+			}
+		case models.Reject:
+			if err := vh.HandleBasicNack(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false, false); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to reject management message")
+			}
+		case models.RejectRequeue:
+			if err := vh.HandleBasicNack(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false, true); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to reject-requeue management message")
+			}
+		}
 
 		redelivered := vh.ShouldRedeliver(msg.ID)
 
 		dto := models.MessageDTO{
 			ID:          msg.ID,
 			Payload:     msg.Body,
+			PayloadText: string(msg.Body),
 			Properties:  propertiesToMap(msg.Properties),
 			DeliveryTag: deliveryTag,
 			Redelivered: redelivered,

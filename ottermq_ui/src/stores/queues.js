@@ -64,12 +64,13 @@ lastMessage: null,
         await this.fetch()
     },
     async get(queue) {
-        const {data} = await api.post(`/queues/${encodeURIComponent(queue)}/get`, {
-          queue: queue,
-          vhost: "/",
-          ackMode: "ack", // "ack" | "noack" | "reject" | "reject_requeue"
+        const encodedVhost = encodeURIComponent('/')
+        const encodedQueue = encodeURIComponent(queue)
+        const {data} = await api.post(`/queues/${encodedVhost}/${encodedQueue}/get`, {
+          ack_mode: "ack",
+          message_count: 1,
         })
-        this.lastMessage = data?.message ?? null
+        this.lastMessage = data?.messages?.[0]?.payload_text ?? null
         await this.fetch()
         return this.lastMessage
     },

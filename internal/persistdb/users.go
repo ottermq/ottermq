@@ -13,10 +13,6 @@ import (
 )
 
 func AddUser(user UserCreateDTO) error {
-	if err := OpenDB(); err != nil {
-		return err
-	}
-	defer CloseDB()
 	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to hash password")
@@ -31,10 +27,6 @@ func AddUser(user UserCreateDTO) error {
 }
 
 func GetUsers() ([]User, error) {
-	if err := OpenDB(); err != nil {
-		return nil, err
-	}
-	defer CloseDB()
 	rows, err := db.Query("SELECT id, username, role_id FROM users")
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query users")
@@ -56,10 +48,6 @@ func GetUsers() ([]User, error) {
 }
 
 func GetUserByUsername(username string) (User, error) {
-	if err := OpenDB(); err != nil {
-		return User{}, err
-	}
-	defer CloseDB()
 	var user User
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
@@ -69,7 +57,7 @@ func GetUserByUsername(username string) (User, error) {
 	return user, nil
 }
 
-func GenerateJWTToken(user UserListDTO) (string, error) {
+func GenerateJWTToken(user UserListDTO, jwtSecret string) (string, error) {
 	// convert user to json
 	jsonUser, err := json.Marshal(user)
 	if err != nil {
@@ -80,7 +68,7 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 
 	claims := jwt.MapClaims{
 		"iss":         "ottermq",
-		"sud":         user.ID,
+		"sub":         user.ID,
 		"aud":         "ottermq",
 		"exp":         jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		"nbf":         jwt.NewNumericDate(time.Now()),
@@ -91,11 +79,13 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 		"encodeduser": encoded,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte("secret"))
+	return token.SignedString([]byte(jwtSecret))
 }
 
+var bcryptCost = 14
+
 func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	return string(bytes), err
 }
 
