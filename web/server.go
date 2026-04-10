@@ -185,6 +185,18 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.GetChannel(c, ws.Broker)
 	})
 
+	// Node routes
+
+	apiGrp.Get("/nodes", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListNodes(c, ws.Broker)
+	})
+	apiGrp.Get("/nodes/:name", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetNode(c, ws.Broker)
+	})
+	apiGrp.Get("/nodes/:name/memory", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetNodeMemory(c, ws.Broker)
+	})
+
 	// Definitions routes
 
 	apiGrp.Get("/definitions", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {

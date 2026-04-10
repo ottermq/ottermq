@@ -1943,6 +1943,132 @@ const docTemplate = `{
                 }
             }
         },
+        "/nodes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the list of nodes in the cluster. OtterMQ is single-node, so this always returns one entry.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "List cluster nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OverviewNodeDetails"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns details for a specific node by name (e.g. ottermq@hostname).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get node details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OverviewNodeDetails"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{name}/memory": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a detailed memory usage breakdown for the specified node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get node memory breakdown",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.NodeMemoryDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/overview": {
             "get": {
                 "security": [
@@ -3585,6 +3711,55 @@ const docTemplate = `{
                 "message_rates": {
                     "description": "message rates strategy",
                     "type": "string"
+                }
+            }
+        },
+        "models.NodeMemoryBreakdown": {
+            "type": "object",
+            "properties": {
+                "gc_sys": {
+                    "description": "bytes used for GC metadata",
+                    "type": "integer"
+                },
+                "heap_alloc": {
+                    "description": "bytes currently allocated on the heap",
+                    "type": "integer"
+                },
+                "heap_idle": {
+                    "description": "bytes in idle spans",
+                    "type": "integer"
+                },
+                "heap_inuse": {
+                    "description": "bytes in in-use spans",
+                    "type": "integer"
+                },
+                "heap_sys": {
+                    "description": "bytes obtained from the OS for the heap",
+                    "type": "integer"
+                },
+                "other_sys": {
+                    "description": "other runtime allocations",
+                    "type": "integer"
+                },
+                "stack_inuse": {
+                    "description": "bytes used by goroutine stacks",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "MemoryLimit (system RAM)",
+                    "type": "integer"
+                },
+                "used": {
+                    "description": "MemoryUsage (Go heap from OS)",
+                    "type": "integer"
+                }
+            }
+        },
+        "models.NodeMemoryDTO": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "$ref": "#/definitions/models.NodeMemoryBreakdown"
                 }
             }
         },
