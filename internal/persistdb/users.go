@@ -120,6 +120,40 @@ func ChangePassword(username, newPassword string) error {
 	return nil
 }
 
+// GetUsersWithHashes returns all users including their bcrypt password hashes.
+// Used for definitions export.
+func GetUsersWithHashes() ([]User, error) {
+	rows, err := db.Query("SELECT id, username, password, role_id FROM users")
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query users with hashes")
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.RoleID); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+// AddUserWithHash inserts a user using an already-hashed password (e.g. from a definitions import).
+// Silently skips the insert when the username already exists.
+func AddUserWithHash(username, hash string, roleID int) error {
+	_, err := db.Exec(
+		"INSERT OR IGNORE INTO users (username, password, role_id) VALUES (?, ?, ?)",
+		username, hash, roleID,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("username", username).Msg("Failed to insert user with hash")
+	}
+	return err
+}
+
 func (u User) ToUserListDTO() (UserListDTO, error) {
 	role, err := GetRoleByID(u.RoleID)
 	if err != nil {

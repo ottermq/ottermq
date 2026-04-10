@@ -1166,6 +1166,206 @@ const docTemplate = `{
                 }
             }
         },
+        "/definitions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Export vhosts, users, permissions, exchanges, queues, and bindings as JSON.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Export all broker definitions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Import vhosts, users, permissions, exchanges, queues, and bindings from JSON. Existing resources are skipped.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Import broker definitions",
+                "parameters": [
+                    {
+                        "description": "Definitions to import",
+                        "name": "definitions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsImportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/definitions/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Export exchanges, queues, and bindings scoped to one vhost.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Export definitions for a single virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Import exchanges, queues, and bindings into the specified vhost. Existing resources are skipped.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Import definitions scoped to a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Definitions to import",
+                        "name": "definitions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsImportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/exchanges": {
             "get": {
                 "security": [
@@ -2719,6 +2919,30 @@ const docTemplate = `{
                 }
             }
         },
+        "models.BindingDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "destination_type": {
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
         "models.BindingListResponse": {
             "type": "object",
             "properties": {
@@ -3030,6 +3254,73 @@ const docTemplate = `{
                 }
             }
         },
+        "models.DefinitionsDTO": {
+            "type": "object",
+            "properties": {
+                "bindings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.BindingDefinition"
+                    }
+                },
+                "exchanges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ExchangeDefinition"
+                    }
+                },
+                "ottermq_version": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PermissionDefinition"
+                    }
+                },
+                "queues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.QueueDefinition"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserDefinition"
+                    }
+                },
+                "vhosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VHostDefinition"
+                    }
+                }
+            }
+        },
+        "models.DefinitionsImportResponse": {
+            "type": "object",
+            "properties": {
+                "bindings_created": {
+                    "type": "integer"
+                },
+                "exchanges_created": {
+                    "type": "integer"
+                },
+                "permissions_granted": {
+                    "type": "integer"
+                },
+                "queues_created": {
+                    "type": "integer"
+                },
+                "users_created": {
+                    "type": "integer"
+                },
+                "vhosts_created": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.DeleteBindingRequest": {
             "type": "object",
             "required": [
@@ -3102,6 +3393,33 @@ const docTemplate = `{
                 },
                 "vhost": {
                     "description": "Identity",
+                    "type": "string"
+                }
+            }
+        },
+        "models.ExchangeDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "type": "boolean"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "vhost": {
                     "type": "string"
                 }
             }
@@ -3462,6 +3780,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.PermissionDefinition": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
         "models.PermissionListResponse": {
             "type": "object",
             "properties": {
@@ -3607,6 +3936,27 @@ const docTemplate = `{
                 }
             }
         },
+        "models.QueueDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
         "models.QueueListResponse": {
             "type": "object",
             "properties": {
@@ -3679,6 +4029,21 @@ const docTemplate = `{
                 }
             }
         },
+        "models.UserDefinition": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "password_hash": {
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "role name, e.g. \"administrator\"",
+                    "type": "string"
+                }
+            }
+        },
         "models.UserListResponse": {
             "type": "object",
             "properties": {
@@ -3743,6 +4108,14 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "models.VHostDefinition": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
                 }
             }
         },

@@ -185,6 +185,21 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.GetChannel(c, ws.Broker)
 	})
 
+	// Definitions routes
+
+	apiGrp.Get("/definitions", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ExportDefinitions(c, ws.Broker)
+	})
+	apiGrp.Post("/definitions", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ImportDefinitions(c, ws.Broker)
+	})
+	apiGrp.Get("/definitions/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ExportVHostDefinitions(c, ws.Broker)
+	})
+	apiGrp.Post("/definitions/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ImportVHostDefinitions(c, ws.Broker)
+	})
+
 	// Health check routes
 
 	apiGrp.Get("/health/checks/alarms", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
