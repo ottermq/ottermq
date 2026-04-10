@@ -69,6 +69,18 @@ func createTables() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create 'role_permissions' table")
 	}
+
+	createUserVHostsTable := `
+	CREATE TABLE IF NOT EXISTS user_vhosts (
+		username TEXT NOT NULL,
+		vhost TEXT NOT NULL,
+		PRIMARY KEY(username, vhost),
+		FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE
+	);`
+	_, err = db.Exec(createUserVHostsTable)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create 'user_vhosts' table")
+	}
 }
 
 func OpenDB() error {

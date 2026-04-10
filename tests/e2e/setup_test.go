@@ -105,6 +105,9 @@ func setupBroker() error {
 	if err := persistdb.AddUser(user); err != nil {
 		return fmt.Errorf("failed to add test user: %w", err)
 	}
+	if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
+		return fmt.Errorf("failed to grant vhost access: %w", err)
+	}
 	dbUser, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
