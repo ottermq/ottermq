@@ -85,6 +85,10 @@ type ManagementService interface {
 	ListVHosts() ([]models.VHostDTO, error)
 	// GetVHost retrieves details of a specific virtual host.
 	GetVHost(name string) (*models.VHostDTO, error)
+	// CreateVHost creates a new virtual host.
+	CreateVHost(name string) error
+	// DeleteVHost deletes a virtual host and all its resources.
+	DeleteVHost(name string) error
 
 	/* Overview/Stats */
 
