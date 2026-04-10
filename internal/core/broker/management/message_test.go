@@ -148,14 +148,14 @@ func TestGetMessages_WithAck(t *testing.T) {
 
 	assert.Len(t, msgs, 1)
 
-	// Verify message is tracked as unacked
+	// Verify message was acked immediately (not left as unacked)
 	key := vhost.ConnectionChannelKey{
 		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
 		Channel:      0,
 	}
 	state := vh.ChannelDeliveries[key]
 	require.NotNil(t, state)
-	assert.Len(t, state.UnackedByTag, 1)
+	assert.Empty(t, state.UnackedByTag)
 }
 
 func TestGetMessages_EmptyQueue(t *testing.T) {

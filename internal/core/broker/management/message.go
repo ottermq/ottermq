@@ -69,6 +69,12 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 		count = msgCount
 	}
 
+	channelKey := vhost.ConnectionChannelKey{
+		ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
+		Channel:      0,
+	}
+	ch := vh.GetOrCreateChannelDelivery(channelKey)
+
 	for i := 0; i < count; i++ {
 		msg := vh.GetMessage(queue, noAck)
 
@@ -76,13 +82,22 @@ func (s *Service) GetMessages(vhostName, queue string, count int, ackMode models
 			return []models.MessageDTO{}, nil
 		}
 
-		channelKey := vhost.ConnectionChannelKey{
-			ConnectionID: vhost.MANAGEMENT_CONNECTION_ID,
-			Channel:      0,
-		}
-		ch := vh.GetOrCreateChannelDelivery(channelKey)
-
 		deliveryTag := ch.TrackDelivery(noAck, msg, queue)
+
+		switch ackMode {
+		case models.Ack:
+			if err := vh.HandleBasicAck(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to ack management message")
+			}
+		case models.Reject:
+			if err := vh.HandleBasicNack(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false, false); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to reject management message")
+			}
+		case models.RejectRequeue:
+			if err := vh.HandleBasicNack(vhost.MANAGEMENT_CONNECTION_ID, 0, deliveryTag, false, true); err != nil {
+				log.Warn().Err(err).Uint64("delivery_tag", deliveryTag).Msg("Failed to reject-requeue management message")
+			}
+		}
 
 		redelivered := vh.ShouldRedeliver(msg.ID)
 
