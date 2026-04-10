@@ -43,3 +43,8 @@ type ConsumerListResponse struct {
 type MessageListResponse struct {
 	Messages []MessageDTO `json:"messages"`
 }
+
+type HealthCheckResponse struct {
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
