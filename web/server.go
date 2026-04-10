@@ -208,6 +208,9 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	apiAdminGrp.Use(middleware.AdminOnly)
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
+	apiAdminGrp.Get("/users/:username", api_admin.GetUser)
+	apiAdminGrp.Delete("/users/:username", api_admin.DeleteUser)
+	apiAdminGrp.Put("/users/:username/password", api_admin.ChangePassword)
 }
 
 func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
