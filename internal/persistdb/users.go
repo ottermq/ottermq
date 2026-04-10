@@ -3,6 +3,7 @@ package persistdb
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -87,6 +88,36 @@ var bcryptCost = 14
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	return string(bytes), err
+}
+
+func DeleteUser(username string) error {
+	result, err := db.Exec("DELETE FROM users WHERE username = ?", username)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to delete user")
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+	return nil
+}
+
+func ChangePassword(username, newPassword string) error {
+	hashed, err := hashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	result, err := db.Exec("UPDATE users SET password = ? WHERE username = ?", hashed, username)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update password")
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+	return nil
 }
 
 func (u User) ToUserListDTO() (UserListDTO, error) {
