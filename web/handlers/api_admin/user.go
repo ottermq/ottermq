@@ -83,38 +83,39 @@ func GetUsers(c *fiber.Ctx) error {
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Invalid username or password"
 // @Failure 500 {object} models.ErrorResponse
 // @Router /login [post]
-func Login(c *fiber.Ctx) error {
-	var req models.AuthRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
+func Login(jwtSecret string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.AuthRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		err := persistdb.OpenDB()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		defer persistdb.CloseDB()
 
-	ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(models.UnauthorizedErrorResponse{Error: "Invalid username or password"})
-	}
-	// get user
-	persistedUser, err := persistdb.GetUserByUsername(req.Username)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
+		ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(models.UnauthorizedErrorResponse{Error: "Invalid username or password"})
+		}
+		// get user
+		persistedUser, err := persistdb.GetUserByUsername(req.Username)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
 
-	userdto, err := persistedUser.ToUserListDTO()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		userdto, err := persistedUser.ToUserListDTO()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		token, err := persistdb.GenerateJWTToken(userdto, jwtSecret)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		return c.Status(fiber.StatusOK).JSON(models.AuthResponse{Token: token})
 	}
-	token, err := persistdb.GenerateJWTToken(userdto)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	return c.Status(fiber.StatusOK).JSON(models.AuthResponse{Token: token})
-
 }

@@ -69,7 +69,7 @@ func GetUserByUsername(username string) (User, error) {
 	return user, nil
 }
 
-func GenerateJWTToken(user UserListDTO) (string, error) {
+func GenerateJWTToken(user UserListDTO, jwtSecret string) (string, error) {
 	// convert user to json
 	jsonUser, err := json.Marshal(user)
 	if err != nil {
@@ -80,7 +80,7 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 
 	claims := jwt.MapClaims{
 		"iss":         "ottermq",
-		"sud":         user.ID,
+		"sub":         user.ID,
 		"aud":         "ottermq",
 		"exp":         jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		"nbf":         jwt.NewNumericDate(time.Now()),
@@ -91,7 +91,7 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 		"encodeduser": encoded,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte("secret"))
+	return token.SignedString([]byte(jwtSecret))
 }
 
 func hashPassword(password string) (string, error) {

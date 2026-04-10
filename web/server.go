@@ -67,7 +67,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// Public API routes
-	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login)
+	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login(ws.config.JwtKey))
 
 	app.Get(ws.config.ApiPrefix+"/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetBasicBrokerInfo(c, ws.Broker)
