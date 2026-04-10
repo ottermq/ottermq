@@ -201,20 +201,21 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 		}
 		log.Debug().Str("client", conn.RemoteAddr().String()).Msg("New client waiting for connection")
 		connCtx, connCancel := context.WithCancel(b.rootCtx)
-		defer connCancel()
 		connInfo, err := b.framer.Handshake(&configurations, conn, connCtx)
 		if err != nil {
+			connCancel()
 			log.Info().Err(err).Msg("Handshake failed")
 			continue
 		}
 		b.registerConnection(conn, connInfo)
-		go b.monitorConnectionLifecycle(conn, connInfo.Client)
+		go b.monitorConnectionLifecycle(conn, connInfo.Client, connCancel)
 
 		go b.handleConnection(conn, connInfo)
 	}
 }
 
-func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient) {
+func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient, cancel context.CancelFunc) {
+	defer cancel()
 	<-client.Ctx.Done()
 	log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 	b.cleanupConnection(conn)
