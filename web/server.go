@@ -191,6 +191,7 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	// Admin API routes
 	apiAdminGrp := app.Group(ws.config.ApiPrefix + "/admin")
 	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
+	apiAdminGrp.Use(middleware.AdminOnly)
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
 }
