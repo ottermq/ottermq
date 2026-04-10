@@ -25,3 +25,11 @@ func (s *Service) GetVHost(name string) (*models.VHostDTO, error) {
 	}
 	return &dto, nil
 }
+
+func (s *Service) CreateVHost(name string) error {
+	return s.broker.CreateVHost(name)
+}
+
+func (s *Service) DeleteVHost(name string) error {
+	return s.broker.DeleteVHost(name)
+}

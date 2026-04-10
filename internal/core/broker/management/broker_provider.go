@@ -13,6 +13,8 @@ type BrokerProvider interface {
 	ListVHosts() []*vhost.VHost
 	ListVhostDetails() ([]models.VHostDTO, error)
 	CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error)
+	CreateVHost(name string) error
+	DeleteVHost(name string) error
 	ListConnections() []amqp.ConnectionInfo
 	ListChannels(vhost string) ([]models.ChannelInfo, error)
 	ListConnectionChannels(connectionName string) ([]models.ChannelInfo, error)

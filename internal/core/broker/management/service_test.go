@@ -1,6 +1,7 @@
 package management
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -83,8 +84,24 @@ func (fb *fakeBroker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
 }
 
 func (fb *fakeBroker) GetCollector() metrics.MetricsCollector {
-	// For testing purposes, return a new Collector.
 	return fb.collector
+}
+
+func (fb *fakeBroker) CreateVHost(name string) error {
+	if _, exists := fb.vhosts[name]; exists {
+		return fmt.Errorf("vhost '%s' already exists", name)
+	}
+	options := vhost.VHostOptions{QueueBufferSize: 100, Persistence: &dummy.DummyPersistence{}}
+	fb.vhosts[name] = vhost.NewVhost(name, options)
+	return nil
+}
+
+func (fb *fakeBroker) DeleteVHost(name string) error {
+	if _, exists := fb.vhosts[name]; !exists {
+		return fmt.Errorf("vhost '%s' not found", name)
+	}
+	delete(fb.vhosts, name)
+	return nil
 }
 
 // setupTestBroker creates a single default vhost and returns a BrokerProvider.
