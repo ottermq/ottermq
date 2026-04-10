@@ -108,14 +108,12 @@ func main() {
 		}
 		log.Info().Msg("Web server gracefully stopped")
 	}
-	log.Info().Msg("Server gracefully stopped")
 
-	defer func() {
-		if promServer != nil {
-			promServer.Shutdown()
-		}
-	}()
-	os.Exit(0) // if came so far it means the server has stopped gracefully
+	if promServer != nil {
+		promServer.Shutdown()
+	}
+
+	log.Info().Msg("Server gracefully stopped")
 }
 
 // initializeMetricsCollector sets up the metrics collector for the broker.
