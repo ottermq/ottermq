@@ -15,9 +15,11 @@ func TestMaxLen_BasicOverflow(t *testing.T) {
 	tc := NewTestConnection(t, brokerURL)
 	defer tc.Close()
 
+	queueName := tc.UniqueQueueName("test-maxlen-basic")
+
 	// Create queue with max-length=5
 	queue, err := tc.Ch.QueueDeclare(
-		"test-maxlen-basic",
+		queueName,
 		false,
 		true,
 		false,
@@ -61,19 +63,22 @@ func TestMaxLen_WithDeadLetter(t *testing.T) {
 	defer tc.Close()
 
 	// Setup DLX infrastructure
-	dlx := "test-dlx-maxlen"
+	dlx := tc.UniqueName("test-dlx-maxlen")
+	dlk := "evicted"
+	dlqName := tc.UniqueQueueName("test-dlq-maxlen")
 	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	dlq, err := tc.Ch.QueueDeclare("test-dlq-maxlen", false, true, false, false, nil)
+	dlq, err := tc.Ch.QueueDeclare(dlqName, false, true, false, false, nil)
 	require.NoError(t, err)
 
-	err = tc.Ch.QueueBind(dlq.Name, "evicted", dlx, false, nil)
+	err = tc.Ch.QueueBind(dlq.Name, dlk, dlx, false, nil)
 	require.NoError(t, err)
 
 	// Create main queue with max-length=3 and DLX
+	mainQueueName := tc.UniqueQueueName("test-queue-maxlen-dlx")
 	mainQueue, err := tc.Ch.QueueDeclare(
-		"test-queue-maxlen-dlx",
+		mainQueueName,
 		false,
 		true,
 		false,
@@ -81,7 +86,7 @@ func TestMaxLen_WithDeadLetter(t *testing.T) {
 		amqp.Table{
 			"x-max-length":              int32(3),
 			"x-dead-letter-exchange":    dlx,
-			"x-dead-letter-routing-key": "evicted",
+			"x-dead-letter-routing-key": dlk,
 		},
 	)
 	require.NoError(t, err)
@@ -138,9 +143,11 @@ func TestMaxLen_TransactionCommit(t *testing.T) {
 	err := tc.Ch.Tx()
 	require.NoError(t, err)
 
+	queueName := tc.UniqueQueueName("test-maxlen-tx")
+
 	// Create queue with max-length=5
 	queue, err := tc.Ch.QueueDeclare(
-		"test-maxlen-tx",
+		queueName,
 		false,
 		true,
 		false,
@@ -183,19 +190,22 @@ func TestMaxLen_RequeueRespected(t *testing.T) {
 	defer tc.Close()
 
 	// Setup DLX for overflow detection
-	dlx := "test-dlx-maxlen-requeue"
+	dlx := tc.UniqueName("test-dlx-maxlen-requeue")
+	dlk := "evicted"
+	dlqName := tc.UniqueQueueName("test-dlq-maxlen-requeue")
 	err := tc.Ch.ExchangeDeclare(dlx, "direct", false, true, false, false, nil)
 	require.NoError(t, err)
 
-	dlq, err := tc.Ch.QueueDeclare("test-dlq-maxlen-requeue", false, false, false, false, nil)
+	dlq, err := tc.Ch.QueueDeclare(dlqName, false, false, false, false, nil)
 	require.NoError(t, err)
 
-	err = tc.Ch.QueueBind(dlq.Name, "evicted", dlx, false, nil)
+	err = tc.Ch.QueueBind(dlq.Name, dlk, dlx, false, nil)
 	require.NoError(t, err)
 
 	// Create queue with max-length=3 (NOT auto-delete to avoid race during consumer cancel)
+	queueName := tc.UniqueQueueName("test-maxlen-requeue")
 	queue, err := tc.Ch.QueueDeclare(
-		"test-maxlen-requeue",
+		queueName,
 		false,
 		false, // NOT auto-delete
 		false,
@@ -203,7 +213,7 @@ func TestMaxLen_RequeueRespected(t *testing.T) {
 		amqp.Table{
 			"x-max-length":              int32(3),
 			"x-dead-letter-exchange":    dlx,
-			"x-dead-letter-routing-key": "evicted",
+			"x-dead-letter-routing-key": dlk,
 		},
 	)
 	require.NoError(t, err)
@@ -276,13 +286,14 @@ func TestMaxLen_FanoutIndependence(t *testing.T) {
 	defer tc.Close()
 
 	// Create fanout exchange
-	exchange := "test-fanout-maxlen"
+	exchange := tc.UniqueName("test-fanout-maxlen")
 	err := tc.Ch.ExchangeDeclare(exchange, "fanout", false, true, false, false, nil)
 	require.NoError(t, err)
 
 	// Create three queues with different max-lengths
+	queue1Name := tc.UniqueQueueName("test-q1-max2")
 	queue1, err := tc.Ch.QueueDeclare(
-		"test-q1-max2",
+		queue1Name,
 		false,
 		true,
 		false,
@@ -291,8 +302,9 @@ func TestMaxLen_FanoutIndependence(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	queue2Name := tc.UniqueQueueName("test-q2-max5")
 	queue2, err := tc.Ch.QueueDeclare(
-		"test-q2-max5",
+		queue2Name,
 		false,
 		true,
 		false,
@@ -301,8 +313,9 @@ func TestMaxLen_FanoutIndependence(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	queue3Name := tc.UniqueQueueName("test-q3-unlimited")
 	queue3, err := tc.Ch.QueueDeclare(
-		"test-q3-unlimited",
+		queue3Name,
 		false,
 		true,
 		false,
@@ -367,8 +380,9 @@ func TestMaxLen_NoLimitQueue(t *testing.T) {
 	defer tc.Close()
 
 	// Create queue without max-length
+	queueName := tc.UniqueQueueName("test-no-maxlen")
 	queue, err := tc.Ch.QueueDeclare(
-		"test-no-maxlen",
+		queueName,
 		false,
 		true,
 		false,
@@ -407,8 +421,9 @@ func TestMaxLen_PropertyPreservation(t *testing.T) {
 	defer tc.Close()
 
 	// Create queue with max-length=2
+	queueName := tc.UniqueQueueName("test-maxlen-props")
 	queue, err := tc.Ch.QueueDeclare(
-		"test-maxlen-props",
+		queueName,
 		false,
 		true,
 		false,

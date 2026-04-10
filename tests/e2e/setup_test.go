@@ -105,16 +105,10 @@ func setupBroker() error {
 	if err := persistdb.AddUser(user); err != nil {
 		return fmt.Errorf("failed to add test user: %w", err)
 	}
-	persistdb.CloseDB()
-
-	if err := persistdb.OpenDB(); err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
 	dbUser, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
-	persistdb.CloseDB()
 
 	// Create broker
 	testBrokerCtx, testBrokerStop = context.WithCancel(context.Background())
@@ -156,6 +150,8 @@ func waitForBroker(timeout time.Duration) error {
 }
 
 func teardownBroker() {
+	defer persistdb.CloseDB()
+
 	if testBrokerStop != nil {
 		log.Info().Msg("Shutting down test broker...")
 		testBrokerStop()
