@@ -36,6 +36,11 @@ type Persistence interface {
 	LoadAllExchanges(vhost string) ([]ExchangeSnapshot, error)
 	LoadAllQueues(vhost string) ([]QueueSnapshot, error)
 
+	// VHost operations
+	SaveVHostMetadata(name string) error
+	DeleteVHostMetadata(name string) error
+	LoadAllVHosts() ([]string, error)
+
 	// Lifecycle
 	Initialize() error
 	Close() error

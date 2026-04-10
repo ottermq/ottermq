@@ -386,6 +386,43 @@ func (jp *JsonPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnaps
 	return snapshots, nil
 }
 
+// SaveVHostMetadata ensures the vhost directory exists on disk.
+func (jp *JsonPersistence) SaveVHostMetadata(name string) error {
+	dir := filepath.Join(jp.dataDir, "vhosts", safeVHostName(name))
+	return os.MkdirAll(dir, 0755)
+}
+
+// DeleteVHostMetadata removes the entire vhost directory tree.
+func (jp *JsonPersistence) DeleteVHostMetadata(name string) error {
+	dir := filepath.Join(jp.dataDir, "vhosts", safeVHostName(name))
+	return os.RemoveAll(dir)
+}
+
+// LoadAllVHosts returns the names of all persisted vhosts by reading the
+// vhosts/ directory. The safe-encoded directory names are decoded back.
+func (jp *JsonPersistence) LoadAllVHosts() ([]string, error) {
+	dir := filepath.Join(jp.dataDir, "vhosts")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name, err := url.PathUnescape(e.Name())
+		if err != nil {
+			name = e.Name()
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 /* ---- Private methods ---- */
 
 // LoadQueue loads a single queue from a JSON file
