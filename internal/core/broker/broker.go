@@ -105,6 +105,17 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 
 	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
 
+	// Recover any additional vhosts that were persisted from previous runs
+	if names, err := persist.LoadAllVHosts(); err == nil {
+		for _, name := range names {
+			if name == DEFAULT_VHOST {
+				continue
+			}
+			b.VHosts[name] = initializeVHost(name, options, b)
+			log.Info().Str("vhost", name).Msg("Recovered persisted vhost")
+		}
+	}
+
 	b.Management = management.NewService(b)
 	return b
 }
@@ -338,6 +349,70 @@ func (b *Broker) ListVHosts() []*vhost.VHost {
 		vhosts = append(vhosts, vh)
 	}
 	return vhosts
+}
+
+// CreateVHost creates a new virtual host with the given name.
+// Returns an error if the vhost already exists.
+func (b *Broker) CreateVHost(name string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, exists := b.VHosts[name]; exists {
+		return fmt.Errorf("vhost '%s' already exists", name)
+	}
+
+	options := vhost.VHostOptions{
+		QueueBufferSize: b.config.QueueBufferSize,
+		MaxPriority:     b.config.MaxPriority,
+		Persistence:     b.persist,
+		EnableDLX:       b.config.EnableDLX,
+		EnableTTL:       b.config.EnableTTL,
+		EnableQLL:       b.config.EnableQLL,
+	}
+	vh := initializeVHost(name, options, b)
+	b.VHosts[name] = vh
+
+	if b.persist != nil {
+		if err := b.persist.SaveVHostMetadata(name); err != nil {
+			delete(b.VHosts, name)
+			return fmt.Errorf("failed to persist vhost: %w", err)
+		}
+	}
+	log.Info().Str("vhost", name).Msg("Created vhost")
+	return nil
+}
+
+// DeleteVHost removes a virtual host and all its resources.
+// The default vhost "/" cannot be deleted.
+// Returns an error if the vhost has active connections.
+func (b *Broker) DeleteVHost(name string) error {
+	if name == DEFAULT_VHOST {
+		return fmt.Errorf("cannot delete the default vhost '/'")
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, exists := b.VHosts[name]; !exists {
+		return fmt.Errorf("vhost '%s' not found", name)
+	}
+
+	// Reject if there are active connections on this vhost
+	for _, connInfo := range b.Connections {
+		if connInfo.VHostName == name {
+			return fmt.Errorf("vhost '%s' has active connections", name)
+		}
+	}
+
+	delete(b.VHosts, name)
+
+	if b.persist != nil {
+		if err := b.persist.DeleteVHostMetadata(name); err != nil {
+			log.Warn().Err(err).Str("vhost", name).Msg("Failed to delete persisted vhost data")
+		}
+	}
+	log.Info().Str("vhost", name).Msg("Deleted vhost")
+	return nil
 }
 
 // ListConnections returns all active connections in the broker.
