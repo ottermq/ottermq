@@ -233,14 +233,20 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	if err := persistdb.OpenDB(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to open database")
 	}
+	// InitDB is idempotent (CREATE TABLE IF NOT EXISTS) — always run it so new
+	// tables added in later versions are created on existing databases too.
+	persistdb.InitDB()
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		log.Info().Msg("Database file not found. Creating a new one...")
-		persistdb.InitDB()
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
 		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
 		if err := persistdb.AddUser(user); err != nil {
 			log.Error().Err(err).Msg("Failed to add user")
+		}
+		// Grant default user access to the default vhost
+		if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
+			log.Error().Err(err).Msg("Failed to grant default vhost access")
 		}
 	}
 	user, err := persistdb.GetUserByUsername(cfg.Username)

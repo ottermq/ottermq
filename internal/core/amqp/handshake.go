@@ -143,16 +143,19 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	}
 
 	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpen)
-	// TODO: #121 validate if the vhost exists - if not, raise connection exception - 402
-	// The challenge is that at this point we don't have access to the Broker struct
-	// We can return the VHostName in the ConnectionInfo struct and let the Broker handle it
-	// We could also pass a callback function to the handshake function to validate the vhost
-	// Or a list of valid vhosts in the configurations map
-
 	if openFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionOpenFrame failed")
 	}
 	VHostName := openFrame.VirtualHost
+
+	// Enforce vhost membership: check that the authenticated user is allowed on this vhost.
+	username, _ := (*configurations)["username"].(string)
+	if username != "" {
+		ok, err := persistdb.HasVHostAccess(username, VHostName)
+		if err != nil || !ok {
+			return nil, fmt.Errorf("access to vhost '%s' denied for user '%s'", VHostName, username)
+		}
+	}
 
 	connInfo := NewConnectionInfo(VHostName)
 	connInfo.Client = client
