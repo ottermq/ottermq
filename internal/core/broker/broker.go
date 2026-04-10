@@ -228,7 +228,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		log.Debug().Msg("processRequest called with nil MethodFrame")
 		return nil, nil
 	}
+	b.mu.Lock()
 	connInfo, exist := b.Connections[conn]
+	b.mu.Unlock()
 	if !exist {
 		// connection terminated while processing the request
 		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")

@@ -20,7 +20,10 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 
 	defer func() {
 		defer b.ActiveConns.Done()
-		if len(b.Connections) == 0 {
+		b.mu.Lock()
+		_, exists := b.Connections[conn]
+		b.mu.Unlock()
+		if !exists {
 			log.Debug().Msg("No connections to clean")
 			return
 		}
