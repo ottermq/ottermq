@@ -48,6 +48,7 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	cmd.AddCommand(NewChannelsCmd(rt))
 	cmd.AddCommand(NewConsumersCmd(rt))
 	cmd.AddCommand(NewHealthCmd(rt))
+	cmd.AddCommand(NewDefinitionsCmd(rt))
 
 	return cmd
 }
