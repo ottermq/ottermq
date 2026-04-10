@@ -148,7 +148,33 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ❌ **Missing Features**
 
-#### **Phase 1: Clustering & Federation (Lower Priority)**
+#### **Phase 1: CLI Admin Tool (Next Priority)**
+
+- [ ] **CLI Admin Tool (`ottermqadmin`)**
+  - [ ] Cobra-based CLI application
+  - [ ] Shared typed HTTP client for OtterMQ management API
+  - [ ] Authentication via existing login/JWT flow
+  - [ ] Human-readable and `--json` output modes
+  - [ ] Initial commands for overview, queues, exchanges, bindings, publish, and message retrieval
+  - [ ] Remote broker support (local and remote HTTP endpoints)
+  - [ ] CLI-focused integration tests
+
+#### **Phase 2: Broker/Product Improvements**
+
+- [ ] **Swappable Persistence Architecture**
+  - [ ] Configuration-based persistence selection
+  - [ ] Fully decouple active backend creation from broker startup
+- [ ] **Recovery system**
+  - [ ] Durable queues and exchanges
+  - [ ] Persistent message recovery
+- [ ] **Metrics and monitoring**
+  - [ ] Better broker/channel publish and deliver statistics
+- [ ] **Enhanced Web UI**
+  - [ ] Real-time connection monitoring
+  - [ ] Message flow visualization
+  - [ ] Performance metrics dashboard
+
+#### **Phase 3: Clustering & Federation (Lowest Priority)**
 
 - [ ] **Cluster support**
 - [ ] **Queue mirroring**

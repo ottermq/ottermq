@@ -3,12 +3,12 @@ package web
 import (
 	"os"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/web/docs"
-	_ "github.com/andrelcunha/ottermq/web/docs"
-	"github.com/andrelcunha/ottermq/web/handlers/api"
-	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
-	"github.com/andrelcunha/ottermq/web/middleware"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/web/docs"
+	_ "github.com/ottermq/ottermq/web/docs"
+	"github.com/ottermq/ottermq/web/handlers/api"
+	"github.com/ottermq/ottermq/web/handlers/api_admin"
+	"github.com/ottermq/ottermq/web/middleware"
 
 	"github.com/gofiber/swagger"
 
@@ -67,7 +67,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// Public API routes
-	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login)
+	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login(ws.config.JwtKey))
 
 	app.Get(ws.config.ApiPrefix+"/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetBasicBrokerInfo(c, ws.Broker)
@@ -120,7 +120,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetExchange(c, ws.Broker)
 	})
-	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Post("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})
 	apiGrp.Delete("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
@@ -138,7 +138,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListBindings(c, ws.Broker)
 	})
 	apiGrp.Get("/bindings/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.ListBindings(c, ws.Broker)
+		return api.ListVhostBindings(c, ws.Broker)
 	})
 	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.BindQueue(c, ws.Broker)
@@ -191,6 +191,7 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	// Admin API routes
 	apiAdminGrp := app.Group(ws.config.ApiPrefix + "/admin")
 	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
+	apiAdminGrp.Use(middleware.AdminOnly)
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
 }

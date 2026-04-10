@@ -10,10 +10,6 @@ var defaultPermissions = []Permission{
 }
 
 func AddDefaultPermissions() {
-	if err := OpenDB(); err != nil {
-		return
-	}
-	defer CloseDB()
 	// Add permissions to the database
 	for _, permission := range defaultPermissions {
 		_, err := db.Exec("INSERT INTO permissions (action, resource) VALUES (?, ?)", permission.Action, permission.Resource)

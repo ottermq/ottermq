@@ -1,6 +1,6 @@
 package management
 
-import "github.com/andrelcunha/ottermq/internal/core/models"
+import "github.com/ottermq/ottermq/internal/core/models"
 
 func (s *Service) ListVHosts() ([]models.VHostDTO, error) {
 	vhosts := s.broker.ListVHosts()

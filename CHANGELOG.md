@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** Prior to establishing this CHANGELOG.md file, release notes were maintained directly in [GitHub Releases](https://github.com/ottermq/ottermq/releases). Going forward, all changes will be tracked here and synchronized with releases.
 
+## [Unreleased]
+
+### Added
+
+- **`ottermqadmin` CLI foundation**:
+  - new `cmd/ottermqadmin` binary using Cobra
+  - shared typed management API client in `pkg/adminapi/client`
+  - read commands for overview, queues, exchanges, bindings, connections, channels, and consumers
+  - mutation commands for queues, exchanges, bindings, publish, and queue message retrieval
+  - JSON and human-readable output modes
+  - focused CLI and client unit tests
+
+### Changed
+
+- **Make targets**:
+  - added `make build-admin`
+  - added `make install-admin`
+  - added `make test-cli`
+  - `make build-all` now builds the broker, UI, and CLI
+
+### Fixed
+
+- **CLI output wiring**: successful `ottermqadmin` commands now write to process stdout instead of being discarded
+- **Default exchange publishing**:
+  - `ottermqadmin publish / "" ...` now targets the AMQP default exchange correctly
+  - management publish handler now URL-decodes the `vhost` path parameter
+- **Management API path fixes used by the CLI**:
+  - fixed exchange creation route registration
+  - fixed vhost-filtered bindings route wiring
+  - queue message retrieval now returns structured message DTOs
+
 ## [v0.17.0] - 2025-12-15
 
 ### Added

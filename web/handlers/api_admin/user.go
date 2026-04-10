@@ -1,8 +1,8 @@
 package api_admin
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/persistdb"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -28,12 +28,7 @@ func AddUser(c *fiber.Ctx) error {
 	if user.Password != user.ConfirmPassword {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "Passwords do not match"})
 	}
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
-	err = persistdb.AddUser(user.ToPersist())
+	err := persistdb.AddUser(user.ToPersist())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
@@ -52,11 +47,6 @@ func AddUser(c *fiber.Ctx) error {
 // @Router /admin/users [get]
 // @Security BearerAuth
 func GetUsers(c *fiber.Ctx) error {
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
 	list, err := persistdb.GetUsers()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
@@ -83,38 +73,33 @@ func GetUsers(c *fiber.Ctx) error {
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Invalid username or password"
 // @Failure 500 {object} models.ErrorResponse
 // @Router /login [post]
-func Login(c *fiber.Ctx) error {
-	var req models.AuthRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
+func Login(jwtSecret string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.AuthRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(models.UnauthorizedErrorResponse{Error: "Invalid username or password"})
+		}
+		// get user
+		persistedUser, err := persistdb.GetUserByUsername(req.Username)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
 
-	ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		userdto, err := persistedUser.ToUserListDTO()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		token, err := persistdb.GenerateJWTToken(userdto, jwtSecret)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		return c.Status(fiber.StatusOK).JSON(models.AuthResponse{Token: token})
 	}
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(models.UnauthorizedErrorResponse{Error: "Invalid username or password"})
-	}
-	// get user
-	persistedUser, err := persistdb.GetUserByUsername(req.Username)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-
-	userdto, err := persistedUser.ToUserListDTO()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	token, err := persistdb.GenerateJWTToken(userdto)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	return c.Status(fiber.StatusOK).JSON(models.AuthResponse{Token: token})
-
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/metrics"
 )
 
 // MockConnection implements net.Conn for testing

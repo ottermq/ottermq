@@ -3,8 +3,8 @@ package vhost
 import (
 	"testing"
 
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // Test Suite: Channel Flow Control (AMQP channel.flow)

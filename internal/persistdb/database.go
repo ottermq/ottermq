@@ -18,13 +18,7 @@ func SetDbPath(path string) {
 }
 
 func InitDB() {
-	var err error
-	db, err = sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to open database")
-	}
 	createTables()
-	db.Close()
 }
 
 func createTables() {
@@ -77,15 +71,19 @@ func createTables() {
 	}
 }
 
-func CloseDB() {
-	db.Close()
-}
-
 func OpenDB() error {
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Error().Err(err).Msg("Error opening database")
+		return err
 	}
-	return err
+	db.SetMaxOpenConns(1)
+	return nil
+}
+
+func CloseDB() {
+	if db != nil {
+		db.Close()
+	}
 }

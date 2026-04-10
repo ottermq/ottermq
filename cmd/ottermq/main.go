@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
-	"github.com/andrelcunha/ottermq/pkg/logger"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/web"
-	"github.com/andrelcunha/ottermq/web/prometheus"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/pkg/logger"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/web"
+	"github.com/ottermq/ottermq/web/prometheus"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -39,7 +39,7 @@ func main() {
 	// Initialize logger with configured log level
 	logger.Init(cfg.LogLevel)
 
-	dataDir := getOrCreateDataDir()
+	dataDir := getOrCreateDataDir(cfg.DataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -108,14 +108,13 @@ func main() {
 		}
 		log.Info().Msg("Web server gracefully stopped")
 	}
-	log.Info().Msg("Server gracefully stopped")
 
-	defer func() {
-		if promServer != nil {
-			promServer.Shutdown()
-		}
-	}()
-	os.Exit(0) // if came so far it means the server has stopped gracefully
+	if promServer != nil {
+		promServer.Shutdown()
+	}
+
+	persistdb.CloseDB()
+	log.Info().Msg("Server gracefully stopped")
 }
 
 // initializeMetricsCollector sets up the metrics collector for the broker.
@@ -212,10 +211,10 @@ func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (inter
 	return app, logfile
 }
 
-func getOrCreateDataDir() string {
-	// Determine the directory of the running binary
-	dataDir := filepath.Join("data")
-
+func getOrCreateDataDir(dataDir string) string {
+	if dataDir == "" {
+		dataDir = filepath.Join("data")
+	}
 	// Ensure the data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		log.Info().Msg("Data directory not found. Creating a new one...")
@@ -231,6 +230,9 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	log.Info().Msg("Searching for database...")
 	dbPath := filepath.Join(dataDir, "ottermq.db")
 	persistdb.SetDbPath(dbPath)
+	if err := persistdb.OpenDB(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to open database")
+	}
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		log.Info().Msg("Database file not found. Creating a new one...")
 		persistdb.InitDB()
@@ -240,10 +242,6 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 		if err := persistdb.AddUser(user); err != nil {
 			log.Error().Err(err).Msg("Failed to add user")
 		}
-		persistdb.CloseDB()
-	}
-	if err := persistdb.OpenDB(); err != nil {
-		log.Error().Err(err).Msg("Failed to open database")
 	}
 	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
@@ -252,6 +250,5 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	if user.RoleID != 1 {
 		log.Fatal().Msg("User is not an admin")
 	}
-	persistdb.CloseDB()
 	return user, err
 }

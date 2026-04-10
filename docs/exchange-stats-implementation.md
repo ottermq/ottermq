@@ -234,7 +234,7 @@ import (
     "sync/atomic"
     "time"
     
-    "github.com/andrelcunha/ottermq/pkg/stats"
+    "github.com/ottermq/ottermq/pkg/stats"
 )
 
 type Exchange struct {
@@ -488,8 +488,8 @@ Update `internal/core/broker/management/exchange.go`:
 package management
 
 import (
-    "github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-    "github.com/andrelcunha/ottermq/internal/core/models"
+    "github.com/ottermq/ottermq/internal/core/broker/vhost"
+    "github.com/ottermq/ottermq/internal/core/models"
 )
 
 func (s *Service) exchangeToDTO(vh *vhost.VHost, exchange *vhost.Exchange) models.ExchangeDTO {

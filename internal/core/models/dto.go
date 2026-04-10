@@ -3,8 +3,8 @@ package models
 import (
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/pkg/metrics"
 )
 
 // TimeSeriesDTO represents time-series data for charting
@@ -210,6 +210,7 @@ type OverviewDTO struct {
 type MessageDTO struct {
 	ID          string         `json:"id"`
 	Payload     []byte         `json:"payload"`
+	PayloadText string         `json:"payload_text,omitempty"`
 	Properties  map[string]any `json:"properties"`
 	DeliveryTag uint64         `json:"delivery_tag"`
 	Redelivered bool           `json:"redelivered"`

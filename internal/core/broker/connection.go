@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,7 +20,10 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 
 	defer func() {
 		defer b.ActiveConns.Done()
-		if len(b.Connections) == 0 {
+		b.mu.Lock()
+		_, exists := b.Connections[conn]
+		b.mu.Unlock()
+		if !exists {
 			log.Debug().Msg("No connections to clean")
 			return
 		}

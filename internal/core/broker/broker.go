@@ -10,19 +10,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/management"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/pkg/metrics"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/memento"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/management"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/json"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/memento"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/andrelcunha/ottermq/internal/persistdb"
+	_ "github.com/ottermq/ottermq/internal/persistdb"
 )
 
 const (
@@ -201,20 +201,21 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 		}
 		log.Debug().Str("client", conn.RemoteAddr().String()).Msg("New client waiting for connection")
 		connCtx, connCancel := context.WithCancel(b.rootCtx)
-		defer connCancel()
 		connInfo, err := b.framer.Handshake(&configurations, conn, connCtx)
 		if err != nil {
+			connCancel()
 			log.Info().Err(err).Msg("Handshake failed")
 			continue
 		}
 		b.registerConnection(conn, connInfo)
-		go b.monitorConnectionLifecycle(conn, connInfo.Client)
+		go b.monitorConnectionLifecycle(conn, connInfo.Client, connCancel)
 
 		go b.handleConnection(conn, connInfo)
 	}
 }
 
-func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient) {
+func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient, cancel context.CancelFunc) {
+	defer cancel()
 	<-client.Ctx.Done()
 	log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 	b.cleanupConnection(conn)
@@ -227,7 +228,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		log.Debug().Msg("processRequest called with nil MethodFrame")
 		return nil, nil
 	}
+	b.mu.Lock()
 	connInfo, exist := b.Connections[conn]
+	b.mu.Unlock()
 	if !exist {
 		// connection terminated while processing the request
 		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")

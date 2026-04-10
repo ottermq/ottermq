@@ -17,7 +17,7 @@ This package provides centralized structured logging for OtterMQ using [Zerolog]
 Initialize the logger at application startup:
 
 ```go
-import "github.com/andrelcunha/ottermq/pkg/logger"
+import "github.com/ottermq/ottermq/pkg/logger"
 
 func main() {
     // Initialize with log level from config
@@ -67,7 +67,7 @@ The logger package includes support for metrics hooks, paving the way for future
 
 ```go
 import (
-    "github.com/andrelcunha/ottermq/pkg/logger"
+    "github.com/ottermq/ottermq/pkg/logger"
     "github.com/rs/zerolog"
 )
 

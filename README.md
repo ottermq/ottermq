@@ -53,7 +53,7 @@ quasar dev
 ### Production Mode (Integrated UI)
 
 ```sh
-# Build everything (UI + broker):
+# Build everything (UI + broker + CLI):
 make build-all
 
 # Run the integrated server:
@@ -64,8 +64,11 @@ make run
 
 ```sh
 make build           # Build broker only
-make build-all       # Build UI and broker (production ready)
+make build-admin     # Build ottermqadmin only
+make build-all       # Build UI, broker, and CLI
+make install-admin   # Install ottermqadmin into GOPATH/bin
 make run            # Run broker (with embedded UI if built)
+make test-cli       # Run focused CLI tests
 make run-dev        # Run broker in development mode
 make test           # Run all tests
 make lint           # Run code quality checks
@@ -78,6 +81,50 @@ OtterMq uses:
 - Port **5672** for the AMQP broker
 
 - Port **3000** for the management UI
+
+## 🖥️ CLI Admin Tool
+
+OtterMQ now includes `ottermqadmin`, a Cobra-based admin CLI that talks to the same HTTP management API used by the web UI.
+
+### Build and Install
+
+```sh
+make build-admin
+make install-admin
+```
+
+Or run it directly from the repo:
+
+```sh
+go run ./cmd/ottermqadmin --help
+```
+
+### Quick Start
+
+```sh
+go run ./cmd/ottermqadmin overview --username guest --password guest
+go run ./cmd/ottermqadmin queues list --username guest --password guest
+go run ./cmd/ottermqadmin exchanges list --username guest --password guest
+go run ./cmd/ottermqadmin bindings list --username guest --password guest
+```
+
+### Example Commands
+
+```sh
+go run ./cmd/ottermqadmin queues create / jobs --durable --username guest --password guest
+go run ./cmd/ottermqadmin publish / "" --routing-key jobs --body "hello" --username guest --password guest
+go run ./cmd/ottermqadmin queues get-messages / jobs --count 5 --ack-mode ack --username guest --password guest
+go run ./cmd/ottermqadmin connections list --username guest --password guest
+go run ./cmd/ottermqadmin channels list --username guest --password guest
+go run ./cmd/ottermqadmin consumers list --username guest --password guest
+```
+
+Notes:
+
+- `ottermqadmin` targets the management API, so the OtterMQ web API must be enabled and reachable.
+- The default management URL is `http://localhost:3000`.
+- Use `""` or `"(AMQP default)"` as the exchange argument when publishing to the AMQP default exchange.
+- Add `--json` to any command for machine-readable output.
 
 ## ⚙️ Configuration
 
@@ -142,9 +189,8 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
 
-- Message TTL and expiration
-- Queue length limits with dead lettering
-- Priority queues
+- CLI polish and future `ottermqadmin` enhancements
+- VHost management endpoints in the HTTP API
 - Memento WAL persistence engine (planned)
 
 **All core AMQP 0.9.1 message operations are now fully implemented**, including:
@@ -161,6 +207,8 @@ OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, s
 
 - Dead Letter Exchanges (DLX) with `x-death` tracking
 - Message TTL and Expiration with per-message and per-queue support
+- Queue length limits with dead lettering
+- Priority queues
 
 Basic compatibility with RabbitMQ clients is functional and tested. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 
@@ -236,13 +284,13 @@ curl -X POST http://localhost:3000/api/exchanges/my-vhost/my-exchange \
 **Bind a queue to an exchange:**
 
 ```sh
-curl -X POST http://localhost:3000/api/bindings/my-vhost \
+curl -X POST http://localhost:3000/api/bindings \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
+    "vhost": "my-vhost",
     "source": "my-exchange",
     "destination": "my-queue",
-    "destination_type": "queue",
     "routing_key": "events.#"
   }'
 ```
@@ -252,7 +300,7 @@ curl -X POST http://localhost:3000/api/bindings/my-vhost \
 **Publish a message:**
 
 ```sh
-curl -X POST http://localhost:3000/api/messages/my-vhost/my-exchange \
+curl -X POST http://localhost:3000/api/exchanges/my-vhost/my-exchange/publish \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -267,12 +315,12 @@ curl -X POST http://localhost:3000/api/messages/my-vhost/my-exchange \
 **Get messages from a queue:**
 
 ```sh
-curl -X POST http://localhost:3000/api/messages/my-vhost/my-queue/get \
+curl -X POST http://localhost:3000/api/queues/my-vhost/my-queue/get \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "count": 10,
-    "ack_mode": "ack_requeue_true"
+    "message_count": 10,
+    "ack_mode": "ack"
   }'
 ```
 

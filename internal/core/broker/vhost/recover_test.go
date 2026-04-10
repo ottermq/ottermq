@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/testutil"
+	"github.com/ottermq/ottermq/internal/testutil"
 )
 
 // mockFrameSender implements FrameSender for testing

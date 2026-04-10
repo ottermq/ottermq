@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp"
 )
 
 // MockFramer is a configurable test double for amqp.Framer
