@@ -16,6 +16,9 @@ func (s *Service) PublishMessage(vhostName, exchangeName string, req models.Publ
 		return fmt.Errorf("vhost '%s' not found", vhostName)
 	}
 	exchange := vh.GetExchange(exchangeName)
+	if exchange == nil {
+		return fmt.Errorf("exchange '%s' not found in vhost '%s'", exchangeName, vhostName)
+	}
 	routingKey := req.RoutingKey
 
 	payload := []byte(req.Payload)
