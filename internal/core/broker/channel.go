@@ -170,11 +170,11 @@ func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn ne
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	b.mu.Lock()
 	_, exists := b.Connections[conn].Channels[request.Channel]
+	b.mu.Unlock()
 	if !exists {
 		log.Debug().Uint16("channel", request.Channel).Msg("Channel already closed") // no need to rise an error here
 		return nil, nil
 	}
-	b.mu.Unlock()
 	// send channel close ok
 	frame := b.framer.CreateChannelCloseOkFrame(request.Channel)
 	err := b.framer.SendFrame(conn, frame)
