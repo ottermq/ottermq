@@ -28,12 +28,7 @@ func AddUser(c *fiber.Ctx) error {
 	if user.Password != user.ConfirmPassword {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "Passwords do not match"})
 	}
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
-	err = persistdb.AddUser(user.ToPersist())
+	err := persistdb.AddUser(user.ToPersist())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
@@ -52,11 +47,6 @@ func AddUser(c *fiber.Ctx) error {
 // @Router /admin/users [get]
 // @Security BearerAuth
 func GetUsers(c *fiber.Ctx) error {
-	err := persistdb.OpenDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-	}
-	defer persistdb.CloseDB()
 	list, err := persistdb.GetUsers()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
@@ -89,12 +79,6 @@ func Login(jwtSecret string) fiber.Handler {
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
 		}
-		err := persistdb.OpenDB()
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
-		}
-		defer persistdb.CloseDB()
-
 		ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})

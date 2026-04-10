@@ -113,6 +113,7 @@ func main() {
 		promServer.Shutdown()
 	}
 
+	persistdb.CloseDB()
 	log.Info().Msg("Server gracefully stopped")
 }
 
@@ -229,6 +230,9 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	log.Info().Msg("Searching for database...")
 	dbPath := filepath.Join(dataDir, "ottermq.db")
 	persistdb.SetDbPath(dbPath)
+	if err := persistdb.OpenDB(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to open database")
+	}
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		log.Info().Msg("Database file not found. Creating a new one...")
 		persistdb.InitDB()
@@ -238,10 +242,6 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 		if err := persistdb.AddUser(user); err != nil {
 			log.Error().Err(err).Msg("Failed to add user")
 		}
-		persistdb.CloseDB()
-	}
-	if err := persistdb.OpenDB(); err != nil {
-		log.Error().Err(err).Msg("Failed to open database")
 	}
 	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
@@ -250,6 +250,5 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	if user.RoleID != 1 {
 		log.Fatal().Msg("User is not an admin")
 	}
-	persistdb.CloseDB()
 	return user, err
 }

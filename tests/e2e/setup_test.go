@@ -91,6 +91,9 @@ func setupBroker() error {
 	// Setup database for tests
 	dbPath := filepath.Join(testDataDir, "ottermq-test.db")
 	persistdb.SetDbPath(dbPath)
+	if err := persistdb.OpenDB(); err != nil {
+		return fmt.Errorf("failed to open test database: %w", err)
+	}
 	persistdb.InitDB()
 	persistdb.AddDefaultRoles()
 	persistdb.AddDefaultPermissions()

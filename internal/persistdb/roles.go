@@ -11,10 +11,6 @@ var defaultRoles = []Role{
 }
 
 func AddDefaultRoles() {
-	if err := OpenDB(); err != nil {
-		return
-	}
-	defer CloseDB()
 	// Add roles to the database
 	for _, role := range defaultRoles {
 		_, err := db.Exec("INSERT INTO roles (name, description) VALUES (?, ?)", role.Name, role.Description)
@@ -25,10 +21,6 @@ func AddDefaultRoles() {
 }
 
 func GetRoleByID(id int) (Role, error) {
-	if err := OpenDB(); err != nil {
-		return Role{}, err
-	}
-	defer CloseDB()
 	var role Role
 	err := db.QueryRow("SELECT id, name, description FROM roles WHERE id = ?", id).Scan(&role.ID, &role.Name, &role.Description)
 	if err != nil {
