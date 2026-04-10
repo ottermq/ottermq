@@ -81,6 +81,20 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.GetOverviewCharts(c, ws.Broker)
 	})
 
+	// VHost routes
+	apiGrp.Get("/vhosts", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListVHosts(c, ws.Broker)
+	})
+	apiGrp.Get("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetVHost(c, ws.Broker)
+	})
+	apiGrp.Put("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CreateVHost(c, ws.Broker)
+	})
+	apiGrp.Delete("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.DeleteVHost(c, ws.Broker)
+	})
+
 	// Queue routes
 
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {

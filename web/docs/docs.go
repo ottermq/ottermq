@@ -1795,6 +1795,186 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/vhosts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all virtual hosts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "List all virtual hosts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vhosts/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific virtual host",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Get a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new virtual host",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Create a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a virtual host and all its resources",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Delete a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1994,6 +2174,9 @@ const docTemplate = `{
                 "unconfirmed_count": {
                     "description": "Details",
                     "type": "integer"
+                },
+                "unroutable_rate": {
+                    "type": "number"
                 },
                 "user": {
                     "type": "string"
@@ -2817,6 +3000,45 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "models.VHostDTO": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "prefetch_count": {
+                    "type": "integer"
+                },
+                "state": {
+                    "description": "\"running\", \"idle\"",
+                    "type": "string"
+                },
+                "unacked_count": {
+                    "type": "integer"
+                },
+                "unconfirmed_count": {
+                    "type": "integer"
+                },
+                "users": {
+                    "description": "list of users with access to this vhost",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "models.VHostListResponse": {
+            "type": "object",
+            "properties": {
+                "vhosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VHostDTO"
+                    }
                 }
             }
         }
