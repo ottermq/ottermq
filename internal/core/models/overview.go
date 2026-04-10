@@ -94,3 +94,20 @@ type HttpContext struct {
 	SSL     bool   `json:"ssl"`
 	Path    string `json:"path"`
 }
+
+// NodeMemoryDTO is the memory breakdown returned by GET /nodes/{name}/memory.
+type NodeMemoryDTO struct {
+	Memory NodeMemoryBreakdown `json:"memory"`
+}
+
+type NodeMemoryBreakdown struct {
+	Total      int `json:"total"`       // MemoryLimit (system RAM)
+	Used       int `json:"used"`        // MemoryUsage (Go heap from OS)
+	HeapAlloc  int `json:"heap_alloc"`  // bytes currently allocated on the heap
+	HeapSys    int `json:"heap_sys"`    // bytes obtained from the OS for the heap
+	HeapInUse  int `json:"heap_inuse"`  // bytes in in-use spans
+	HeapIdle   int `json:"heap_idle"`   // bytes in idle spans
+	StackInUse int `json:"stack_inuse"` // bytes used by goroutine stacks
+	GCSys      int `json:"gc_sys"`      // bytes used for GC metadata
+	OtherSys   int `json:"other_sys"`   // other runtime allocations
+}
