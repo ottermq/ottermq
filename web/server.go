@@ -211,6 +211,12 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	apiAdminGrp.Get("/users/:username", api_admin.GetUser)
 	apiAdminGrp.Delete("/users/:username", api_admin.DeleteUser)
 	apiAdminGrp.Put("/users/:username/password", api_admin.ChangePassword)
+
+	// Permissions routes
+	apiAdminGrp.Get("/permissions", api_admin.ListPermissions)
+	apiAdminGrp.Get("/permissions/:vhost/:username", api_admin.GetPermission)
+	apiAdminGrp.Put("/permissions/:vhost/:username", api_admin.GrantPermission)
+	apiAdminGrp.Delete("/permissions/:vhost/:username", api_admin.RevokePermission)
 }
 
 func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
