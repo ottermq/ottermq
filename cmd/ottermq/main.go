@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/ottermq/ottermq/config"
 	"github.com/ottermq/ottermq/internal/core/broker"
 	"github.com/ottermq/ottermq/internal/persistdb"
@@ -16,7 +18,6 @@ import (
 	"github.com/ottermq/ottermq/pkg/metrics"
 	"github.com/ottermq/ottermq/web"
 	"github.com/ottermq/ottermq/web/prometheus"
-	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -229,6 +230,8 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	// Verify if the database file exists
 	log.Info().Msg("Searching for database...")
 	dbPath := filepath.Join(dataDir, "ottermq.db")
+	_, statErr := os.Stat(dbPath)
+	dbExists := statErr == nil
 	persistdb.SetDbPath(dbPath)
 	if err := persistdb.OpenDB(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to open database")
@@ -236,20 +239,28 @@ func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, erro
 	// InitDB is idempotent (CREATE TABLE IF NOT EXISTS) — always run it so new
 	// tables added in later versions are created on existing databases too.
 	persistdb.InitDB()
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Info().Msg("Database file not found. Creating a new one...")
-		persistdb.AddDefaultRoles()
-		persistdb.AddDefaultPermissions()
-		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
-		if err := persistdb.AddUser(user); err != nil {
-			log.Error().Err(err).Msg("Failed to add user")
-		}
-		// Grant default user access to the default vhost
-		if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
-			log.Error().Err(err).Msg("Failed to grant default vhost access")
+
+	persistdb.AddDefaultRoles()
+	persistdb.AddDefaultPermissions()
+
+	user, err := persistdb.GetUserByUsername(cfg.Username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			if !dbExists {
+				log.Info().Msg("Database file not found. Creating a new one...")
+			} else {
+				log.Info().Str("username", cfg.Username).Msg("Configured user not found in database. Bootstrapping default admin user")
+			}
+			newUser := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
+			if err := persistdb.AddUser(newUser); err != nil {
+				log.Fatal().Err(err).Msg("Failed to add user")
+			}
+			if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
+				log.Fatal().Err(err).Msg("Failed to grant default vhost access")
+			}
+			user, err = persistdb.GetUserByUsername(cfg.Username)
 		}
 	}
-	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to get user")
 	}
