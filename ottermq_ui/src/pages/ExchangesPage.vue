@@ -26,24 +26,26 @@
         <div v-if="store.selected" class="q-mt-lg">
           <div class="text-subtitle1 q-mb-sm">Bindings for <b>{{ store.selected }}</b></div>
 
-          <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="addBinding">
-            <q-input v-model="routingKey" label="Routing key" dense outlined />
-            <q-input v-model="queueName" label="Queue" dense outlined />
-            <q-btn label="Bind" color="primary" type="submit" />
-          </q-form>
+          <template v-if="!isDefaultExchange">
+            <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="addBinding">
+              <q-input v-model="routingKey" label="Routing key" dense outlined />
+              <q-input v-model="queueName" label="Queue" dense outlined />
+              <q-btn label="Bind" color="primary" type="submit" />
+            </q-form>
 
-          <q-table
-            :rows="store.bindings"
-            :columns="bindingCols"
-            row-key="routingKey-queue"
-            flat bordered
-          >
-            <template #body-cell-actions="props">
-              <q-td :props="props">
-                <q-btn size="sm" label="Unbind" @click="unbind(props.row)" />
-              </q-td>
-            </template>
-          </q-table>
+            <q-table
+              :rows="store.bindings"
+              :columns="bindingCols"
+              row-key="routingKey-queue"
+              flat bordered
+            >
+              <template #body-cell-actions="props">
+                <q-td :props="props">
+                  <q-btn size="sm" label="Unbind" @click="unbind(props.row)" />
+                </q-td>
+              </template>
+            </q-table>
+          </template>
 
           <q-separator class="q-my-md" />
 
@@ -113,11 +115,15 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useExchangesStore } from 'src/stores/exchanges'
 import { Notify } from 'quasar'
 
 const store = useExchangesStore()
+
+// The default exchange binds every queue automatically; showing the binding
+// form and list for it would be misleading.
+const isDefaultExchange = computed(() => store.selected === '(AMQP default)')
 
 const showCreateDialog = ref(false)
 const creating = ref(false)
