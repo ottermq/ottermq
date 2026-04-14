@@ -152,6 +152,97 @@ func TestBindingsListCommand_UsesVHostFlag(t *testing.T) {
 	assert.Contains(t, stdout.String(), "destination=jobs")
 }
 
+func TestVHostsListCommand_TextOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newReadRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "http://example.test/api/vhosts", req.URL.String())
+		return readJSONResponse(t, http.StatusOK, models.VHostListResponse{
+			VHosts: []models.VHostDTO{
+				{Name: "/", State: "running"},
+				{Name: "staging", State: "idle"},
+			},
+		}), nil
+	}, &stdout)
+
+	cmd := NewVHostsCmd(rt)
+	cmd.SetArgs([]string{"list"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "/")
+	assert.Contains(t, stdout.String(), "state=running")
+	assert.Contains(t, stdout.String(), "staging")
+}
+
+func TestVHostsListCommand_EmptyState(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newReadRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		return readJSONResponse(t, http.StatusOK, models.VHostListResponse{}), nil
+	}, &stdout)
+
+	cmd := NewVHostsCmd(rt)
+	cmd.SetArgs([]string{"list"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "No virtual hosts found\n", stdout.String())
+}
+
+func TestUsersListCommand_TextOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newReadRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "http://example.test/api/admin/users", req.URL.String())
+		return readJSONResponse(t, http.StatusOK, models.UserListResponse{
+			Users: []models.UserSummary{
+				{ID: 1, Username: "alice", Role: "admin", HasPassword: true},
+				{ID: 2, Username: "bob", Role: "user", HasPassword: true},
+			},
+		}), nil
+	}, &stdout)
+
+	cmd := NewUsersCmd(rt)
+	cmd.SetArgs([]string{"list"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "alice")
+	assert.Contains(t, stdout.String(), "role=admin")
+	assert.Contains(t, stdout.String(), "bob")
+}
+
+func TestPermissionsListCommand_TextOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newReadRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "http://example.test/api/admin/permissions", req.URL.String())
+		return readJSONResponse(t, http.StatusOK, models.PermissionListResponse{
+			Permissions: []models.PermissionDTO{
+				{Username: "alice", VHost: "/"},
+				{Username: "bob", VHost: "staging"},
+			},
+		}), nil
+	}, &stdout)
+
+	cmd := NewPermissionsCmd(rt)
+	cmd.SetArgs([]string{"list"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "alice")
+	assert.Contains(t, stdout.String(), "vhost=/")
+	assert.Contains(t, stdout.String(), "bob")
+}
+
 func TestReadCommands_LoginWithUsernamePasswordWhenTokenMissing(t *testing.T) {
 	var stdout bytes.Buffer
 	callCount := 0

@@ -24,8 +24,16 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 - Quality of Service (QoS) with prefetch limits
 - Transactions (TX class) - Atomic commit/rollback
 - Channel Flow Control for backpressure management
+- Message TTL (per-message and per-queue)
+- Queue Length Limits with drop-head strategy
+- Priority Queues (0–255 range)
+- Virtual Hosts with multi-tenant isolation
 - Pluggable Persistence Layer (JSON files, Memento WAL planned)
-- Management Interface (Vue + Quasar)
+- User & Permission Management (SQLite + JWT)
+- Internal Metrics (ring buffers, per-queue/channel/exchange rates)
+- Prometheus `/metrics` exporter
+- Management Interface (Vue + Quasar) with real-time charts
+- `ottermqadmin` CLI tool (Cobra-based)
 - Docker Support via `docker-compose`
 - RabbitMQ Client Compatibility
 
@@ -187,11 +195,15 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 ## 🚧 Development Status
 
-OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
+OtterMq is under active development. All core AMQP 0.9.1 features, RabbitMQ extensions, observability, and the management API are complete. Active work is on finishing the `ottermqadmin` CLI tool.
 
-- CLI polish and future `ottermqadmin` enhancements
-- VHost management endpoints in the HTTP API
-- Memento WAL persistence engine (planned)
+**Remaining CLI commands**: `users` and `permissions` (the HTTP API for both already exists).
+
+**Longer-term planned work**:
+
+- Memento WAL persistence engine (append-only transaction log)
+- OpenTelemetry distributed tracing (Phase 3 observability)
+- Clustering / Federation (lowest priority)
 
 **All core AMQP 0.9.1 message operations are now fully implemented**, including:
 

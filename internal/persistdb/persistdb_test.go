@@ -204,3 +204,39 @@ func TestConcurrentMixedReadWrite(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestAddDefaultRoles_IsIdempotent(t *testing.T) {
+	teardown := setupTestDB(t)
+	defer teardown()
+
+	AddDefaultRoles()
+
+	rows, err := db.Query("SELECT id, name, description FROM roles ORDER BY id")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var count int
+	for rows.Next() {
+		count++
+	}
+
+	assert.Len(t, defaultRoles, count)
+}
+
+func TestAddDefaultPermissions_IsIdempotent(t *testing.T) {
+	teardown := setupTestDB(t)
+	defer teardown()
+
+	AddDefaultPermissions()
+
+	rows, err := db.Query("SELECT id, action, resource FROM permissions ORDER BY id")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var count int
+	for rows.Next() {
+		count++
+	}
+
+	assert.Len(t, defaultPermissions, count)
+}

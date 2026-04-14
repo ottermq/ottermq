@@ -17,152 +17,48 @@ The following command groups are already implemented and tested:
 | `connections` | list, get, close |
 | `channels` | list, get |
 | `consumers` | list |
+| `vhosts` | list, get, create, delete |
+| `users` | list, get, create, delete, change-password |
+| `permissions` | list, get, grant, revoke |
+| `health` | check-alarms, check-local-alarms, check-port-listener, check-virtual-hosts, check-certificate-expiry, check-ready |
+| `definitions` | export, import |
+| `nodes` | list, get, memory |
 
 ---
 
-## Phase 1 — Essential Multi-Tenancy
+## Phase 1 — Essential Multi-Tenancy ✅ COMPLETED
 
-These are blockers for any real multi-tenant deployment. Without them, the CLI cannot manage who has access to what.
+### ~~`vhosts` command group~~ ✅ COMPLETED
 
-### `vhosts` command group
+### ~~`users` command group~~ ✅ COMPLETED
 
-Virtual hosts are already used as path parameters throughout the CLI, but they cannot be managed yet.
+Implemented: `list`, `get`, `create` (`--password`, `--role`), `delete`, `change-password` (interactive prompt).
 
-| Subcommand | Description |
-|-----------|-------------|
-| `vhosts list` | List all virtual hosts with metadata |
-| `vhosts get <name>` | Get details of a specific vhost |
-| `vhosts create <name>` | Create a new vhost |
-| `vhosts delete <name>` | Delete a vhost and all its resources |
+Not implemented (no API endpoint in OtterMQ): `list-without-permissions`, `bulk-delete`.
 
-**Flags for `create`**: `--description`, `--tags`
+### ~~`permissions` command group~~ ✅ COMPLETED
 
-**API endpoints**:
-- `GET /api/vhosts`
-- `GET /api/vhosts/{name}`
-- `PUT /api/vhosts/{name}`
-- `DELETE /api/vhosts/{name}`
+Implemented: `list`, `get`, `grant`, `revoke`.
+
+Note: OtterMQ uses a binary grant/revoke model — the RabbitMQ-style `--configure/--write/--read` regex flags do not apply.
 
 ---
 
-### `users` command group
+## Phase 2 — Operational Safety & Observability ✅ COMPLETED
 
-User management is entirely absent. Required for multi-tenant operations and security auditing.
+### ~~`health` command group~~ ✅ COMPLETED
 
-| Subcommand | Description |
-|-----------|-------------|
-| `users list` | List all users and their tags |
-| `users get <name>` | Get details of a specific user |
-| `users create <name>` | Create a new user |
-| `users delete <name>` | Delete a user |
-| `users change-password <name>` | Update a user's password |
-| `users list-without-permissions` | List users that have no vhost access (orphaned accounts) |
+### ~~`definitions` command group~~ ✅ COMPLETED
 
-**Flags for `create`**: `--password`, `--tags` (e.g. `administrator`, `management`, `monitoring`)
-
-**API endpoints**:
-- `GET /api/users`
-- `GET /api/users/{name}`
-- `PUT /api/users/{name}`
-- `DELETE /api/users/{name}`
-- `POST /api/users/bulk-delete`
-- `GET /api/users/without-permissions`
+### ~~`nodes` command group~~ ✅ COMPLETED
 
 ---
 
-### `permissions` command group
-
-Without this, user management is incomplete — you can create users but not grant them access to vhosts.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `permissions list` | List all permissions across all vhosts |
-| `permissions get <vhost> <user>` | Get a user's permissions in a specific vhost |
-| `permissions set <vhost> <user>` | Grant or update a user's permissions in a vhost |
-| `permissions revoke <vhost> <user>` | Remove a user's access to a vhost |
-
-**Flags for `set`**: `--configure <regex>`, `--write <regex>`, `--read <regex>`
-
-**API endpoints**:
-- `GET /api/permissions`
-- `GET /api/permissions/{vhost}/{user}`
-- `PUT /api/permissions/{vhost}/{user}`
-- `DELETE /api/permissions/{vhost}/{user}`
-
----
-
-## Phase 2 — Operational Safety & Observability
-
-Features that make day-to-day operations safer and more automatable.
-
-### `health` command group
-
-Targeted health probes — useful for monitoring scripts, CI/CD pipelines, and readiness checks. Each subcommand exits `0` on healthy, non-zero on failure, making them shell-friendly.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `health check-alarms` | Fail if any cluster-wide alarms are active |
-| `health check-local-alarms` | Fail if the target node has local alarms |
-| `health check-port-listener <port>` | Fail if the given port is not listening |
-| `health check-virtual-hosts` | Fail if any vhost is in a failed state |
-| `health check-certificate-expiry` | Fail if TLS cert expires within a threshold |
-| `health check-ready` | Fail if node is not ready to serve clients |
-
-**Flags for `check-certificate-expiry`**: `--within <n>`, `--unit days|weeks|months`
-
-**API endpoints**:
-- `GET /api/health/checks/alarms`
-- `GET /api/health/checks/local-alarms`
-- `GET /api/health/checks/port-listener/{port}`
-- `GET /api/health/checks/virtual-hosts`
-- `GET /api/health/checks/certificate-expiration/{within}/{unit}`
-- `GET /api/health/checks/ready-to-serve-clients`
-
----
-
-### `definitions` command group
-
-Export and import the full broker configuration as JSON. Critical for backups, environment cloning, and disaster recovery.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `definitions export` | Export cluster-wide definitions to stdout or a file |
-| `definitions export --vhost <v>` | Export definitions scoped to one vhost |
-| `definitions import <file>` | Restore definitions from a JSON file |
-| `definitions import --vhost <v> <file>` | Restore vhost-scoped definitions |
-
-**Flags for `export`**: `--output <file>` (default: stdout)
-
-The exported JSON contains: vhosts, users, permissions, exchanges, queues, bindings, and policies.
-
-**API endpoints**:
-- `GET /api/definitions`
-- `POST /api/definitions`
-- `GET /api/definitions/{vhost}`
-- `POST /api/definitions/{vhost}`
-
----
-
-### `nodes` command group
-
-Node-level inspection. Useful for diagnosing memory pressure and verifying cluster membership.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `nodes list` | List all cluster nodes with status |
-| `nodes get <name>` | Get details of a specific node |
-| `nodes memory <name>` | Show memory usage breakdown by component |
-
-**API endpoints**:
-- `GET /api/nodes`
-- `GET /api/nodes/{name}`
-- `GET /api/nodes/{name}/memory`
-
----
-
-## Phase 3 — Policy Engine
+## Phase 3 — Policy Engine ❌ BLOCKED (broker side)
 
 Policies apply configuration to queues and exchanges dynamically (TTL, overflow behavior, dead-lettering, etc.) without modifying resource definitions directly.
+
+OtterMQ does not yet have a policy engine. These CLI commands cannot be implemented until the HTTP API exists in the broker.
 
 ### `policies` command group
 

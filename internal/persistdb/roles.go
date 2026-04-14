@@ -13,7 +13,7 @@ var defaultRoles = []Role{
 func AddDefaultRoles() {
 	// Add roles to the database
 	for _, role := range defaultRoles {
-		_, err := db.Exec("INSERT INTO roles (name, description) VALUES (?, ?)", role.Name, role.Description)
+		_, err := db.Exec("INSERT OR IGNORE INTO roles (name, description) VALUES (?, ?)", role.Name, role.Description)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to insert role")
 		}

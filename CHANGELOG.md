@@ -11,32 +11,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`ottermqadmin` CLI foundation**:
-  - new `cmd/ottermqadmin` binary using Cobra
-  - shared typed management API client in `pkg/adminapi/client`
-  - read commands for overview, queues, exchanges, bindings, connections, channels, and consumers
-  - mutation commands for queues, exchanges, bindings, publish, and queue message retrieval
+- **`nodes` CLI command group** (`nodes list`, `nodes get`, `nodes memory`)
+- **Nodes client methods** in `pkg/adminapi/client/nodes.go`
+- **Nodes API handlers** (`web/handlers/api/nodes.go`) with `ListNodes`, `GetNode`, `GetNodeMemory`
+- **`NodeMemoryDTO`** model with full Go runtime memory breakdown (heap, stack, GC metadata)
+- **`definitions` CLI command group** (`definitions export`, `definitions import`)
+- **Definitions client methods** in `pkg/adminapi/client/definitions.go`
+- **Definitions export/import handlers** with full broker configuration backup/restore
+- **`health` CLI command group**: `check-alarms`, `check-local-alarms`, `check-port-listener`, `check-virtual-hosts`, `check-certificate-expiry`, `check-ready`
+- **Health check client methods** in `pkg/adminapi/client/health.go`
+- **Health check API handlers**
+- **`vhosts` CLI command group** (`vhosts list`, `vhosts get`, `vhosts create`, `vhosts delete`)
+- **VHost HTTP handlers and routes** — vhost CRUD exposed through management service
+- **User management HTTP API**: create, list, get, delete, change-password endpoints
+- **Permission management HTTP API**: grant/revoke per-user per-vhost access
+- **VHost membership enforcement** in AMQP handshake
+- **`user_vhosts` table** and CRUD in `internal/persistdb`
+- **Default user granted vhost access** on first broker run
+- **`ottermqadmin` CLI tool** (`cmd/ottermqadmin`):
+  - Cobra-based binary with shared typed management API client (`pkg/adminapi/client`)
+  - Commands: `overview`, `queues`, `exchanges`, `bindings`, `publish`, `connections`, `channels`, `consumers`
   - JSON and human-readable output modes
-  - focused CLI and client unit tests
+  - Focused CLI and client unit tests
 
 ### Changed
 
-- **Make targets**:
-  - added `make build-admin`
-  - added `make install-admin`
-  - added `make test-cli`
-  - `make build-all` now builds the broker, UI, and CLI
+- **Make targets**: added `make build-admin`, `make install-admin`, `make test-cli`; `make build-all` now builds broker, UI, and CLI
 
 ### Fixed
 
-- **CLI output wiring**: successful `ottermqadmin` commands now write to process stdout instead of being discarded
-- **Default exchange publishing**:
-  - `ottermqadmin publish / "" ...` now targets the AMQP default exchange correctly
-  - management publish handler now URL-decodes the `vhost` path parameter
-- **Management API path fixes used by the CLI**:
-  - fixed exchange creation route registration
-  - fixed vhost-filtered bindings route wiring
-  - queue message retrieval now returns structured message DTOs
+- **Bootstrap**: default admin user now seeded when SQLite DB exists but has no users
+- **CLI output wiring**: commands now write to process stdout instead of being discarded
+- **Default exchange publishing**: `ottermqadmin publish / "" ...` now targets AMQP default exchange correctly
+- **Management API**: fixed exchange creation route, vhost-filtered bindings route, message retrieval DTOs
+- **JWT secret**: now wired from config into token signing
+- **Connection map**: guarded accesses with mutex
+- **Priority queue requeue**: messages requeued to priority queue on shutdown
+- **Persistent DB**: single connection reused instead of per-request open/close
+
+---
+
+## [v0.18.0] - 2025-12-22
+
+### Added
+
+- **Prometheus metrics exporter**: exposes broker metrics at a configurable `/metrics` endpoint
+  - Queue depth, message rates (publish/deliver/ack/nack) per queue
+  - Exchange publish and delivery rates per exchange
+  - Channel state and activity metrics
+  - Broker-level connection, channel, queue, and exchange counts
+  - Configurable via `OTTERMQ_ENABLE_PROMETHEUS`, `OTTERMQ_PROMETHEUS_PORT`
+- **`prometheus/` package**: dedicated Prometheus integration with `promauto`-based registration
+
+### Changed
+
+- **Broker setup**: metrics collector initialization extracted to `SetupMetricsCollector` method
+- **Main function**: improved data directory and user setup logic
+
+### Removed
+
+- **Grafana integration**: removed bundled Grafana configuration and `docker-compose` Grafana service (Prometheus endpoint is the integration point; users bring their own Grafana)
+
+---
 
 ## [v0.17.0] - 2025-12-15
 
@@ -219,6 +255,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - VHost helper methods for thread-safe statistics (`GetAllQueues()`, `GetConsumerCountsAllQueues()`)
   - Queue operations: List, Get, Create, Delete, Purge with full property support
   - Exchange operations: List, Get, Create, Delete with property configuration
+- **Per-consumer unacked message tracking**: dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
+- **Consumer cancel E2E tests**: 6 comprehensive tests for consumer cancel behavior and edge cases
+- Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)
 
 ### Changed
 
@@ -227,49 +266,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Exchange handlers refactored for direct broker access
   - Proper separation of concerns: HTTP layer → Service layer → Broker core
   - Thread-safe operations with proper lock management
+- Queue delivery loop now uses WaitGroup for proper synchronization during shutdown
+- Lock ordering improved: release `vh.mu` before queue.Push operations to prevent deadlock
+- QoS counting optimized from O(N) to O(1) for per-consumer prefetch enforcement
 
 ### Fixed
 
 - **Import Cycle Resolution**: Management service uses interface pattern for broker access
 - **Lock Management**: VHost operations handle locking internally, preventing deadlocks
 - **Encapsulation**: Removed direct `broker.mu` access from management code
+- **AMQP Spec Compliance**: Consumer cancel now properly requeues all unacked messages with redelivered flag set
+- **Race Conditions**: Fixed multiple race conditions in queue delivery loop and consumer cancellation
+- **Deadlocks**: Resolved deadlock in message publishing path when enforcing queue length limits
 
 ### Performance
 
 - Direct broker access eliminates AMQP protocol overhead for management operations
-- O(1) queue/exchange lookups via map access
-- Efficient statistics gathering with dedicated VHost methods
-
-## [v0.14.0] - 2025-11-18
-
-### Added
-
-- **Per-consumer unacked message tracking**: Implemented dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
-- **Consumer cancel E2E tests**: Added 6 comprehensive tests for consumer cancel behavior and edge cases
-- Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)
-- Performance optimization: Consumer cancel now O(1) instead of O(N) for large prefetch scenarios
-
-### Fixed
-
-- **AMQP Spec Compliance**: Consumer cancel now properly requeues all unacked messages with redelivered flag set
-- **Race Conditions**: Fixed multiple race conditions in queue delivery loop and consumer cancellation
-- **Deadlocks**: Resolved deadlock in message publishing path when enforcing queue length limits
-- Test `TestMaxLen_RequeueRespected` re-enabled and passing after implementing consumer cancel auto-requeue feature
-- Test `TestHandleBasicNack_Multiple_Boundary_DiscardPersistent` fixed by correcting queue name mismatch
-
-### Changed
-
-- Queue delivery loop now uses WaitGroup for proper synchronization during shutdown
-- Lock ordering improved: release vh.mu before queue.Push operations to prevent deadlock
-- QoS counting optimized from O(N) to O(1) for per-consumer prefetch enforcement
-
-### Performance
-
 - Consumer cancel with 500 unacked messages: < 1ms (100-1000x improvement)
 - QoS per-consumer counting: O(1) lookup instead of O(N) scan
-- Memory overhead: Minimal (~8 bytes per unacked message for second index pointer)
 
-## [0.13.0] - 2025-11-16
+## [v0.13.0] - 2025-11-16
 
 ### Added
 
@@ -295,7 +311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero CPU overhead for idle queues with expired messages
 - Optimized lock management to prevent contention
 
-## [0.12.0] - 2025-11-15
+## [v0.12.0] - 2025-11-15
 
 ### Added
 
@@ -318,7 +334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced `DeadLetterer` interface for pluggable implementations
 - Added `NoOpDeadLetterer` for testing and feature flags
 
-## [0.10.0] - 2025-10-28
+## [v0.10.0] - 2025-10-28
 
 ### Added
 
@@ -327,7 +343,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Basic.QoS` handling for prefetch limits (per-consumer and global)
 - Message recovery handling improvements
 
-## [0.9.0] - 2025-10-18
+## [v0.9.0] - 2025-10-18
 
 ### Added
 
@@ -344,7 +360,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fatal error during connection cleanup
 - Exchange listing and sorting logic
 
-## [0.8.0] - 2025-10-02
+## [v0.8.0] - 2025-10-02
 
 ### Added
 
@@ -395,12 +411,15 @@ For releases prior to v0.7.1, please refer to [GitHub Releases](https://github.c
 
 ---
 
-[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.18.0...HEAD
+[v0.18.0]: https://github.com/ottermq/ottermq/releases/tag/v0.18.0
+[v0.17.0]: https://github.com/ottermq/ottermq/releases/tag/v0.17.0
+[v0.16.0]: https://github.com/ottermq/ottermq/releases/tag/v0.16.0
 [v0.15.0]: https://github.com/ottermq/ottermq/releases/tag/v0.15.0
 [v0.14.0]: https://github.com/ottermq/ottermq/releases/tag/v0.14.0
-[0.13.0]: https://github.com/ottermq/ottermq/releases/tag/v0.13.0
-[0.12.0]: https://github.com/ottermq/ottermq/releases/tag/v0.12.0
-[0.10.0]: https://github.com/ottermq/ottermq/releases/tag/v0.10.0
-[0.9.0]: https://github.com/ottermq/ottermq/releases/tag/v0.9.0
-[0.8.0]: https://github.com/ottermq/ottermq/releases/tag/v0.8.0
-[0.7.1]: https://github.com/ottermq/ottermq/releases/tag/v0.7.1
+[v0.13.0]: https://github.com/ottermq/ottermq/releases/tag/v0.13.0
+[v0.12.0]: https://github.com/ottermq/ottermq/releases/tag/v0.12.0
+[v0.10.0]: https://github.com/ottermq/ottermq/releases/tag/v0.10.0
+[v0.9.0]: https://github.com/ottermq/ottermq/releases/tag/v0.9.0
+[v0.8.0]: https://github.com/ottermq/ottermq/releases/tag/v0.8.0
+[v0.7.1]: https://github.com/ottermq/ottermq/releases/tag/v0.7.1
