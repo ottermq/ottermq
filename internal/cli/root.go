@@ -47,6 +47,7 @@ func NewRootCmd(opts *RootOptions) *cobra.Command {
 	cmd.AddCommand(NewConnectionsCmd(rt))
 	cmd.AddCommand(NewChannelsCmd(rt))
 	cmd.AddCommand(NewConsumersCmd(rt))
+	cmd.AddCommand(NewVHostsCmd(rt))
 	cmd.AddCommand(NewHealthCmd(rt))
 	cmd.AddCommand(NewNodesCmd(rt))
 	cmd.AddCommand(NewDefinitionsCmd(rt))

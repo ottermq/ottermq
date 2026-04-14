@@ -17,7 +17,7 @@ The following command groups are already implemented and tested:
 | `connections` | list, get, close |
 | `channels` | list, get |
 | `consumers` | list |
-| `vhosts` | list, get, create, delete |
+| `vhosts` | list, get, create, delete | ✅ |
 | `health` | check-alarms, check-local-alarms, check-port-listener, check-virtual-hosts, check-certificate-expiry, check-ready |
 | `definitions` | export, import |
 | `nodes` | list, get, memory |
