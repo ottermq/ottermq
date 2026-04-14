@@ -172,6 +172,137 @@ func TestPublishCommand_PublishesMessage(t *testing.T) {
 	assert.Equal(t, "Message published\n", stdout.String())
 }
 
+func TestVHostsCreateCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodPut, req.Method)
+		require.Equal(t, "http://example.test/api/vhosts/staging", req.URL.String())
+		return mutateJSONResponse(t, http.StatusCreated, models.VHostDTO{Name: "staging", State: "running"}), nil
+	}, &stdout)
+
+	cmd := NewVHostsCmd(rt)
+	cmd.SetArgs([]string{"create", "staging"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "staging")
+}
+
+func TestVHostsDeleteCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodDelete, req.Method)
+		require.Equal(t, "http://example.test/api/vhosts/staging", req.URL.String())
+		return mutateEmptyResponse(http.StatusNoContent), nil
+	}, &stdout)
+
+	cmd := NewVHostsCmd(rt)
+	cmd.SetArgs([]string{"delete", "staging"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "staging")
+}
+
+func TestUsersCreateCommand_InvalidRole(t *testing.T) {
+	rt := newMutateRuntime(&RootOptions{Token: "jwt-token"}, func(req *http.Request) (*http.Response, error) {
+		t.Fatal("unexpected http request")
+		return nil, nil
+	}, &bytes.Buffer{})
+
+	cmd := NewUsersCmd(rt)
+	cmd.SetArgs([]string{"create", "alice", "--password", "s3cr3t", "--role", "superuser"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid role")
+}
+
+func TestUsersCreateCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodPost, req.Method)
+		require.Equal(t, "http://example.test/api/admin/users", req.URL.String())
+
+		var payload models.UserCreateRequest
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&payload))
+		assert.Equal(t, "alice", payload.Username)
+		assert.Equal(t, "s3cr3t", payload.Password)
+		assert.Equal(t, "s3cr3t", payload.ConfirmPassword)
+		assert.Equal(t, 1, payload.Role) // admin
+
+		return mutateJSONResponse(t, http.StatusOK, models.SuccessResponse{Message: "User added successfully"}), nil
+	}, &stdout)
+
+	cmd := NewUsersCmd(rt)
+	cmd.SetArgs([]string{"create", "alice", "--password", "s3cr3t", "--role", "admin"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "User added successfully\n", stdout.String())
+}
+
+func TestUsersDeleteCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodDelete, req.Method)
+		require.Equal(t, "http://example.test/api/admin/users/alice", req.URL.String())
+		return mutateEmptyResponse(http.StatusNoContent), nil
+	}, &stdout)
+
+	cmd := NewUsersCmd(rt)
+	cmd.SetArgs([]string{"delete", "alice"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "alice")
+}
+
+func TestPermissionsGrantCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodPut, req.Method)
+		require.Equal(t, "http://example.test/api/admin/permissions/staging/alice", req.URL.String())
+		return mutateJSONResponse(t, http.StatusCreated, models.PermissionDTO{Username: "alice", VHost: "staging"}), nil
+	}, &stdout)
+
+	cmd := NewPermissionsCmd(rt)
+	cmd.SetArgs([]string{"grant", "staging", "alice"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "alice")
+	assert.Contains(t, stdout.String(), "staging")
+}
+
+func TestPermissionsRevokeCommand_SendsRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	rt := newMutateRuntime(&RootOptions{
+		BaseURL: "http://example.test",
+		Token:   "jwt-token",
+	}, func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodDelete, req.Method)
+		require.Equal(t, "http://example.test/api/admin/permissions/staging/alice", req.URL.String())
+		return mutateEmptyResponse(http.StatusNoContent), nil
+	}, &stdout)
+
+	cmd := NewPermissionsCmd(rt)
+	cmd.SetArgs([]string{"revoke", "staging", "alice"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "alice")
+	assert.Contains(t, stdout.String(), "staging")
+}
+
 func TestQueuesGetMessagesCommand_TextOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	rt := newMutateRuntime(&RootOptions{
