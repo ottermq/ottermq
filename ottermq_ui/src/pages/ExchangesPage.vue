@@ -184,8 +184,12 @@ async function del(name) {
 
 async function addBinding() {
   if (!store.selected) return
-  await store.addBinding(store.selected, routingKey.value, queueName.value)
-  routingKey.value = ''; queueName.value = ''
+  try {
+    await store.addBinding(store.selected, routingKey.value, queueName.value)
+    routingKey.value = ''; queueName.value = ''
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to add binding' })
+  }
 }
 
 async function unbind(row) {
@@ -194,9 +198,13 @@ async function unbind(row) {
 
 async function publish() {
   if (!store.selected) return
-  await store.publish(store.selected, pubRoutingKey.value, message.value)
-  Notify.create({ type: 'positive', message: 'Message published!' })
-  pubRoutingKey.value = ''; message.value = ''
+  try {
+    await store.publish(store.selected, pubRoutingKey.value, message.value)
+    Notify.create({ type: 'positive', message: 'Message published!' })
+    pubRoutingKey.value = ''; message.value = ''
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to publish message' })
+  }
 }
 
 onMounted(store.fetch)
