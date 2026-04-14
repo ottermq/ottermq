@@ -14,6 +14,18 @@
           </div>
         </q-toolbar-title>
 
+        <q-select
+          v-model="vhostsStore.selected"
+          :options="vhostsStore.names"
+          dense
+          outlined
+          dark
+          class="q-mr-md"
+          style="min-width: 120px"
+          label="VHost"
+          @update:model-value="vhostsStore.setSelected"
+        />
+
         <div class="q-mr-md text-subtitle1">
           User: <strong>{{username}}</strong>
         </div>
@@ -47,11 +59,13 @@ import { onMounted, ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from 'src/stores/auth'
 import { useOverviewStore } from 'src/stores/overview'
+import { useVHostsStore } from 'src/stores/vhosts'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const overview = useOverviewStore()
+const vhostsStore = useVHostsStore()
 
 const username = ref(auth.username || 'guest')
 
@@ -76,9 +90,10 @@ const goVersion = computed(() => {
   return `Go ${ver}`
 })
 
-// fetch overview data for header info
+// fetch overview data and vhost list for header
 onMounted(() => {
   overview.fetch()
+  vhostsStore.fetch()
 })
 
 

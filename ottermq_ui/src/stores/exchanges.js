@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
+import { useVHostsStore } from 'src/stores/vhosts'
 
 
 export const useExchangesStore = defineStore('exchanges', {
@@ -48,8 +49,8 @@ export const useExchangesStore = defineStore('exchanges', {
         no_wait: false,
         arguments: {}
       }
-      
-      const vhost = exchangeData.vhost || '/'
+
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedName = encodeURIComponent(exchangeData.name)
       
@@ -57,14 +58,14 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetch()
     },
     async deleteExchange(name) {
-      const vhost = '/'
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedName = encodeURIComponent(name)
       await api.delete(`/exchanges/${encodedVhost}/${encodedName}`)
       await this.fetch()
     },
     async fetchBindings(exchange) {
-        const vhost = '/'
+        const vhost = useVHostsStore().selected
         const encodedVhost = encodeURIComponent(vhost)
         const encodedExchange = encodeURIComponent(exchange)
         try {
@@ -85,7 +86,7 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        vhost: '/',
+        vhost: useVHostsStore().selected,
         source: exchange,
         routing_key: routingKey,
         destination: queue,
@@ -95,7 +96,7 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async deleteBinding(exchange, routingKey, queue) {
       await api.delete(`/bindings`, { data: {
-        vhost: "/",
+        vhost: useVHostsStore().selected,
         source: exchange,
         routing_key: routingKey,
         destination: queue,
@@ -104,7 +105,7 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
-      const vhost = '/'
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedExchange = encodeURIComponent(exchange)
 
