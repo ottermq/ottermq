@@ -17,7 +17,7 @@ type MetricsCollector interface {
 	RecordQueueRequeue(queueName string)
 	RecordQueueDelivery(queueName string, autoAck bool)
 	RecordQueueAck(queueName string)
-	RecordQueueNack(queueName string)
+	RecordQueueNack(queueName string, discard bool)
 	SetQueueDepth(queueName string, depth int64)
 	RecordConsumerAdded(queueName string)
 	RecordConsumerRemoved(queueName string)

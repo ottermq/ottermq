@@ -123,7 +123,7 @@ func (m *MockCollector) RecordQueueDelivery(queueName string, autoAck bool) {}
 
 func (m *MockCollector) RecordQueueAck(queueName string) {}
 
-func (m *MockCollector) RecordQueueNack(queueName string) {}
+func (m *MockCollector) RecordQueueNack(queueName string, discard bool) {}
 
 func (m *MockCollector) SetQueueDepth(queueName string, depth int64) {}
 

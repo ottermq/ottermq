@@ -16,11 +16,12 @@ func (vh *VHost) HandleBasicAck(connID ConnectionID, channel uint16, deliveryTag
 		return nil
 	}
 
-	if vh.persist != nil {
-		for _, rec := range toDelete {
-			if rec.Persistent {
-				_ = vh.persist.DeleteMessage(vh.Name, rec.QueueName, rec.Message.ID)
-			}
+	connName := connID.String()
+	for _, rec := range toDelete {
+		vh.collector.RecordQueueAck(rec.QueueName)
+		vh.collector.RecordChannelAck(connName, vh.Name, channel)
+		if rec.Persistent && vh.persist != nil {
+			_ = vh.persist.DeleteMessage(vh.Name, rec.QueueName, rec.Message.ID)
 		}
 	}
 
@@ -46,26 +47,15 @@ func (vh *VHost) popUnackedRecords(connID ConnectionID, channel uint16, delivery
 			log.Debug().Uint64("tag", tag).Msg("Checking unacked tag for multiple ack")
 			if tag <= deliveryTag {
 				removed = append(removed, record)
-
 				deleteUnackedDelivery(ch, tag, record.ConsumerTag)
-				vh.collector.RecordQueueAck(record.QueueName)
-				connName := connID.String()
-				vh.collector.RecordChannelAck(connName, vh.Name, channel)
 				log.Debug().Uint64("tag", tag).Msg("Removed unacked tag for multiple ack")
 			}
 		}
 	} else {
 		// Single ack: O(1) lookup in flat map
 		if record, exists := ch.UnackedByTag[deliveryTag]; exists {
-			// TODO: refactor to avoid code duplication with above
 			removed = append(removed, record)
-
-			// Remove from both maps
 			deleteUnackedDelivery(ch, deliveryTag, record.ConsumerTag)
-			vh.collector.RecordQueueAck(record.QueueName)
-			connName := connID.String()
-			vh.collector.RecordChannelAck(connName, vh.Name, channel)
-
 			log.Debug().Uint64("tag", deliveryTag).Msg("Removed unacked tag for single ack")
 		}
 	}
@@ -110,7 +100,7 @@ func (vh *VHost) HandleBasicNack(connID ConnectionID, channel uint16, deliveryTa
 			queue := vh.Queues[record.QueueName]
 			vh.mu.Unlock()
 			if queue != nil {
-				vh.collector.RecordQueueNack(queue.Name) // Record Nack before requeue
+				vh.collector.RecordQueueNack(queue.Name, false) // requeue=true: message stays in system
 				if vh.handleTTLExpiration(record.Message, queue) {
 					continue
 				}
@@ -132,7 +122,7 @@ func (vh *VHost) HandleBasicNack(connID ConnectionID, channel uint16, deliveryTa
 		if !exists {
 			continue
 		}
-		vh.collector.RecordQueueNack(queue.Name) // Record Nack before DLX/discard
+		vh.collector.RecordQueueNack(queue.Name, true) // discard: message removed from system
 
 		ok := vh.handleDeadLetter(queue, record.Message, REASON_REJECTED)
 		if ok {

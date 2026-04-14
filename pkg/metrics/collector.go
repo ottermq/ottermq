@@ -286,15 +286,20 @@ func (c *Collector) RecordQueueAck(queueName string) {
 
 }
 
-// RecordQueueNack records a message negative acknowledgment
-func (c *Collector) RecordQueueNack(queueName string) {
+// RecordQueueNack records a message negative acknowledgment.
+// discard=true when the message is dropped (requeue=false, no DLX); false when requeued.
+func (c *Collector) RecordQueueNack(queueName string, discard bool) {
 	if !c.config.Enabled {
 		return
 	}
 
 	qm := c.getOrCreateQueueMetrics(queueName)
 	qm.UnackedCount.Add(-1)
+	c.unackedDepth.Add(-1)
 	c.totalNackCount.Add(1)
+	if discard {
+		c.messageCount.Add(-1)
+	}
 }
 
 // SetQueueDepth explicitly sets the queue depth (for periodic updates)
