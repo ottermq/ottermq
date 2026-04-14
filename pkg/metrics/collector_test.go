@@ -1085,8 +1085,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 
 	// Consumer cancels - unacked messages requeued
 	c.RecordConsumerRemoved("my.queue")
-	c.RecordQueueNack("my.queue", true)    // Remove from unacked
-	c.RecordQueueRequeue("my.queue") // Back to ready
+	c.RecordQueueNack("my.queue", false) // requeue: message stays in system
+	c.RecordQueueRequeue("my.queue")     // Back to ready
 
 	if qm.Depth.Load() != 1 {
 		t.Errorf("After consumer cancel: MessageCount = %d, want 1", qm.Depth.Load())

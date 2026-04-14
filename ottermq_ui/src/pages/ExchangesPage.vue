@@ -179,7 +179,11 @@ async function createExchange() {
 }
 
 async function del(name) {
-  await store.deleteExchange(name)
+  try {
+    await store.deleteExchange(name)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to delete exchange' })
+  }
 }
 
 async function addBinding() {
@@ -193,7 +197,11 @@ async function addBinding() {
 }
 
 async function unbind(row) {
-  await store.deleteBinding(store.selected, row.routingKey, row.queue)
+  try {
+    await store.deleteBinding(store.selected, row.routingKey, row.queue)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to remove binding' })
+  }
 }
 
 async function publish() {

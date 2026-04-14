@@ -74,17 +74,21 @@ export const useExchangesStore = defineStore('exchanges', {
         const vhost = '/'
         const encodedVhost = encodeURIComponent(vhost)
         const encodedExchange = encodeURIComponent(exchange)
-        const {data} = await api.get(`/exchanges/${encodedVhost}/${encodedExchange}/bindings/source`)
-        const list = Array.isArray(data?.bindings)
-        ? data.bindings.map(b => ({
-            source: b.source,
-            destination_type: b.destination_type,
-            queue: b.destination,
-            routingKey: b.routing_key,
-            arguments: b.arguments,
-            propertiesKey: b.properties_key,
-        })) : []
-        this.bindings = list
+        try {
+          const {data} = await api.get(`/exchanges/${encodedVhost}/${encodedExchange}/bindings/source`)
+          this.bindings = Array.isArray(data?.bindings)
+            ? data.bindings.map(b => ({
+                source: b.source,
+                destination_type: b.destination_type,
+                queue: b.destination,
+                routingKey: b.routing_key,
+                arguments: b.arguments,
+                propertiesKey: b.properties_key,
+            })) : []
+        } catch (err) {
+          this.error = err?.response?.data?.error || err.message
+          this.bindings = []
+        }
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
