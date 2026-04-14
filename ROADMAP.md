@@ -146,18 +146,30 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [x] **Consumer management** - Push/pull consumption with QoS support
 - [x] **Message acknowledgments** - ACK, NACK, REJECT, and RECOVER
 
+### ✅ **Recently Completed**
+
+#### **CLI Admin Tool (`ottermqadmin`) — Phase 1 (COMPLETED)**
+
+- [x] Cobra-based CLI application
+- [x] Shared typed HTTP client (`pkg/adminapi/client`)
+- [x] Authentication via login/JWT flow
+- [x] Human-readable and `--json` output modes
+- [x] Commands: `overview`, `queues`, `exchanges`, `bindings`, `publish`, `connections`, `channels`, `consumers`
+- [x] Commands: `vhosts`, `health`, `definitions`, `nodes`
+- [x] CLI-focused integration tests
+
+#### **Metrics & Observability — Phase 1 + 2 (COMPLETED)**
+
+- [x] Internal metrics with ring buffers (per-queue, per-channel, per-exchange rates)
+- [x] Prometheus `/metrics` exporter
+- [x] Real-time rate charts in the Web UI
+
 ### ❌ **Missing Features**
 
-#### **Phase 1: CLI Admin Tool (Next Priority)**
+#### **CLI Admin Tool — Remaining (Next Priority)**
 
-- [ ] **CLI Admin Tool (`ottermqadmin`)**
-  - [ ] Cobra-based CLI application
-  - [ ] Shared typed HTTP client for OtterMQ management API
-  - [ ] Authentication via existing login/JWT flow
-  - [ ] Human-readable and `--json` output modes
-  - [ ] Initial commands for overview, queues, exchanges, bindings, publish, and message retrieval
-  - [ ] Remote broker support (local and remote HTTP endpoints)
-  - [ ] CLI-focused integration tests
+- [ ] `users` commands: list, get, create, delete, change-password
+- [ ] `permissions` commands: list, get, set, revoke
 
 #### **Phase 2: Broker/Product Improvements**
 
@@ -167,12 +179,8 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [ ] **Recovery system**
   - [ ] Durable queues and exchanges
   - [ ] Persistent message recovery
-- [ ] **Metrics and monitoring**
-  - [ ] Better broker/channel publish and deliver statistics
-- [ ] **Enhanced Web UI**
-  - [ ] Real-time connection monitoring
-  - [ ] Message flow visualization
-  - [ ] Performance metrics dashboard
+- [ ] **Observability Phase 3**
+  - [ ] OpenTelemetry distributed tracing
 
 #### **Phase 3: Clustering & Federation (Lowest Priority)**
 
@@ -349,13 +357,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Persistence Layer Improvements** and **Performance Optimization**. Contributors should focus on:
+The highest priority is **finishing the `ottermqadmin` CLI tool** (`users` and `permissions` command groups), followed by persistence durability improvements.
 
-1. Swappable persistence architecture refactoring
-2. Durable queue and exchange recovery
-3. Performance benchmarking and optimization
-4. Memory management for high-throughput scenarios
-5. Metrics and monitoring integration
+1. `users` and `permissions` CLI commands
+2. Swappable persistence architecture refactoring
+3. Durable queue and exchange recovery
+4. Performance benchmarking and optimization
+5. Memory management for high-throughput scenarios
 
 ### **Getting Started**
 
@@ -376,10 +384,10 @@ The highest priority is **Persistence Layer Improvements** and **Performance Opt
 
 ## Progress Tracking
 
-**Last Updated**: December 4, 2025  
-**Current Focus**: Persistence Layer Improvements and Performance Optimization  
-**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE (including priority queues and length limits), BASIC, TX class methods, Dead Letter Exchanges, Message TTL, Priority Queues, and Queue Length Limits  
-**Latest Release**: v0.16.0 - Priority Queues Support  
-**Next Milestone**: Swappable persistence architecture and durable message recovery
+**Last Updated**: April 13, 2026  
+**Current Focus**: `ottermqadmin` CLI — `users` and `permissions` commands  
+**Completed**: All AMQP 0.9.1 classes, RabbitMQ extensions (DLX, TTL, QLL, priority queues), metrics (Phase 1+2), management API, CLI tool (all commands except `users`/`permissions`)  
+**Latest Release**: v0.17.0 - Metrics & Observability  
+**Next Milestone**: `users` and `permissions` CLI commands
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

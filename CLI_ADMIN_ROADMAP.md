@@ -17,35 +17,20 @@ The following command groups are already implemented and tested:
 | `connections` | list, get, close |
 | `channels` | list, get |
 | `consumers` | list |
+| `vhosts` | list, get, create, delete |
+| `health` | check-alarms, check-local-alarms, check-port-listener, check-virtual-hosts, check-certificate-expiry, check-ready |
+| `definitions` | export, import |
+| `nodes` | list, get, memory |
 
 ---
 
 ## Phase 1 — Essential Multi-Tenancy
 
-These are blockers for any real multi-tenant deployment. Without them, the CLI cannot manage who has access to what.
-
-### `vhosts` command group
-
-Virtual hosts are already used as path parameters throughout the CLI, but they cannot be managed yet.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `vhosts list` | List all virtual hosts with metadata |
-| `vhosts get <name>` | Get details of a specific vhost |
-| `vhosts create <name>` | Create a new vhost |
-| `vhosts delete <name>` | Delete a vhost and all its resources |
-
-**Flags for `create`**: `--description`, `--tags`
-
-**API endpoints**:
-- `GET /api/vhosts`
-- `GET /api/vhosts/{name}`
-- `PUT /api/vhosts/{name}`
-- `DELETE /api/vhosts/{name}`
+### ~~`vhosts` command group~~ ✅ COMPLETED
 
 ---
 
-### `users` command group
+### `users` command group ⏳ NEXT
 
 User management is entirely absent. Required for multi-tenant operations and security auditing.
 
@@ -70,7 +55,7 @@ User management is entirely absent. Required for multi-tenant operations and sec
 
 ---
 
-### `permissions` command group
+### `permissions` command group ⏳ NEXT
 
 Without this, user management is incomplete — you can create users but not grant them access to vhosts.
 
@@ -91,72 +76,13 @@ Without this, user management is incomplete — you can create users but not gra
 
 ---
 
-## Phase 2 — Operational Safety & Observability
+## Phase 2 — Operational Safety & Observability ✅ COMPLETED
 
-Features that make day-to-day operations safer and more automatable.
+### ~~`health` command group~~ ✅ COMPLETED
 
-### `health` command group
+### ~~`definitions` command group~~ ✅ COMPLETED
 
-Targeted health probes — useful for monitoring scripts, CI/CD pipelines, and readiness checks. Each subcommand exits `0` on healthy, non-zero on failure, making them shell-friendly.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `health check-alarms` | Fail if any cluster-wide alarms are active |
-| `health check-local-alarms` | Fail if the target node has local alarms |
-| `health check-port-listener <port>` | Fail if the given port is not listening |
-| `health check-virtual-hosts` | Fail if any vhost is in a failed state |
-| `health check-certificate-expiry` | Fail if TLS cert expires within a threshold |
-| `health check-ready` | Fail if node is not ready to serve clients |
-
-**Flags for `check-certificate-expiry`**: `--within <n>`, `--unit days|weeks|months`
-
-**API endpoints**:
-- `GET /api/health/checks/alarms`
-- `GET /api/health/checks/local-alarms`
-- `GET /api/health/checks/port-listener/{port}`
-- `GET /api/health/checks/virtual-hosts`
-- `GET /api/health/checks/certificate-expiration/{within}/{unit}`
-- `GET /api/health/checks/ready-to-serve-clients`
-
----
-
-### `definitions` command group
-
-Export and import the full broker configuration as JSON. Critical for backups, environment cloning, and disaster recovery.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `definitions export` | Export cluster-wide definitions to stdout or a file |
-| `definitions export --vhost <v>` | Export definitions scoped to one vhost |
-| `definitions import <file>` | Restore definitions from a JSON file |
-| `definitions import --vhost <v> <file>` | Restore vhost-scoped definitions |
-
-**Flags for `export`**: `--output <file>` (default: stdout)
-
-The exported JSON contains: vhosts, users, permissions, exchanges, queues, bindings, and policies.
-
-**API endpoints**:
-- `GET /api/definitions`
-- `POST /api/definitions`
-- `GET /api/definitions/{vhost}`
-- `POST /api/definitions/{vhost}`
-
----
-
-### `nodes` command group
-
-Node-level inspection. Useful for diagnosing memory pressure and verifying cluster membership.
-
-| Subcommand | Description |
-|-----------|-------------|
-| `nodes list` | List all cluster nodes with status |
-| `nodes get <name>` | Get details of a specific node |
-| `nodes memory <name>` | Show memory usage breakdown by component |
-
-**API endpoints**:
-- `GET /api/nodes`
-- `GET /api/nodes/{name}`
-- `GET /api/nodes/{name}/memory`
+### ~~`nodes` command group~~ ✅ COMPLETED
 
 ---
 
