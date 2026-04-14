@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.19.1] - 2026-04-14
+
+### Added
+
+- **Vhost Pinia store** (`ottermq_ui/src/stores/vhosts.js`) — groundwork for the vhost switcher; fetches available vhosts, preserves selection across refreshes, falls back to `/`
+
+### Fixed
+
+- **Broker panic on dead-letter to deleted queue** — added a `stopped` flag on `Queue` to guard `push()`/`pushPriority()` against sends on a closed channel; added a deferred recovery in `publishUnlocked` to re-acquire the mutex before re-panicking, preventing a secondary "unlock of unlocked mutex" fatal error
+- **UnackedCount underflow on nack** — `popUnackedRecords` was calling `RecordQueueAck` for all pops (including nacks), causing a double-decrement; recording is now the caller's responsibility. `RecordQueueNack` gains a `discard bool` parameter to correctly track message removal vs requeue in broker-level counters
+- **Exchange page: wrong API endpoints** — `fetchBindings` was calling `/bindings/:vhost/:exchange` instead of `/exchanges/:vhost/:exchange/bindings/source`; `publish` was calling `/messages/:vhost/:exchange` instead of `/exchanges/:vhost/:exchange/publish`
+- **Exchange page: binding operations for `(AMQP default)`** — `addBinding`/`deleteBinding` were sending the display alias as the exchange name; `BindQueue`/`UnbindQueue` do a direct map lookup so the alias was never resolved. Now maps `"(AMQP default)"` → `""` client-side
+- **Exchange page: silent API failures** — `addBinding`, `deleteBinding`, `del`, `unbind`, `publish`, and `fetchBindings` now surface API errors via a `Notify` toast instead of swallowing them silently
+- **Exchange page: binding UI shown for default exchange** — the binding form and list are now hidden when `(AMQP default)` is selected, since all queues are already bound to it automatically
+
+### Refactored
+
+- Replaced remaining `log.Printf("[DEBUG] ...")` calls in `internal/core/amqp/` with structured zerolog calls
+
+---
+
 ## [v0.19.0] - 2026-04-14
 
 ### Added
