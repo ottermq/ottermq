@@ -138,7 +138,7 @@ func parseExchangeDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
-	log.Printf("[DEBUG] Received EXCHANGE_DELETE frame %x \n", payload)
+	log.Debug().Bytes("payload", payload).Msg("Received EXCHANGE_DELETE frame")
 
 	buf := bytes.NewReader(payload)
 	reserverd1, err := DecodeShortInt(buf)

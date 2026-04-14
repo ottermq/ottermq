@@ -334,8 +334,8 @@ func TestQueueNackWithRequeue(t *testing.T) {
 	}
 
 	// NACK with requeue (moves from unacked back to ready)
-	c.RecordQueueNack("testq")    // Remove from unacked
-	c.RecordQueueRequeue("testq") // Add back to ready
+	c.RecordQueueNack("testq", false) // requeue=true: message stays in system
+	c.RecordQueueRequeue("testq")     // Add back to ready
 
 	if qm.Depth.Load() != 2 {
 		t.Errorf("MessageCount after nack+requeue = %d, want 2", qm.Depth.Load())
@@ -366,7 +366,7 @@ func TestQueueNackWithoutRequeue(t *testing.T) {
 	}
 
 	// NACK without requeue (message is dead-lettered or discarded)
-	c.RecordQueueNack("testq")
+	c.RecordQueueNack("testq", true)
 
 	if qm.Depth.Load() != 1 {
 		t.Errorf("MessageCount after nack = %d, want 1 (only ready messages)", qm.Depth.Load())
@@ -395,8 +395,8 @@ func TestQueueRequeue(t *testing.T) {
 
 	// Consumer cancels - message needs to be requeued
 	// In real code: RecordQueueNack + RecordQueueRequeue
-	c.RecordQueueNack("testq")    // Remove from unacked
-	c.RecordQueueRequeue("testq") // Add back to ready
+	c.RecordQueueNack("testq", false) // requeue: message stays in system
+	c.RecordQueueRequeue("testq")     // Add back to ready
 
 	if qm.Depth.Load() != 1 {
 		t.Errorf("MessageCount after requeue = %d, want 1", qm.Depth.Load())
@@ -1006,7 +1006,7 @@ func TestFullMessageLifecycle_NackRequeue(t *testing.T) {
 	}
 
 	// 3. Consumer NACKs with requeue=true
-	c.RecordQueueNack("my.queue")
+	c.RecordQueueNack("my.queue", true)
 	c.RecordQueueRequeue("my.queue")
 
 	if qm.Depth.Load() != 1 {
@@ -1051,7 +1051,7 @@ func TestFullMessageLifecycle_NackDeadLetter(t *testing.T) {
 	}
 
 	// 3. Consumer NACKs with requeue=false (dead-letter or discard)
-	c.RecordQueueNack("my.queue")
+	c.RecordQueueNack("my.queue", true)
 
 	if qm.Depth.Load() != 0 {
 		t.Errorf("After nack (no requeue): MessageCount = %d, want 0", qm.Depth.Load())
@@ -1085,8 +1085,8 @@ func TestFullMessageLifecycle_ConsumerCancel(t *testing.T) {
 
 	// Consumer cancels - unacked messages requeued
 	c.RecordConsumerRemoved("my.queue")
-	c.RecordQueueNack("my.queue")    // Remove from unacked
-	c.RecordQueueRequeue("my.queue") // Back to ready
+	c.RecordQueueNack("my.queue", false) // requeue: message stays in system
+	c.RecordQueueRequeue("my.queue")     // Back to ready
 
 	if qm.Depth.Load() != 1 {
 		t.Errorf("After consumer cancel: MessageCount = %d, want 1", qm.Depth.Load())
@@ -1140,7 +1140,7 @@ func TestFullMessageLifecycle_MultipleMessages(t *testing.T) {
 
 	// NACK 2 with requeue
 	for i := 0; i < 2; i++ {
-		c.RecordQueueNack("my.queue")
+		c.RecordQueueNack("my.queue", true)
 		c.RecordQueueRequeue("my.queue")
 	}
 

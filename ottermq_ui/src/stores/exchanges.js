@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
 
+// The server stores the default exchange under "" and "amq.default".
+// The API returns it with the display alias "(AMQP default)".
+// BindQueue/UnbindQueue look up vh.Exchanges[name] directly, so we must
+// send "" (the empty-string key) not the alias.
+function resolveExchangeName(name) {
+  return name === '(AMQP default)' ? '' : name
+}
+
 export const useExchangesStore = defineStore('exchanges', {
   state: () => ({
     items: [],
@@ -66,33 +74,37 @@ export const useExchangesStore = defineStore('exchanges', {
         const vhost = '/'
         const encodedVhost = encodeURIComponent(vhost)
         const encodedExchange = encodeURIComponent(exchange)
-        const {data} = await api.get(`/bindings/${encodedVhost}/${encodedExchange}`)
-        const list = Array.isArray(data?.bindings) 
-        ? data.bindings.map(b => ({
-            source: b.source,
-            destination_type: b.destination_type,
-            queue: b.destination,
-            routingKey: b.routing_key,
-            arguments: b.arguments,
-            propertiesKey: b.properties_key,
-        })) : []
-        this.bindings = list
+        try {
+          const {data} = await api.get(`/exchanges/${encodedVhost}/${encodedExchange}/bindings/source`)
+          this.bindings = Array.isArray(data?.bindings)
+            ? data.bindings.map(b => ({
+                source: b.source,
+                destination_type: b.destination_type,
+                queue: b.destination,
+                routingKey: b.routing_key,
+                arguments: b.arguments,
+                propertiesKey: b.properties_key,
+            })) : []
+        } catch (err) {
+          this.error = err?.response?.data?.error || err.message
+          this.bindings = []
+        }
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
         vhost: '/',
-        source: exchange, 
-        routing_key: routingKey, 
+        source: resolveExchangeName(exchange),
+        routing_key: routingKey,
         destination: queue,
         arguments: {}
       })
       await this.fetchBindings(exchange)
     },
     async deleteBinding(exchange, routingKey, queue) {
-      await api.delete(`/bindings`, { data: { 
+      await api.delete(`/bindings`, { data: {
         vhost: "/",
-        source: exchange, 
-        routing_key: routingKey, 
+        source: resolveExchangeName(exchange),
+        routing_key: routingKey,
         destination: queue,
         arguments: {},
       } })
@@ -102,8 +114,8 @@ export const useExchangesStore = defineStore('exchanges', {
       const vhost = '/'
       const encodedVhost = encodeURIComponent(vhost)
       const encodedExchange = encodeURIComponent(exchange)
-      
-      await api.post(`/messages/${encodedVhost}/${encodedExchange}`, {
+
+      await api.post(`/exchanges/${encodedVhost}/${encodedExchange}/publish`, {
         routing_key: routingKey, 
         payload: message,
         content_type: "text/plain",

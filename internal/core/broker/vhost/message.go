@@ -226,6 +226,16 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 	// Release lock BEFORE calling queue.Push() to avoid deadlock during QLL enforcement
 	vh.mu.Unlock()
 
+	// If anything panics between the manual Unlock above and the manual Lock below,
+	// the caller's deferred vh.mu.Unlock() would fire on an already-unlocked mutex.
+	// Re-acquire the lock before re-panicking so the caller's defer stays consistent.
+	defer func() {
+		if r := recover(); r != nil {
+			vh.mu.Lock()
+			panic(r)
+		}
+	}()
+
 	// Push messages to queues without holding vh.mu
 	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
 	for _, queue := range targetQueues {

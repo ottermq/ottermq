@@ -31,6 +31,7 @@ type Queue struct {
 	messageSignal    chan struct{}          `json:"-"` // Avoid blocking on empty priority queue
 
 	count     int          `json:"-"`
+	stopped   bool         `json:"-"` // true after queue is deleted; guarded by mu
 	mu        sync.Mutex   `json:"-"`
 	OwnerConn ConnectionID `json:"-"`
 
@@ -433,6 +434,12 @@ func (vh *VHost) deleteQueuebyNameUnlocked(name string) error {
 	// Stop delivery loop first, wait for it to complete
 	queue.stopDeliveryLoop()
 
+	// Mark queue as stopped under its own lock before closing the channel.
+	// This prevents any concurrent push from writing to the closed channel.
+	queue.mu.Lock()
+	queue.stopped = true
+	queue.mu.Unlock()
+
 	// Now safe to close the messages channel
 	close(queue.messages)
 	// verify if there are any bindings to this queue and remove them
@@ -516,6 +523,10 @@ func (q *Queue) Push(msg Message) {
 func (q *Queue) pushPriority(msg Message) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if q.stopped {
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Push discarded: queue is stopped")
+		return
+	}
 
 	// Clamp priority to max
 	priority := min(msg.Properties.Priority, q.maxPriority)
@@ -559,6 +570,10 @@ func (q *Queue) pushPriority(msg Message) {
 func (q *Queue) push(msg Message) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if q.stopped {
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Push discarded: queue is stopped")
+		return
+	}
 	select {
 	case q.messages <- msg:
 		q.count++

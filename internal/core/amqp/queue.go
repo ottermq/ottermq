@@ -193,7 +193,7 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
-	log.Printf("[DEBUG] Received QUEUE_BIND frame %x \n", payload)
+	log.Debug().Bytes("payload", payload).Msg("Received QUEUE_BIND frame")
 	buf := bytes.NewReader(payload)
 	reserverd1, err := DecodeShortInt(buf)
 	if err != nil {
@@ -210,7 +210,7 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
-	log.Printf("[DEBUG] Exchange name: %s\n", exchange)
+	log.Debug().Str("exchange", exchange).Msg("Exchange name")
 	routingKey, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode routing key: %v", err)
@@ -332,7 +332,7 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
-	log.Printf("[DEBUG] Received QUEUE_DELETE frame %x \n", payload)
+	log.Debug().Bytes("payload", payload).Msg("Received QUEUE_DELETE frame")
 
 	buf := bytes.NewReader(payload)
 	reserverd1, err := DecodeShortInt(buf)

@@ -75,7 +75,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Started\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	log.Debug().Str("remote", conn.RemoteAddr().String()).Str("local", conn.LocalAddr().String()).Msg("Handshake - Started")
 
 	heartbeat, _ := (*configurations)["heartbeatInterval"].(uint16)
 	frameMax, _ := (*configurations)["frameMax"].(uint32)
@@ -120,7 +120,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	config := NewAmqpClientConfig(configurations)
 	connCtx, cancel := context.WithCancel(connCtx)
 	client := NewAmqpClient(conn, config, connCtx, cancel)
-	log.Printf("[DEBUG] Connection successfully tunned")
+	log.Debug().Msg("Connection successfully tuned")
 
 	client.StartHeartbeat()
 
@@ -165,8 +165,8 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err := sendFrame(conn, openOkFrame); err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
-	log.Printf("[DEBUG] Handshake Completed")
+	log.Debug().Str("remote", conn.RemoteAddr().String()).Str("local", conn.LocalAddr().String()).Msg("Handshake - Opened")
+	log.Debug().Msg("Handshake Completed")
 
 	return connInfo, nil
 }
@@ -179,7 +179,7 @@ func processStartOkContent(configurations *map[string]any, startOkFrame *Connect
 	// parse username and password from startOkFrame.Response
 	log.Printf("Response: '%s'\n", startOkFrame.Response)
 	credentials := strings.Split(strings.Trim(startOkFrame.Response, " "), " ")
-	log.Printf("[DEBUG] Credentials: username: '%s' password: '%s'\n", credentials[0], credentials[1])
+	log.Debug().Str("username", credentials[0]).Msg("Credentials parsed")
 	if len(credentials) != 2 {
 		return fmt.Errorf("failed to parse credentials: invalid format")
 	}
