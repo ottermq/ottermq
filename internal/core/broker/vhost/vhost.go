@@ -241,12 +241,7 @@ func (vh *VHost) GetAllExchanges() []*Exchange {
 func (vh *VHost) GetExchange(exchangeName string) *Exchange {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	// get actual exchange name in case an alias was used
-	actualName := exchangeName
-	if exchangeName == DEFAULT_EXCHANGE_ALIAS || exchangeName == EMPTY_EXCHANGE {
-		actualName = DEFAULT_EXCHANGE
-	}
-	return vh.Exchanges[actualName]
+	return vh.Exchanges[resolveExchangeAlias(exchangeName)]
 }
 
 // GetAllQueues returns a copy of all queues in this vhost.

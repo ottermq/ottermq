@@ -1,13 +1,6 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
 
-// The server stores the default exchange under "" and "amq.default".
-// The API returns it with the display alias "(AMQP default)".
-// BindQueue/UnbindQueue look up vh.Exchanges[name] directly, so we must
-// send "" (the empty-string key) not the alias.
-function resolveExchangeName(name) {
-  return name === '(AMQP default)' ? '' : name
-}
 
 export const useExchangesStore = defineStore('exchanges', {
   state: () => ({
@@ -93,7 +86,7 @@ export const useExchangesStore = defineStore('exchanges', {
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
         vhost: '/',
-        source: resolveExchangeName(exchange),
+        source: exchange,
         routing_key: routingKey,
         destination: queue,
         arguments: {}
@@ -103,7 +96,7 @@ export const useExchangesStore = defineStore('exchanges', {
     async deleteBinding(exchange, routingKey, queue) {
       await api.delete(`/bindings`, { data: {
         vhost: "/",
-        source: resolveExchangeName(exchange),
+        source: exchange,
         routing_key: routingKey,
         destination: queue,
         arguments: {},

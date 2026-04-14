@@ -27,6 +27,16 @@ func (e *Exchange) NameOrAlias() string {
 	return e.Name
 }
 
+// resolveExchangeAlias normalises any form of the default exchange name
+// ("", "amq.default", "(AMQP default)") to the canonical internal key
+// used in vh.Exchanges. Non-default names are returned unchanged.
+func resolveExchangeAlias(name string) string {
+	if name == EMPTY_EXCHANGE || name == DEFAULT_EXCHANGE_ALIAS || name == DEFAULT_EXCHANGE {
+		return DEFAULT_EXCHANGE
+	}
+	return name
+}
+
 type Exchange struct {
 	Name     string                `json:"name"`
 	Typ      ExchangeType          `json:"type"`
@@ -136,11 +146,6 @@ func (vh *VHost) createMandatoryExchanges() {
 		}); err != nil {
 			log.Error().Err(err).Str("exchange", mandatoryExchange.Name).Msg("Failed to create mandatory exchange")
 		}
-	}
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	if defaultExchange, exists := vh.Exchanges[DEFAULT_EXCHANGE]; exists {
-		vh.Exchanges[EMPTY_EXCHANGE] = defaultExchange
 	}
 }
 
