@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.19.0] - 2026-04-14
+
 ### Added
 
 - **`nodes` CLI command group** (`nodes list`, `nodes get`, `nodes memory`)
@@ -411,7 +413,8 @@ For releases prior to v0.7.1, please refer to [GitHub Releases](https://github.c
 
 ---
 
-[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.19.0...HEAD
+[v0.19.0]: https://github.com/ottermq/ottermq/releases/tag/v0.19.0
 [v0.18.0]: https://github.com/ottermq/ottermq/releases/tag/v0.18.0
 [v0.17.0]: https://github.com/ottermq/ottermq/releases/tag/v0.17.0
 [v0.16.0]: https://github.com/ottermq/ottermq/releases/tag/v0.16.0
