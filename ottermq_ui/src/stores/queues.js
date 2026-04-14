@@ -53,7 +53,7 @@ lastMessage: null,
         const vhost = useVHostsStore().selected
         const encodedVhost = encodeURIComponent(vhost)
         const encodedName = encodeURIComponent(queueData.name)
-        
+
         await api.post(`/queues/${encodedVhost}/${encodedName}`, payload)
         await this.fetch()
     },

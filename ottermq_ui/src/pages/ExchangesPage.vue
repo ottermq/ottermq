@@ -193,6 +193,8 @@ async function createExchange() {
     await store.addExchange(newExchange.value)
     showCreateDialog.value = false
     resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create exchange' })
   } finally {
     creating.value = false
   }

@@ -215,12 +215,14 @@ function resetForm() {
 
 async function createQueue() {
   if (!newQueue.value.name) return
-  
+
   creating.value = true
   try {
     await store.addQueue(newQueue.value)
     showCreateDialog.value = false
     resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create queue' })
   } finally {
     creating.value = false
   }
