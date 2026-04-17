@@ -1,5 +1,5 @@
-#include:
-#  - ./prometheus/docker-compose.yml
+include:
+ - ./prometheus/docker-compose.yml
 
 services:
   ottermq:
@@ -14,12 +14,12 @@ services:
       - GO_ENV=production
     env_file:
       - .env # load all variables into container environment
-#    networks:
-#      - ottermq_network
+    networks:
+     - ottermq_network
 
 volumes:
   data:
 
-    #networks:
-    #  ottermq_network:
-    #    driver: bridge
+networks:
+  ottermq_network:
+    driver: bridge
