@@ -16,6 +16,7 @@ This site tracks project status and documentation for users and contributors. Fo
 - AMQP 0.9.1 Support Status: [Status Matrix](./amqp-status)
 - CLI Admin Tool: [ottermqadmin](./ottermqadmin)
 - REST API Swagger: served by the broker at `/docs` when running
+- Prometheus & Grafana: [Monitoring Integration](./prometheus)
 - Project README: [https://github.com/ottermq/ottermq#readme](https://github.com/ottermq/ottermq#readme)
 - Roadmap: [https://github.com/ottermq/ottermq/blob/main/ROADMAP.md](https://github.com/ottermq/ottermq/blob/main/ROADMAP.md)
 
@@ -97,7 +98,7 @@ OTTERMQ_METRICS_SAMPLES_INTERVAL=5       # Sample frequency (seconds)
 
 See [Configuration Reference](./configuration) for all available settings.
 
-**Future**: Prometheus exporter and Grafana dashboards are planned for advanced monitoring workflows.
+A [Prometheus/Grafana integration](./prometheus) is available as an optional monitoring add-on for long-term storage, alerting, and pre-built dashboards.
 
 ## Getting started
 
