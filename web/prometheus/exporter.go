@@ -13,33 +13,42 @@ type Exporter struct {
 	collector *metrics.Collector
 	config    *Config
 
-	// Prometheus metrics
+	// Broker-wide counters (monotonically increasing)
 	publishedTotal prometheus.Counter
 	deliveredTotal prometheus.Counter
 	ackedTotal     prometheus.Counter
 	nackedTotal    prometheus.Counter
 
-	publishedRate prometheus.Gauge
-	deliveredRate prometheus.Gauge
-
+	// Broker-wide gauges (current state)
+	publishedRate   prometheus.Gauge
+	deliveredRate   prometheus.Gauge
 	messageCount    prometheus.Gauge
 	queueCount      prometheus.Gauge
 	connectionCount prometheus.Gauge
+	channelCount    prometheus.Gauge
+	consumerCount   prometheus.Gauge
 
-	publishLatency prometheus.Histogram
-	deliverLatency prometheus.Histogram
+	// Per-queue gauges
+	queueDepth        *prometheus.GaugeVec
+	queueMessageRate  *prometheus.GaugeVec
+	queueDeliveryRate *prometheus.GaugeVec
+	queueAckRate      *prometheus.GaugeVec
+	queueConsumers    *prometheus.GaugeVec
+	queueUnacked      *prometheus.GaugeVec
 
-	// Per-queue metrics
-	queueDepth       *prometheus.GaugeVec
-	queuePublishRate *prometheus.CounterVec
+	// Per-exchange gauges and counters
+	exchangePublishRate    *prometheus.GaugeVec
+	exchangeDeliveryRate   *prometheus.GaugeVec
+	exchangePublishedTotal *prometheus.CounterVec
 
-	// Delta tracking for counters
-	// We need to track the last value we saw to calculate deltas
-	// because Prometheus counters must be monotonically increasing
+	// Delta tracking for broker-wide counters
 	lastPublished int64
 	lastDelivered int64
 	lastAcked     int64
 	lastNacked    int64
+
+	// Delta tracking for per-exchange counters (keyed by exchange name)
+	lastExchangePublished map[string]int64
 
 	stopChan chan struct{}
 	wg       sync.WaitGroup
@@ -48,15 +57,17 @@ type Exporter struct {
 
 func NewExporter(collector *metrics.Collector, config *Config) *Exporter {
 	e := &Exporter{
-		collector: collector,
-		config:    config,
-		stopChan:  make(chan struct{}),
+		collector:             collector,
+		config:                config,
+		lastExchangePublished: make(map[string]int64),
+		stopChan:              make(chan struct{}),
 	}
 	e.registerMetrics()
 	return e
 }
 
 func (e *Exporter) registerMetrics() {
+	// Broker-wide counters
 	e.publishedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ottermq_messages_published_total",
 		Help: "Total number of messages published",
@@ -74,6 +85,7 @@ func (e *Exporter) registerMetrics() {
 		Help: "Total number of messages not acknowledged",
 	})
 
+	// Broker-wide gauges
 	e.publishedRate = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_messages_publish_rate",
 		Help: "Rate of messages published per second",
@@ -82,43 +94,73 @@ func (e *Exporter) registerMetrics() {
 		Name: "ottermq_messages_deliver_rate",
 		Help: "Rate of messages delivered per second",
 	})
-
 	e.messageCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_message_count",
 		Help: "Current number of messages in the broker",
 	})
 	e.queueCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_queue_count",
-		Help: "Current number of queues in the broker",
+		Help: "Current number of queues",
 	})
 	e.connectionCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "ottermq_connection_count",
-		Help: "Current number of connections to the broker",
+		Help: "Current number of connections",
+	})
+	e.channelCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ottermq_channel_count",
+		Help: "Current number of open channels",
+	})
+	e.consumerCount = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ottermq_consumer_count",
+		Help: "Current number of active consumers",
 	})
 
-	e.publishLatency = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "ottermq_publish_latency_milliseconds",
-		Help:    "Latency of message publishing in milliseconds",
-		Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
-	})
-
-	e.deliverLatency = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "ottermq_deliver_latency_milliseconds",
-		Help:    "Latency of message delivery in milliseconds",
-		Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
-	})
-
+	// Per-queue gauges
 	e.queueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "ottermq_queue_message_depth",
-		Help: "Number of messages in the queue",
-	}, []string{"queue"},
-	)
+		Name: "ottermq_queue_depth",
+		Help: "Number of ready messages in the queue",
+	}, []string{"queue"})
 
-	e.queuePublishRate = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "ottermq_queue_publish_rate_total",
-		Help: "Total number of messages published to the queue",
-	}, []string{"queue"},
-	)
+	e.queueMessageRate = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_queue_message_rate",
+		Help: "Rate of messages enqueued per second",
+	}, []string{"queue"})
+
+	e.queueDeliveryRate = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_queue_delivery_rate",
+		Help: "Rate of messages delivered per second from the queue",
+	}, []string{"queue"})
+
+	e.queueAckRate = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_queue_ack_rate",
+		Help: "Rate of message acknowledgements per second",
+	}, []string{"queue"})
+
+	e.queueConsumers = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_queue_consumers",
+		Help: "Number of consumers on the queue",
+	}, []string{"queue"})
+
+	e.queueUnacked = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_queue_unacked",
+		Help: "Number of unacknowledged messages in the queue",
+	}, []string{"queue"})
+
+	// Per-exchange metrics
+	e.exchangePublishRate = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_exchange_publish_rate",
+		Help: "Rate of messages published to the exchange per second",
+	}, []string{"exchange", "type"})
+
+	e.exchangeDeliveryRate = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ottermq_exchange_delivery_rate",
+		Help: "Rate of messages routed from the exchange per second",
+	}, []string{"exchange", "type"})
+
+	e.exchangePublishedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "ottermq_exchange_published_total",
+		Help: "Total number of messages published to the exchange",
+	}, []string{"exchange", "type"})
 }
 
 func (e *Exporter) Start() {
@@ -148,60 +190,77 @@ func (e *Exporter) updateLoop() {
 }
 
 func (e *Exporter) update() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.updateBroker()
+	e.updateQueues()
+	e.updateExchanges()
+}
+
+func (e *Exporter) updateBroker() {
 	snapshot := e.collector.GetBrokerSnapshot()
 
-	// Update gauges directly (current state)
-	// Gauges can be set to absolute values
 	e.publishedRate.Set(float64(snapshot.PublishRate))
 	e.deliveredRate.Set(float64(snapshot.DeliveryRate))
 	e.messageCount.Set(float64(snapshot.MessageCount))
 	e.queueCount.Set(float64(snapshot.QueueCount))
 	e.connectionCount.Set(float64(snapshot.ConnectionCount))
+	e.channelCount.Set(float64(snapshot.ChannelCount))
+	e.consumerCount.Set(float64(snapshot.ConsumerCount))
 
-	// Update counters by calculating deltas
-	// Prometheus counters must be monotonically increasing
-	// We track the delta since last update
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	// Calculate deltas from the collector's internal counters
-	// The collector should expose cumulative totals
-	currentPublished := snapshot.PublishedTotal // Assuming snapshot has these
-	currentDelivered := snapshot.DeliveredTotal
-	currentAcked := snapshot.AckedTotal
-	currentNacked := snapshot.NackedTotal
-
-	// Add the delta to Prometheus counters
-	if currentPublished > e.lastPublished {
-		delta := currentPublished - e.lastPublished
+	if delta := snapshot.PublishedTotal - e.lastPublished; delta > 0 {
 		e.publishedTotal.Add(float64(delta))
-		e.lastPublished = currentPublished
+		e.lastPublished = snapshot.PublishedTotal
 	}
-
-	if currentDelivered > e.lastDelivered {
-		delta := currentDelivered - e.lastDelivered
+	if delta := snapshot.DeliveredTotal - e.lastDelivered; delta > 0 {
 		e.deliveredTotal.Add(float64(delta))
-		e.lastDelivered = currentDelivered
+		e.lastDelivered = snapshot.DeliveredTotal
 	}
-
-	if currentAcked > e.lastAcked {
-		delta := currentAcked - e.lastAcked
+	if delta := snapshot.AckedTotal - e.lastAcked; delta > 0 {
 		e.ackedTotal.Add(float64(delta))
-		e.lastAcked = currentAcked
+		e.lastAcked = snapshot.AckedTotal
 	}
-
-	if currentNacked > e.lastNacked {
-		delta := currentNacked - e.lastNacked
+	if delta := snapshot.NackedTotal - e.lastNacked; delta > 0 {
 		e.nackedTotal.Add(float64(delta))
-		e.lastNacked = currentNacked
+		e.lastNacked = snapshot.NackedTotal
+	}
+}
+
+func (e *Exporter) updateQueues() {
+	for _, qm := range e.collector.GetAllQueueMetrics() {
+		name := qm.Name
+		e.queueDepth.WithLabelValues(name).Set(float64(qm.Depth.Load()))
+		e.queueMessageRate.WithLabelValues(name).Set(qm.PublishRate.Rate())
+		e.queueDeliveryRate.WithLabelValues(name).Set(qm.DeliveryRate.Rate())
+		e.queueAckRate.WithLabelValues(name).Set(qm.AckRate.Rate())
+		e.queueConsumers.WithLabelValues(name).Set(float64(qm.ConsumerCount.Load()))
+		e.queueUnacked.WithLabelValues(name).Set(float64(qm.UnackedCount.Load()))
+	}
+}
+
+func (e *Exporter) updateExchanges() {
+	seen := make(map[string]struct{})
+
+	for _, em := range e.collector.GetAllExchangeMetrics() {
+		name := em.Name
+		typ := em.Type
+		seen[name] = struct{}{}
+
+		e.exchangePublishRate.WithLabelValues(name, typ).Set(em.PublishRate.Rate())
+		e.exchangeDeliveryRate.WithLabelValues(name, typ).Set(em.DeliveryRate.Rate())
+
+		current := em.PublishCount.Load()
+		if delta := current - e.lastExchangePublished[name]; delta > 0 {
+			e.exchangePublishedTotal.WithLabelValues(name, typ).Add(float64(delta))
+			e.lastExchangePublished[name] = current
+		}
 	}
 
-	// Update per-queue metrics
-	for _, qm := range e.collector.GetAllQueueMetrics() {
-		e.queueDepth.WithLabelValues(qm.Name).Set(float64(qm.Depth.Load()))
-
-		// For queue publish rate, we need deltas too
-		// This assumes QueueMetrics has a cumulative PublishedTotal field
-		// e.queuePublishRate.WithLabelValues(qm.Name).Add(delta)
+	// Clean up stale delta entries for deleted exchanges
+	for name := range e.lastExchangePublished {
+		if _, ok := seen[name]; !ok {
+			delete(e.lastExchangePublished, name)
+		}
 	}
 }
