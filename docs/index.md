@@ -14,6 +14,7 @@ This site tracks project status and documentation for users and contributors. Fo
 ## Quick links
 
 - AMQP 0.9.1 Support Status: [Status Matrix](./amqp-status)
+- CLI Admin Tool: [ottermqadmin](./ottermqadmin)
 - REST API Swagger: served by the broker at `/docs` when running
 - Project README: [https://github.com/ottermq/ottermq#readme](https://github.com/ottermq/ottermq#readme)
 - Roadmap: [https://github.com/ottermq/ottermq/blob/main/ROADMAP.md](https://github.com/ottermq/ottermq/blob/main/ROADMAP.md)
