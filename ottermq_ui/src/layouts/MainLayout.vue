@@ -31,9 +31,6 @@
         </div>
         <q-btn flat label="logout" @click="logout" />
       </q-toolbar>
-    </q-header>
-
-    <q-page-container>
       <q-tabs
         v-model="tab"
         class="bg-primary text-white"
@@ -48,7 +45,9 @@
         <q-route-tab to="/exchanges" name="exchanges" label="Exchanges" />
         <q-route-tab to="/queues" name="queues" label="Queues" />
       </q-tabs>
+    </q-header>
 
+    <q-page-container>
       <router-view />
     </q-page-container>
   </q-layout>
