@@ -44,6 +44,7 @@
         <q-route-tab to="/channels" name="channels" label="Channels" />
         <q-route-tab to="/exchanges" name="exchanges" label="Exchanges" />
         <q-route-tab to="/queues" name="queues" label="Queues" />
+        <q-route-tab v-if="auth.isAdmin" to="/admin" name="admin" label="Admin" />
       </q-tabs>
     </q-header>
 
