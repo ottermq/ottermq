@@ -4,7 +4,9 @@ global:
 
 scrape_configs:
   - job_name: 'ottermq'
-    static_configs:
-      - targets: ['ottermq:9090']
-    metrics_path: '/metrics'
     scrape_interval: 5s
+    metrics_path: '/metrics'
+    static_configs:
+      # When running the broker natively (make run-dev), use host.docker.internal
+      # When running the broker in Docker on the same compose network, use the service name
+      - targets: ['host.docker.internal:9090']

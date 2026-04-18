@@ -9,16 +9,30 @@ services:
       - "9091:9090"
     restart: unless-stopped
     networks:
-      - ottermq_network
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ottermq_grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/ottermq.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring
 
 volumes:
   prometheus_data:
+  grafana_data:
 
-# networks:
-#   ottermq_network:
-#     external: true 
+networks:
+  monitoring:
+    driver: bridge
