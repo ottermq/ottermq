@@ -9,7 +9,7 @@
         </div>
 
         <q-table
-          :rows="store.items"
+          :rows="filteredExchanges"
           :columns="columns"
           row-key="name"
           flat bordered
@@ -78,7 +78,7 @@
                 <q-select
                   v-model="newExchange.vhost"
                   label="Virtual Host"
-                  :options="['/']"
+                  :options="vhostsStore.names"
                   outlined
                   dense
                   class="q-mb-md"
@@ -115,21 +115,35 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useExchangesStore } from 'src/stores/exchanges'
+import { useVHostsStore } from 'src/stores/vhosts'
 import { Notify } from 'quasar'
 
 const store = useExchangesStore()
+const vhostsStore = useVHostsStore()
 
 // The default exchange binds every queue automatically; showing the binding
 // form and list for it would be misleading.
 const isDefaultExchange = computed(() => store.selected === '(AMQP default)')
 
+// Only show exchanges that belong to the active vhost
+const filteredExchanges = computed(() =>
+  store.items.filter(e => e.vhost === vhostsStore.selected)
+)
+
+// When the active vhost changes, refetch and clear any selected exchange
+watch(() => vhostsStore.selected, () => {
+  store.selected = null
+  store.bindings = []
+  store.fetch()
+})
+
 const showCreateDialog = ref(false)
 const creating = ref(false)
 const newExchange = ref({
   name: '',
-  vhost: '/',
+  vhost: vhostsStore.selected,
   type: 'direct',
   durable: false,
   auto_delete: false
@@ -164,7 +178,7 @@ function select(name) {
 function resetForm() {
   newExchange.value = {
     name: '',
-    vhost: '/',
+    vhost: vhostsStore.selected,
     type: 'direct',
     durable: false,
     auto_delete: false
@@ -179,6 +193,8 @@ async function createExchange() {
     await store.addExchange(newExchange.value)
     showCreateDialog.value = false
     resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create exchange' })
   } finally {
     creating.value = false
   }

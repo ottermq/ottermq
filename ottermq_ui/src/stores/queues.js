@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
+import { useVHostsStore } from 'src/stores/vhosts'
 
 export const useQueuesStore = defineStore('queues', {
   state: () => ({
@@ -49,22 +50,22 @@ lastMessage: null,
           payload['x-dead-letter-routing-key'] = queueData.x_dead_letter_routing_key
         }
 
-        const vhost = queueData.vhost || '/'
+        const vhost = useVHostsStore().selected
         const encodedVhost = encodeURIComponent(vhost)
         const encodedName = encodeURIComponent(queueData.name)
-        
+
         await api.post(`/queues/${encodedVhost}/${encodedName}`, payload)
         await this.fetch()
     },
     async deleteQueue (name) {
-        const vhost = '/'
+        const vhost = useVHostsStore().selected
         const encodedVhost = encodeURIComponent(vhost)
         const encodedName = encodeURIComponent(name)
         await api.delete(`/queues/${encodedVhost}/${encodedName}`)
         await this.fetch()
     },
     async get(queue) {
-        const encodedVhost = encodeURIComponent('/')
+        const encodedVhost = encodeURIComponent(useVHostsStore().selected)
         const encodedQueue = encodeURIComponent(queue)
         const {data} = await api.post(`/queues/${encodedVhost}/${encodedQueue}/get`, {
           ack_mode: "ack",

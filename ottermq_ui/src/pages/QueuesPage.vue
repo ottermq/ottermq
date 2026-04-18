@@ -7,7 +7,7 @@
         </div>
 
           <q-table
-            :rows="rows"
+            :rows="filteredRows"
             :columns="columns"
             row-key="name"
             flat bordered
@@ -66,7 +66,7 @@
                   <q-select
                     v-model="newQueue.vhost"
                     label="Virtual Host"
-                    :options="['/']"
+                    :options="vhostsStore.names"
                     outlined
                     dense
                     class="q-mb-md"
@@ -142,15 +142,18 @@
 <script setup>
 import { onMounted, ref, computed, watch } from 'vue'
 import { useQueuesStore } from 'src/stores/queues'
+import { useVHostsStore } from 'src/stores/vhosts'
+import { Notify } from 'quasar'
 
 const store = useQueuesStore()
+const vhostsStore = useVHostsStore()
 const selectedName = ref('')
 const showCreateDialog = ref(false)
 const creating = ref(false)
 
 const newQueue = ref({
   name: '',
-  vhost: '/',
+  vhost: vhostsStore.selected,
   durable: false,
   auto_delete: false,
   max_length: null,
@@ -180,6 +183,17 @@ const rows = computed(() =>
   }))
 )
 
+// Only show queues that belong to the active vhost
+const filteredRows = computed(() =>
+  rows.value.filter(q => q.vhost === vhostsStore.selected)
+)
+
+// When the active vhost changes, refetch and clear selection
+watch(() => vhostsStore.selected, () => {
+  store.selected = null
+  store.fetch()
+})
+
 function select(row) {
   store.select(row.name)
 }
@@ -189,7 +203,7 @@ watch(() => store.selected, v => { selectedName.value = v || '' })
 function resetForm() {
   newQueue.value = {
     name: '',
-    vhost: '/',
+    vhost: vhostsStore.selected,
     durable: false,
     auto_delete: false,
     max_length: null,
@@ -201,24 +215,34 @@ function resetForm() {
 
 async function createQueue() {
   if (!newQueue.value.name) return
-  
+
   creating.value = true
   try {
     await store.addQueue(newQueue.value)
     showCreateDialog.value = false
     resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create queue' })
   } finally {
     creating.value = false
   }
 }
 
 async function del(name) {
-  await store.deleteQueue(name)
+  try {
+    await store.deleteQueue(name)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to delete queue' })
+  }
 }
 
 async function consume() {
   if (!selectedName.value) return
-  await store.get(selectedName.value)
+  try {
+    await store.get(selectedName.value)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to get message' })
+  }
 }
 
 onMounted(store.fetch)

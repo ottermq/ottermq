@@ -10,6 +10,7 @@ const routes = [
       { path: 'channels', component: () => import('pages/ChannelsPage.vue'), meta: { requiresAuth: true } },
       { path: 'exchanges', component: () => import('pages/ExchangesPage.vue'), meta: { requiresAuth: true } },
       { path: 'queues', component: () => import('pages/QueuesPage.vue'), meta: { requiresAuth: true } },
+      { path: 'admin', component: () => import('pages/AdminPage.vue'), meta: { requiresAuth: true } },
       { path: 'login', component: () => import('pages/LoginPage.vue'), meta: { requiresAuth: false } },
     ],
   },

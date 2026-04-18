@@ -1,13 +1,7 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
+import { useVHostsStore } from 'src/stores/vhosts'
 
-// The server stores the default exchange under "" and "amq.default".
-// The API returns it with the display alias "(AMQP default)".
-// BindQueue/UnbindQueue look up vh.Exchanges[name] directly, so we must
-// send "" (the empty-string key) not the alias.
-function resolveExchangeName(name) {
-  return name === '(AMQP default)' ? '' : name
-}
 
 export const useExchangesStore = defineStore('exchanges', {
   state: () => ({
@@ -55,8 +49,8 @@ export const useExchangesStore = defineStore('exchanges', {
         no_wait: false,
         arguments: {}
       }
-      
-      const vhost = exchangeData.vhost || '/'
+
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedName = encodeURIComponent(exchangeData.name)
       
@@ -64,14 +58,14 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetch()
     },
     async deleteExchange(name) {
-      const vhost = '/'
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedName = encodeURIComponent(name)
       await api.delete(`/exchanges/${encodedVhost}/${encodedName}`)
       await this.fetch()
     },
     async fetchBindings(exchange) {
-        const vhost = '/'
+        const vhost = useVHostsStore().selected
         const encodedVhost = encodeURIComponent(vhost)
         const encodedExchange = encodeURIComponent(exchange)
         try {
@@ -92,8 +86,8 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        vhost: '/',
-        source: resolveExchangeName(exchange),
+        vhost: useVHostsStore().selected,
+        source: exchange,
         routing_key: routingKey,
         destination: queue,
         arguments: {}
@@ -102,8 +96,8 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async deleteBinding(exchange, routingKey, queue) {
       await api.delete(`/bindings`, { data: {
-        vhost: "/",
-        source: resolveExchangeName(exchange),
+        vhost: useVHostsStore().selected,
+        source: exchange,
         routing_key: routingKey,
         destination: queue,
         arguments: {},
@@ -111,7 +105,7 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
-      const vhost = '/'
+      const vhost = useVHostsStore().selected
       const encodedVhost = encodeURIComponent(vhost)
       const encodedExchange = encodeURIComponent(exchange)
 
