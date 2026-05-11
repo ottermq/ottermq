@@ -134,6 +134,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 // publishUnlocked performs message publishing without acquiring vh.mu
 // MUST be called with vh.mu already locked
 func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) (string, error) {
+	exchangeName = resolveExchangeAlias(exchangeName)
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
@@ -318,6 +319,7 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
+	exchangeName = resolveExchangeAlias(exchangeName)
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		return false, errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))
