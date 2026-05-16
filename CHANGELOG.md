@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** Prior to establishing this CHANGELOG.md file, release notes were maintained directly in [GitHub Releases](https://github.com/ottermq/ottermq/releases). Going forward, all changes will be tracked here and synchronized with releases.
 
-## [Unreleased]
+## [v0.19.3-1]
+
+### Fixed
+
+- **Critical: queue name corruption via Fiber unsafe string aliasing** — Fiber's default mode uses `utils.UnsafeString` to extract path parameters, returning a zero-copy string backed directly by fasthttp's reused request buffer. Queue names stored from `c.Params("queue")` were silently overwritten when fasthttp recycled that buffer on the next request, producing corrupted names such as `"2F/(AMQ"` (bytes from a subsequent exchange URL). Fixed by enabling `Immutable: true` in the Fiber config, which forces proper copies of all request-derived strings.
+- **UI: "Get message" block persists after navigation or queue deletion** — `store.lastMessage` was never cleared when switching to a different queue, navigating away from the Queues page, or deleting the selected queue. The queue store's `select` action now resets `lastMessage` on queue change; `deleteQueue` clears both `selected` and `lastMessage` when the deleted queue was selected; and `QueuesPage` clears `lastMessage` on unmount.
+- **UI: no feedback on message publish** — Quasar's `Notify` plugin was not registered in `quasar.config.js` (`plugins: []`), causing all `Notify.create()` calls (success and error toasts) to silently no-op across the entire application. Added `'Notify'` to the plugins list.
 
 ## [v0.19.3] - 2026-05-15
 
