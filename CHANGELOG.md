@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.19.3] - 2026-05-15
+
+### Fixed
+
+- **`queue.delete` AMQP compliance** — `if-unused` and `if-empty` flags are now enforced with `PRECONDITION_FAILED` channel errors; exclusive queue ownership is validated and returns `ACCESS_REFUSED` when a foreign connection attempts deletion
+- **Publish deadlock under QLL** — `publishUnlocked` now manually releases `vh.mu` before calling `queue.Push()` so that QLL enforcement (which may dead-letter back through `publishUnlocked`) cannot deadlock; a deferred panic recovery re-acquires the lock before re-panicking to keep the caller's `defer mu.Unlock()` consistent
+- **Default exchange alias resolution** — `resolveExchangeAlias` centralises normalisation of `""`, `"amq.default"`, and `"(AMQP default)"` to a single canonical key, fixing routing and binding operations that previously diverged depending on how the default exchange was named
+- **Prometheus: stale delta entries on exchange deletion** — `updateExchanges` now prunes `lastExchangePublished` entries for exchanges that no longer exist, preventing unbounded map growth and incorrect counter increments if an exchange is recreated with the same name
+- **Management queue statistics** — `fetchQueueStatistics` now prefers the metrics collector snapshot (depth, unacked, consumer count) when available, falling back to direct vhost queries only when metrics are disabled
+
 ## [v0.19.2] - 2026-05-11
 
 ### Fixed
@@ -440,7 +450,10 @@ For releases prior to v0.7.1, please refer to [GitHub Releases](https://github.c
 
 ---
 
-[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.19.3...HEAD
+[v0.19.3]: https://github.com/ottermq/ottermq/releases/tag/v0.19.3
+[v0.19.2]: https://github.com/ottermq/ottermq/releases/tag/v0.19.2
+[v0.19.1]: https://github.com/ottermq/ottermq/releases/tag/v0.19.1
 [v0.19.0]: https://github.com/ottermq/ottermq/releases/tag/v0.19.0
 [v0.18.0]: https://github.com/ottermq/ottermq/releases/tag/v0.18.0
 [v0.17.0]: https://github.com/ottermq/ottermq/releases/tag/v0.17.0

@@ -9,15 +9,11 @@ import (
 
 // ListQueues returns a list of all queues across all vhosts.
 func (s *Service) ListQueues() []models.QueueDTO {
-	// get queues from all vhosts
 	var dtos []models.QueueDTO
 	vhosts := s.broker.ListVHosts()
-	queues := []*vhost.Queue{}
 
 	for _, vh := range vhosts {
-		queues = append(queues, vh.GetAllQueues()...)
-		// Map to DTOs
-		for _, queue := range queues {
+		for _, queue := range vh.GetAllQueues() {
 			stats := s.fetchQueueStatistics(vh, queue)
 			dto := s.queueToDTO(vh, queue, stats)
 			dtos = append(dtos, dto)
