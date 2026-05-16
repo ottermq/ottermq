@@ -67,7 +67,8 @@ type QueueMetrics struct {
 	DeliveryRate *RateTracker // Messages delivered per second
 	AckRate      *RateTracker // ACKs per second
 	Depth        atomic.Int64 // Current queue depth
-	// Todo: add DeliveryCount atomic.Int64 // Total messages delivered
+	PublishCount  atomic.Int64 // Cumulative enqueue count (for rate calculation)
+	DeliveryCount atomic.Int64 // Cumulative delivery count (for rate calculation)
 	UnackedCount  atomic.Int64 // Current unacknowledged messages
 	ConsumerCount atomic.Int64 // Current consumer count
 	AckCount      atomic.Int64 // Cumulative ACK count (for rate calculation)
@@ -240,6 +241,7 @@ func (c *Collector) RecordQueuePublish(queueName string) {
 
 	qm := c.getOrCreateQueueMetrics(queueName)
 	qm.Depth.Add(1)
+	qm.PublishCount.Add(1)
 	c.readyDepth.Add(1)
 }
 
@@ -257,6 +259,7 @@ func (c *Collector) RecordQueueDelivery(queueName string, autoAck bool) {
 
 	qm := c.getOrCreateQueueMetrics(queueName)
 	qm.Depth.Add(-1)
+	qm.DeliveryCount.Add(1)
 	c.readyDepth.Add(-1)
 
 	if autoAck {
@@ -390,8 +393,8 @@ func (c *Collector) sampleQueueMetrics(queueName string) {
 	}
 	qm.mu.RLock()
 	defer qm.mu.RUnlock()
-	qm.PublishRate.Record(qm.Depth.Load())
-	qm.DeliveryRate.Record(qm.Depth.Load()) // TODO: change to DeliveryCount when implemented
+	qm.PublishRate.Record(qm.PublishCount.Load())
+	qm.DeliveryRate.Record(qm.DeliveryCount.Load())
 	qm.AckRate.Record(qm.AckCount.Load())
 }
 

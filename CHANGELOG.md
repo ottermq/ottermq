@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** Prior to establishing this CHANGELOG.md file, release notes were maintained directly in [GitHub Releases](https://github.com/ottermq/ottermq/releases). Going forward, all changes will be tracked here and synchronized with releases.
 
+## [v0.19.3-2]
+
+### Fixed
+
+- **Metrics: negative queue message rate** — `PublishRate` and `DeliveryRate` per-queue rate trackers were being sampled with the current queue depth, which decreases as messages are consumed and produces negative rates. Added `PublishCount` and `DeliveryCount` monotonically increasing counters to `QueueMetrics`; rate trackers now sample these cumulative values (same pattern as `AckCount`).
+- **Prometheus: stale queue metrics after deletion** — per-queue `GaugeVec` label sets (`ottermq_queue_depth`, `ottermq_queue_message_rate`, `ottermq_queue_delivery_rate`, `ottermq_queue_ack_rate`, `ottermq_queue_consumers`, `ottermq_queue_unacked`) were never removed when a queue was deleted, causing Grafana to display the last-known value (e.g. a non-zero depth) indefinitely. The exporter now tracks the active queue set each cycle and calls `DeleteLabelValues` for any queue that no longer exists.
+
 ## [v0.19.3-1]
 
 ### Fixed
