@@ -50,6 +50,9 @@ type Exporter struct {
 	// Delta tracking for per-exchange counters (keyed by exchange name)
 	lastExchangePublished map[string]int64
 
+	// Track known queues to detect deletions and clean up stale label sets
+	lastKnownQueues map[string]struct{}
+
 	stopChan chan struct{}
 	wg       sync.WaitGroup
 	mu       sync.Mutex
@@ -60,6 +63,7 @@ func NewExporter(collector *metrics.Collector, config *Config) *Exporter {
 		collector:             collector,
 		config:                config,
 		lastExchangePublished: make(map[string]int64),
+		lastKnownQueues:       make(map[string]struct{}),
 		stopChan:              make(chan struct{}),
 	}
 	e.registerMetrics()
@@ -228,8 +232,11 @@ func (e *Exporter) updateBroker() {
 }
 
 func (e *Exporter) updateQueues() {
+	currentQueues := make(map[string]struct{})
+
 	for _, qm := range e.collector.GetAllQueueMetrics() {
 		name := qm.Name
+		currentQueues[name] = struct{}{}
 		e.queueDepth.WithLabelValues(name).Set(float64(qm.Depth.Load()))
 		e.queueMessageRate.WithLabelValues(name).Set(qm.PublishRate.Rate())
 		e.queueDeliveryRate.WithLabelValues(name).Set(qm.DeliveryRate.Rate())
@@ -237,6 +244,20 @@ func (e *Exporter) updateQueues() {
 		e.queueConsumers.WithLabelValues(name).Set(float64(qm.ConsumerCount.Load()))
 		e.queueUnacked.WithLabelValues(name).Set(float64(qm.UnackedCount.Load()))
 	}
+
+	// Remove label sets for queues that no longer exist
+	for name := range e.lastKnownQueues {
+		if _, ok := currentQueues[name]; !ok {
+			e.queueDepth.DeleteLabelValues(name)
+			e.queueMessageRate.DeleteLabelValues(name)
+			e.queueDeliveryRate.DeleteLabelValues(name)
+			e.queueAckRate.DeleteLabelValues(name)
+			e.queueConsumers.DeleteLabelValues(name)
+			e.queueUnacked.DeleteLabelValues(name)
+		}
+	}
+
+	e.lastKnownQueues = currentQueues
 }
 
 func (e *Exporter) updateExchanges() {
