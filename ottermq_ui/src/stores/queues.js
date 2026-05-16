@@ -62,6 +62,10 @@ lastMessage: null,
         const encodedVhost = encodeURIComponent(vhost)
         const encodedName = encodeURIComponent(name)
         await api.delete(`/queues/${encodedVhost}/${encodedName}`)
+        if (this.selected === name) {
+          this.selected = null
+          this.lastMessage = null
+        }
         await this.fetch()
     },
     async get(queue) {
@@ -76,6 +80,7 @@ lastMessage: null,
         return this.lastMessage
     },
     select(queue) {
+      if (this.selected !== queue) this.lastMessage = null
       this.selected = queue
     }
   },

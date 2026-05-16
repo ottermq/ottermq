@@ -140,7 +140,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useQueuesStore } from 'src/stores/queues'
 import { useVHostsStore } from 'src/stores/vhosts'
 import { Notify } from 'quasar'
@@ -246,6 +246,7 @@ async function consume() {
 }
 
 onMounted(store.fetch)
+onUnmounted(() => { store.lastMessage = null })
 </script>
 
 <style scoped lang="scss">
