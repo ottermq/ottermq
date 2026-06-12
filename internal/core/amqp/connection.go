@@ -254,6 +254,9 @@ func parseConnectionCloseFrame(payload []byte) (*RequestMethodMessage, error) {
 	index += 2
 	replyTextLen := payload[index]
 	index++
+	if len(payload) < int(index)+int(replyTextLen)+4 {
+		return nil, fmt.Errorf("frame too short")
+	}
 	replyText := string(payload[index : index+uint16(replyTextLen)])
 	index += uint16(replyTextLen)
 	classID := binary.BigEndian.Uint16(payload[index : index+2])
