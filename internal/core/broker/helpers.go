@@ -1,7 +1,6 @@
 package broker
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -32,18 +31,6 @@ func getCommitInfo(verInfo string) models.CommitInfo {
 	}
 	commit.Version = verInfo
 	return commit
-}
-
-func getFileDescriptors() uint32 {
-	pid := os.Getpid()
-	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
-
-	entries, err := os.ReadDir(fdDir)
-	if err != nil {
-		log.Error().Err(err).Msg("Error reading fd dir")
-		return 0
-	}
-	return uint32(len(entries))
 }
 
 func getFileDescriptorLimit() uint32 {

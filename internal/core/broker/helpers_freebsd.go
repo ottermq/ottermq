@@ -2,6 +2,7 @@
 package broker
 
 import (
+	"os"
 	"syscall"
 	"time"
 
@@ -36,4 +37,13 @@ func getSysInfo() (Sysinfo, error) {
 		TotalDisk: stat.Blocks * uint64(stat.Bsize),
 		AvailDisk: uint64(stat.Bavail) * uint64(stat.Bsize),
 	}, nil
+}
+
+func getFileDescriptors() uint32 {
+	entries, err := os.ReadDir("/dev/fd")
+	if err != nil {
+		log.Error().Err(err).Msg("Error reading fd dir")
+		return 0
+	}
+	return uint32(len(entries))
 }
