@@ -34,6 +34,7 @@
     "globals": "^16.4.0",
     "postcss": "^8.4.14",
     "prettier": "^3.3.3",
+    "sass": "^1.101.0",
     "vite-plugin-checker": "^0.10.3",
     "vue-eslint-parser": "^10.2.0"
   },
