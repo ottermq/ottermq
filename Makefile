@@ -1,28 +1,32 @@
-VERSION=$(shell git describe --tags --always)
 BINARY_NAME=ottermq
 ADMIN_BINARY_NAME=ottermqadmin
 BUILD_DIR=bin
 MAIN_PATH=cmd/ottermq/main.go
 ADMIN_MAIN_PATH=cmd/ottermqadmin/main.go
 
-build: 
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+
+build:
 	@mkdir -p $(BUILD_DIR)
-	@go build -ldflags "-X main.VERSION=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./${MAIN_PATH}
+	@VERSION=$$(git describe --tags --always 2>/dev/null || echo dev); \
+	go build -ldflags "-X main.VERSION=$$VERSION" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./$(MAIN_PATH)
 
 build-admin:
 	@mkdir -p $(BUILD_DIR)
-	@go build -o ./$(BUILD_DIR)/$(ADMIN_BINARY_NAME) ./${ADMIN_MAIN_PATH}
+	@go build -o ./$(BUILD_DIR)/$(ADMIN_BINARY_NAME) ./$(ADMIN_MAIN_PATH)
 
 docs:
-	@$(shell go env GOPATH)/bin/swag init -g ../../../${MAIN_PATH} --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/docs --ot go
+	@GOPATH=$$(go env GOPATH); \
+	$$GOPATH/bin/swag init -g ../../../$(MAIN_PATH) --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/docs --ot go
 
-install:
-	@mkdir -p $(shell go env GOPATH)/bin
-	@mv ./$(BUILD_DIR)/$(BINARY_NAME) $(shell go env GOPATH)/bin/$(BINARY_NAME)
+install: build
+	@mkdir -p $(BINDIR)
+	@install -m 0755 ./$(BUILD_DIR)/$(BINARY_NAME) $(BINDIR)/$(BINARY_NAME)
 
-install-admin:
-	@mkdir -p $(shell go env GOPATH)/bin
-	@mv ./$(BUILD_DIR)/$(ADMIN_BINARY_NAME) $(shell go env GOPATH)/bin/$(ADMIN_BINARY_NAME)
+install-admin: build-admin
+	@mkdir -p $(BINDIR)
+	@install -m 0755 ./$(BUILD_DIR)/$(ADMIN_BINARY_NAME) $(BINDIR)/$(ADMIN_BINARY_NAME)
 
 run: build
 	@./$(BUILD_DIR)/$(BINARY_NAME)
