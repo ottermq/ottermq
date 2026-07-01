@@ -1,4 +1,5 @@
-// go: linux
+//go:build linux
+
 package broker
 
 import (

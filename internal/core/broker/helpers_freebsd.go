@@ -1,4 +1,5 @@
-// go: build freebsd
+//go:build freebsd
+
 package broker
 
 import (
@@ -12,7 +13,7 @@ import (
 
 func getSysInfo() (Sysinfo, error) {
 	// get total system memory
-	totalram, err := unix.SysctlUint64("hw.phymem")
+	totalram, err := unix.SysctlUint64("hw.physmem")
 	if err != nil {
 		log.Error().Err(err).Msg("Error getting total physical memory")
 		return Sysinfo{}, err
