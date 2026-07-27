@@ -17,9 +17,9 @@ load_rc_config "$name"
 : ${ottermq_pidfile:="/var/run/ottermq.pid"}
 : ${ottermq_logfile:="/var/log/ottermq.log"}
 
-pidfile="${ottemq_pidfile}"
+pidfile="${ottermq_pidfile}"
 command="/usr/sbin/daemon"
-command_args="-f -P ${pidfile} -o ${ottemq_logfile} /usr/local/bin/ottermq"
+command_args="-f -P ${pidfile} -o ${ottermq_logfile} /usr/local/bin/ottermq"
 
 
 start_precmd="ottermq_prestart"
@@ -27,7 +27,7 @@ start_precmd="ottermq_prestart"
 
 ottermq_prestart()
 {
-  if [ -f "$ottermq_pidfile" ]; then
+  if [ -f "$ottermq_env_file" ]; then
     set -a 
     . "$ottermq_env_file"
     set +a
