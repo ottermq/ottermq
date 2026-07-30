@@ -48,9 +48,15 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	app := ws.configServer(logFile)
 
 	// Serve static files (ui -- Vue frontend)
+	uiPath := ws.config.uiPath
+	// test if path exists
+	
 	if ws.config.EnableUI {
-		log.Info().Msg("Web UI enabled")
-		app.Static("/", "./ui")
+		log.Info()
+			.Str("path", uiPath)
+			.Msg("Web UI enabled")
+
+		app.Static("/", "uiPath")
 	}
 	if ws.config.EnableSwagger {
 		docs.SwaggerInfo.Host = "localhost:" + ws.config.WebServerPort
