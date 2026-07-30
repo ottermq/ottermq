@@ -33,6 +33,7 @@ type Config struct {
 	EnableSwagger bool
 	SwaggerPrefix string
 	ApiPrefix     string
+	UIPath        string
 }
 
 func NewWebServer(config *Config, broker *broker.Broker) (*WebServer, error) {
@@ -48,15 +49,15 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	app := ws.configServer(logFile)
 
 	// Serve static files (ui -- Vue frontend)
-	uiPath := ws.config.uiPath
-	// test if path exists
-	
-	if ws.config.EnableUI {
-		log.Info()
-			.Str("path", uiPath)
-			.Msg("Web UI enabled")
+	uiPath := ws.config.UIPath
 
-		app.Static("/", "uiPath")
+	if ws.config.EnableUI {
+		if _, err := os.Stat(uiPath); err == nil {
+			log.Info().Str("path", uiPath).Msg("Web UI enabled")
+			app.Static("/", uiPath)
+		} else {
+			log.Warn().Str("path", uiPath).Err(err).Msg("Web UI path not found")
+		}
 	}
 	if ws.config.EnableSwagger {
 		docs.SwaggerInfo.Host = "localhost:" + ws.config.WebServerPort

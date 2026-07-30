@@ -36,7 +36,7 @@ type Config struct {
 	EnableSwagger bool
 
 	WebAPIPath  string
-	UIPath  		string // Path to files on filesystem
+	UIPath      string // Path to files on filesystem
 	SwaggerPath string
 
 	// Web Admin
@@ -89,7 +89,7 @@ func LoadConfig(version string) *Config {
 		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
 		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
 		WebAPIPath:    getEnv("OTTERMQ_WEB_API_PATH", "/api"),
-		UIPath:    getEnv("OTTERMQ_UI_PATH", "/usr/local/share/ottermq/ui"),
+		UIPath:        getEnv("OTTERMQ_UI_PATH", "/usr/local/share/ottermq/ui"),
 		SwaggerPath:   getEnv("OTTERMQ_SWAGGER_PATH", "/docs"),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),

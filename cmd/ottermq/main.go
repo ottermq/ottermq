@@ -182,6 +182,7 @@ func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (inter
 			EnableSwagger: cfg.EnableSwagger,
 			SwaggerPrefix: cfg.SwaggerPath,
 			ApiPrefix:     cfg.WebAPIPath,
+			UIPath:        cfg.UIPath,
 		}
 
 		webServer, err = web.NewWebServer(webConfig, b)
