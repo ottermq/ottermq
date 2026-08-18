@@ -3,7 +3,9 @@
 
 services:
   ottermq:
-    build: .
+    build:
+      context: .
+      dockerfile: ./packaging/docker/Dockerfile
     env_file:
       - docker.env # load all variables into container environment
     ports:
@@ -15,7 +17,7 @@ services:
     environment:
       - GO_ENV=production
     networks:
-     - ottermq_network
+      - ottermq_network
 
 volumes:
   data:
