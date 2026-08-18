@@ -1,9 +1,13 @@
 include:
- - ./prometheus/docker-compose.yml
+  - ./prometheus/docker-compose.yml
 
 services:
   ottermq:
-    build: .
+    build:
+      context: .
+      dockerfile: ./packaging/docker/Dockerfile
+    env_file:
+      - docker.env # load all variables into container environment
     ports:
       - "3000:3000" # Web UI
       - "5672:5672" # AMQP
@@ -12,10 +16,8 @@ services:
       - data:/app/data
     environment:
       - GO_ENV=production
-    env_file:
-      - .env # load all variables into container environment
     networks:
-     - ottermq_network
+      - ottermq_network
 
 volumes:
   data:
