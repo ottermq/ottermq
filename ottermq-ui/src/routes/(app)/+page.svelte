@@ -1,6 +1,20 @@
 <!-- routes/+page.svelte -->
-<script>
+<script lang="ts">
 	import StatCard from '$lib/components/StatCard.svelte';
+	import { api } from '$lib/services/api';
+
+	let data: any;
+
+	async function loadData() {
+		try {
+			const response = await api.get('/api/overview');
+			data = await response.json();
+		} catch (err) {
+			console.error('Failed to fetch:', err);
+		}
+	}
+
+	loadData();
 </script>
 
 <h1>Overview</h1>
