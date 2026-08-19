@@ -3,7 +3,18 @@
 	import StatCard from '$lib/components/StatCard.svelte';
 	import { api } from '$lib/services/api';
 
-	let data: any;
+	interface OverviewData {
+		message_stats: {
+			messages_total: number;
+			messages_ready: number;
+			messages_unacknowledged: number;
+		};
+		object_totals: {
+			consumers: number;
+		};
+	}
+
+	let data = $state<OverviewData | null>(null);
 
 	async function loadData() {
 		try {
@@ -20,10 +31,21 @@
 <h1>Overview</h1>
 
 <div class="stats">
-	<StatCard title="Total Messages" value={0} color="blue" />
-	<StatCard title="Ready" value={0} color="green" />
-	<StatCard title="Unacknowledged" value={0} color="orange" />
-	<StatCard title="Consumers" value={0} color="black" />
+	{#if data}
+		<StatCard title="Total Messages" value={data.message_stats.messages_total} color="blue" />
+		<StatCard title="Ready" value={data.message_stats.messages_ready} color="green" />
+		<StatCard
+			title="Unacknowledged"
+			value={data.message_stats.messages_unacknowledged}
+			color="orange"
+		/>
+		<StatCard title="Consumers" value={data.object_totals.consumers} color="black" />
+	{:else}
+		<StatCard title="Total Messages" value={0} color="blue" />
+		<StatCard title="Ready" value={0} color="green" />
+		<StatCard title="Unacknowledged" value={0} color="orange" />
+		<StatCard title="Consumers" value={0} color="black" />
+	{/if}
 </div>
 
 <style>
