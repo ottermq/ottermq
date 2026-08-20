@@ -1,33 +1,18 @@
 <!-- routes/+page.svelte -->
 <script lang="ts">
 	import StatCard from '$lib/components/StatCard.svelte';
-	import { api } from '$lib/services/api';
-
-	interface OverviewData {
-		message_stats: {
-			messages_total: number;
-			messages_ready: number;
-			messages_unacknowledged: number;
-		};
-		object_totals: {
-			consumers: number;
-		};
-	}
+	import type { OverviewData } from '$lib/stores/overview.svelte';
+	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
 
 	let data = $state<OverviewData | null>(null);
 
-	async function loadData() {
-		try {
-			const response = await api.get('/api/overview');
-			data = await response.json();
-		} catch (err) {
-			console.error('Failed to fetch:', err);
-		}
+	async function getData() {
+		data = await fetchData();
 	}
 
 	$effect(() => {
-		loadData();
-		const interval = setInterval(loadData, 5000);
+		getData();
+		const interval = setInterval(getData, 5000);
 		return () => clearInterval(interval);
 	});
 </script>
