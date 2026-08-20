@@ -25,7 +25,11 @@
 		}
 	}
 
-	loadData();
+	$effect(() => {
+		loadData();
+		const interval = setInterval(loadData, 5000);
+		return () => clearInterval(interval);
+	});
 </script>
 
 <h1>Overview</h1>
