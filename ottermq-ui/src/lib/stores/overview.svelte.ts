@@ -1,11 +1,12 @@
 import { api } from '$lib/services/api';
 
+export interface BrokerData {
+    product: string;
+    version: string;
+    go_version: string;
+}
 export interface OverviewData {
-    broker: {
-        product: string;
-        version: string;
-        go_version: string;
-    }
+    broker: BrokerData;
     node: {
         name: string;
         uptime: number;
@@ -34,4 +35,14 @@ export async function fetchOverviewData() {
         console.error('Failed to fetch: ', err);
     }
     return data;
+}
+
+export async function fetchBrokerData(): Promise<BrokerData | null> {
+    try {
+        const response = await api.get('/api/overview/broker');
+        return await response.json();
+    } catch (err) {
+        console.error('Failed to fetch: ', err);
+    }
+    return null;
 }
