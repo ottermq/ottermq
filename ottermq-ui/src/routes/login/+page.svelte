@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { auth, login } from '$lib/stores/auth.svelte';
 
 	let username = $state('');
@@ -9,8 +10,10 @@
 		event.preventDefault();
 		try {
 			await login(username, password);
-			goto('/');
-		} catch {}
+			goto(resolve('/'));
+		} catch {
+			// swallowed on purpose
+		}
 	}
 </script>
 
