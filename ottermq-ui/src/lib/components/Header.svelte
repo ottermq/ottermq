@@ -1,20 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { auth, logout } from '$lib/stores/auth.svelte';
 	import type { BrokerData } from '$lib/stores/overview.svelte';
 	import { fetchBrokerData } from '$lib/stores/overview.svelte';
 	import { fetchVhosts, vhosts } from '$lib/stores/vhosts.svelte';
-
-	const menu = [
-		{ label: 'OVERVIEW', href: resolve('/') },
-		{ label: 'CONNECTIONS', href: resolve('/connections') },
-		{ label: 'CHANNELS', href: resolve('/channels') },
-		{ label: 'EXCHANGES', href: resolve('/exchanges') },
-		{ label: 'QUEUES', href: resolve('/queues') },
-		{ label: 'ADMIN', href: resolve('/admin') }
-	];
+	import NavBar from './NavBar.svelte';
 
 	const username = auth.username || 'annonymous';
 
@@ -54,88 +45,110 @@
 </script>
 
 <header>
-	<div class="flex">
-		<div class="text-xl text-white">OtterMQ</div>
-		{#if version}
-			<div class="version">
-				<span>{version}</span>
-				{#if goVersion}
-					<span>{goVersion}</span>
-				{/if}
+	<div class="topbar">
+		<div class="brand-group">
+			<div class="brand">OtterMQ</div>
+			{#if version}
+				<div class="version">
+					<span>{version}</span>
+					{#if goVersion}
+						<span>{goVersion}</span>
+					{/if}
+				</div>
+			{/if}
+		</div>
+		<div class="actions">
+			{#if vhost}
+				<div class="vhost">
+					<span>VHost</span>
+					<span>{vhost}</span>
+				</div>
+			{/if}
+			<div class="user">
+				<p>User:</p>
+				<strong>{username}</strong>
 			</div>
-		{/if}
-		{#if vhost}
-			<div class="vhost">
-				<span>VHost</span>
-				<span>{vhost}</span>
-			</div>
-		{/if}
-		<div>User:<strong>{username}</strong></div>
-		<div class="logout">
-			<button onclick={handleLogout}>LOGOUT</button>
+			<button class="logout" onclick={handleLogout}>logout</button>
 		</div>
 	</div>
 
-	<nav>
-		{#each menu as { label, href } (href)}
-			<a {href} class:active={page.url.pathname === href}>
-				{label}
-			</a>
-		{/each}
-	</nav>
+	<NavBar />
 </header>
 
 <style>
-	@reference "tailwindcss";
 	header {
 		background: #1976d2;
 		color: white;
-		padding-top: 10px;
-		padding-left: 10px;
 	}
 
-	nav {
+	.topbar {
 		display: flex;
-		gap: 28px;
-		padding: 12px 14px 0;
+		align-items: center;
+		justify-content: space-between;
+		padding: 10px 14px;
 	}
 
-	nav a {
-		color: white;
-		text-decoration: none;
-		font-weight: bold;
-		font-size: 13px;
-		padding-bottom: 8px;
-		border-bottom: 2px solid transparent;
+	.brand-group {
+		display: flex;
+		align-items: center;
+		gap: 25px;
 	}
 
-	nav a.active {
-		border-bottom-color: white;
+	.brand {
+		font-size: 2.125rem;
+		font-weight: 600;
 	}
 
 	.version {
-		margin-left: 15px;
-		margin-right: 10px;
+		display: flex;
+		gap: 8px;
 	}
 
 	.version span {
-		background-color: #50a0e2;
-		font-size: 14px;
+		background-color: #ffffff4d;
+		font-size: 0.75rem;
+		font-weight: 300;
 		color: white;
-		margin-left: 5px;
-		padding: 2px;
+		padding: 1px 4px 2px;
 		border-color: transparent;
 		border-width: 1px;
 		border-radius: 4px;
 	}
 
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.user {
+		display: flex;
+		gap: 4px;
+		padding-right: 4px;
+	}
+
 	.vhost {
-		margin-left: 20px;
-		margin-right: 10px;
-		border: 1px solid azure;
-		padding: 1px 4px;
+		border: 1px solid #ffffff6d;
+		padding: 8px 8px 8px 4px;
+		border-radius: 5px;
 	}
 	.vhost span {
-		padding: 0px 2px 0px 2px;
+		padding: 0px 4px 0px 4px;
+	}
+
+	.logout {
+		padding: 8px 16px;
+		background: transparent;
+		border: none;
+		color: white;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		text-transform: uppercase;
+		border: 1px solid #ffffff2e;
+		border-radius: 5px;
+	}
+	.logout:hover {
+		background-color: #ffffff2e;
 	}
 </style>
