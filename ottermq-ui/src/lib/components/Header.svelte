@@ -1,41 +1,34 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { auth, logout } from '$lib/stores/auth.svelte';
-	import type { OverviewData } from '$lib/stores/overview.svelte';
-	import { fetchOverviewData } from '$lib/stores/overview.svelte';
+	import type { BrokerData } from '$lib/stores/overview.svelte';
+	import { fetchBrokerData } from '$lib/stores/overview.svelte';
+	import { fetchVhosts, vhosts } from '$lib/stores/vhosts.svelte';
 
 	const menu = [
-		{ label: 'OVERVIEW', href: '/' },
-		{ label: 'CONNECTIONS', href: '/connections' },
-		{ label: 'CHANNELS', href: '/channels' },
-		{ label: 'EXCHANGES', href: '/exchanges' },
-		{ label: 'QUEUES', href: '/queues' },
-		{ label: 'ADMIN', href: '/admin' }
+		{ label: 'OVERVIEW', href: resolve('/') },
+		{ label: 'CONNECTIONS', href: resolve('/connections') },
+		{ label: 'CHANNELS', href: resolve('/channels') },
+		{ label: 'EXCHANGES', href: resolve('/exchanges') },
+		{ label: 'QUEUES', href: resolve('/queues') },
+		{ label: 'ADMIN', href: resolve('/admin') }
 	];
 
 	const username = auth.username || 'annonymous';
 
-	function handleLogout() {
-		logout();
-		goto('/login');
-	}
-
-	let overview = $state<OverviewData | null>(null);
+	let broker = $state<BrokerData | null>(null);
+	const version = $derived(broker?.version ?? '');
+	const goVersion = $derived(getGoVersion());
+	const vhost = $derived(vhosts.selected);
 
 	async function getData() {
-		overview = await fetchOverviewData();
+		broker = await fetchBrokerData();
 	}
 
-	$effect(() => {
-		getData();
-	});
-
-	const version = $derived(overview?.broker.version ?? '');
-
-	const goVersion = $derived(getGoVersion());
 	function getGoVersion() {
-		const full = overview?.broker.go_version;
+		const full = broker?.go_version;
 		if (!full) return '';
 		const parts = full.split(' ');
 		let ver = parts.length >= 2 ? parts[0] : full;
@@ -44,15 +37,39 @@
 		}
 		return `Go ${ver}`;
 	}
+
+	function handleLogout() {
+		logout();
+		goto(resolve('/login'));
+	}
+
+	async function getVhosts() {
+		await fetchVhosts();
+	}
+
+	$effect(() => {
+		getData();
+		getVhosts();
+	});
 </script>
 
 <header>
 	<div class="flex">
 		<div class="text-xl text-white">OtterMQ</div>
-		<div class="version">
-			<span>{version}</span>
-			<span>{goVersion}</span>
-		</div>
+		{#if version}
+			<div class="version">
+				<span>{version}</span>
+				{#if goVersion}
+					<span>{goVersion}</span>
+				{/if}
+			</div>
+		{/if}
+		{#if vhost}
+			<div class="vhost">
+				<span>VHost</span>
+				<span>{vhost}</span>
+			</div>
+		{/if}
 		<div>User:<strong>{username}</strong></div>
 		<div class="logout">
 			<button onclick={handleLogout}>LOGOUT</button>
@@ -60,7 +77,7 @@
 	</div>
 
 	<nav>
-		{#each menu as { label, href }}
+		{#each menu as { label, href } (href)}
 			<a {href} class:active={page.url.pathname === href}>
 				{label}
 			</a>
@@ -110,5 +127,15 @@
 		border-color: transparent;
 		border-width: 1px;
 		border-radius: 4px;
+	}
+
+	.vhost {
+		margin-left: 20px;
+		margin-right: 10px;
+		border: 1px solid azure;
+		padding: 1px 4px;
+	}
+	.vhost span {
+		padding: 0px 2px 0px 2px;
 	}
 </style>
