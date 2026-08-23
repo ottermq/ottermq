@@ -5,5 +5,7 @@ body {
 }
 
 main {
+    flex: 1;
     padding: 14px;
+    min-width: 0;
 }

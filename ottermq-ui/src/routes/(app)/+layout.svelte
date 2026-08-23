@@ -1,12 +1,20 @@
 <script lang="ts">
-	import Header from '$lib/components/Header.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
 	import '../layout.css';
 
 	let { children } = $props();
 </script>
 
-<Header />
+<div class="shell">
+	<Sidebar />
+	<main>
+		{@render children()}
+	</main>
+</div>
 
-<main>
-	{@render children()}
-</main>
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+	}
+</style>
