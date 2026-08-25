@@ -1,8 +1,10 @@
 <!-- routes/+page.svelte -->
 <script lang="ts">
+	import MessageStatsChart from '$lib/components/MessageStatsChart.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
 	import type { OverviewData } from '$lib/stores/overview.svelte';
 	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
+	import { fetchChartData, type ChartsData } from '$lib/stores/charts.svelte';
 
 	let data = $state<OverviewData | null>(null);
 
@@ -12,9 +14,16 @@
 
 	$effect(() => {
 		getData();
+		getChats();
 		const interval = setInterval(getData, 5000);
 		return () => clearInterval(interval);
 	});
+
+	let charts = $state<ChartsData|null>(null);
+
+	async function getChats() {
+		charts = await fetchChartData();
+	}
 </script>
 
 <h1>Overview</h1>
@@ -35,6 +44,12 @@
 		<StatCard title="Unacknowledged" value={0} color="orange" />
 		<StatCard title="Consumers" value={0} color="black" />
 	{/if}
+</div>
+<div class=charts>
+	<MessageStatsChart
+		chartData={charts?.message_stats!}
+	/>
+		
 </div>
 
 <style>
