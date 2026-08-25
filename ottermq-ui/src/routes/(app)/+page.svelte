@@ -5,6 +5,7 @@
 	import type { OverviewData } from '$lib/stores/overview.svelte';
 	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
 	import { fetchChartData, type ChartsData } from '$lib/stores/charts.svelte';
+	import MessageRateChart from '$lib/components/MessageRateChart.svelte';
 
 	let data = $state<OverviewData | null>(null);
 
@@ -15,7 +16,10 @@
 	$effect(() => {
 		getData();
 		getChats();
-		const interval = setInterval(getData, 5000);
+		const interval = setInterval(()=>{
+			getData(),
+			getChats()
+		}, 5000);
 		return () => clearInterval(interval);
 	});
 
@@ -49,7 +53,9 @@
 	<MessageStatsChart
 		chartData={charts?.message_stats!}
 	/>
-		
+	<MessageRateChart
+		chartData={charts?.message_rates!}
+	/>	
 </div>
 
 <style>

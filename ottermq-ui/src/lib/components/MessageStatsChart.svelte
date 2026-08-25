@@ -1,12 +1,10 @@
 <div>
     <div class="chart-title">Queued Messages</div>
 </div>
-{#if chartData}
-<!-- <div>
-    <pre>{JSON.stringify(chartData, null, 2)}</pre>
-</div> -->
+
 <div class="chart" bind:this={chartEL}></div>
-{/if}
+
+
 
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
@@ -50,7 +48,11 @@
             labels:{
                 formatter: (val:number) => Math.round(val).toLocaleString()
             }
-        },    
+        },
+        tooltip: {
+            x: { format:'HH:mm:ss' },
+            y:{ formatter: (val:number) => Math.round(val).toLocaleString() }
+        },
         legend:{
             position:'top',
             horizontalAlign:'center'
@@ -77,16 +79,6 @@
         }
     ]
    });
-
-   const tooltip = {
-        x: {
-            format:'HH:mm:ss'
-        },
-        y:{
-            formatter: (val:number) => Math.round(val).toLocaleString()
-        }
-    }
-
    
 
    interface Props {
@@ -112,8 +104,7 @@
  onMount(()=> {
         chart = new ApexCharts(chartEL,{...
             options,
-            series,
-            tooltip
+            series
         });
         
         chart.render()
