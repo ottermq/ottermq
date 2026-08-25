@@ -44,7 +44,6 @@
 </div>
 
 <style>
-	@reference "tailwindcss";
 	.card {
 		border-width: 2px;
 		border-radius: 8px;

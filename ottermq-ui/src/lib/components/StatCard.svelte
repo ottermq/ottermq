@@ -1,4 +1,3 @@
-<!--lib/components/Statcard.svelte -->
 <script lang="ts">
 	interface Props {
 		title: string;
@@ -11,14 +10,17 @@
 <div class="stat-card">
 	<div class="stat-data">
 		<span
-			class={color == 'blue'
-				? 'stat-blue'
-				: color == 'green'
-					? 'stat-green'
-					: color == 'orange'
-						? 'stat-orange'
-						: 'stat-black'}>{value}</span
+			// class={color == 'blue'
+			// 	? 'stat-blue'
+			// 	: color == 'green'
+			// 		? 'stat-green'
+			// 		: color == 'orange'
+			// 			? 'stat-orange'
+			// 			: 'stat-black'}
+			class={color}
 		>
+			{value}
+		</span>
 	</div>
 	<div class="stat-name">
 		<strong>{title}</strong>

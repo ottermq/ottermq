@@ -6,7 +6,6 @@
 	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
 	import { fetchChartData, type ChartsData } from '$lib/stores/charts.svelte';
 	import MessageRateChart from '$lib/components/MessageRateChart.svelte';
-
 	let data = $state<OverviewData | null>(null);
 
 	async function getData() {
@@ -34,12 +33,15 @@
 
 <div class="stats">
 	{#if data}
-		<StatCard title="Total Messages" value={data.message_stats.messages_total} color="blue" />
+		<StatCard 
+			title="Total Messages" 
+			value={data.message_stats.messages_total} 
+			color="blue" />
 		<StatCard title="Ready" value={data.message_stats.messages_ready} color="green" />
 		<StatCard
 			title="Unacknowledged"
 			value={data.message_stats.messages_unacknowledged}
-			color="orange"
+			color={`var(color-overview-1)`}
 		/>
 		<StatCard title="Consumers" value={data.object_totals.consumers} color="black" />
 	{:else}
