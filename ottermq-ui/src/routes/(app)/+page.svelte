@@ -32,24 +32,27 @@
 <h1>Overview</h1>
 
 <div class="stats">
-	{#if data}
 		<StatCard 
 			title="Total Messages" 
-			value={data.message_stats.messages_total} 
-			color="blue" />
-		<StatCard title="Ready" value={data.message_stats.messages_ready} color="green" />
+			value={data?.message_stats.messages_total ?? 0} 
+			color="var(--color-series-8)"		 
+			/>
+		<StatCard 
+			title="Ready"
+			value={data?.message_stats.messages_ready ?? 0} 
+		 	color="var(--color-series-4)"		 
+		/>
 		<StatCard
 			title="Unacknowledged"
-			value={data.message_stats.messages_unacknowledged}
-			color={`var(color-overview-1)`}
+			value={data?.message_stats.messages_unacknowledged ?? 0}
+			color="var(--color-series-9)"
 		/>
-		<StatCard title="Consumers" value={data.object_totals.consumers} color="black" />
-	{:else}
-		<StatCard title="Total Messages" value={0} color="blue" />
-		<StatCard title="Ready" value={0} color="green" />
-		<StatCard title="Unacknowledged" value={0} color="orange" />
-		<StatCard title="Consumers" value={0} color="black" />
-	{/if}
+		<StatCard 
+			title="Consumers" 
+			value={data?.object_totals.consumers ?? 0} 
+			color="var(--color-series-6)"
+		/>
+
 </div>
 <div class=charts>
 	<MessageStatsChart
@@ -65,5 +68,9 @@
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		gap: 16px;
+	}
+	h1 {
+		font-size: 34px;
+		font-weight: 600;
 	}
 </style>

@@ -9,16 +9,7 @@
 
 <div class="stat-card">
 	<div class="stat-data">
-		<span
-			// class={color == 'blue'
-			// 	? 'stat-blue'
-			// 	: color == 'green'
-			// 		? 'stat-green'
-			// 		: color == 'orange'
-			// 			? 'stat-orange'
-			// 			: 'stat-black'}
-			class={color}
-		>
+		<span style:color={color}>
 			{value}
 		</span>
 	</div>
@@ -46,21 +37,5 @@
 		display: block;
 		font-size: 48px;
 		font-weight: 600;
-	}
-
-	.stat-blue {
-		color: #1976d2;
-	}
-
-	.stat-green {
-		color: #21ba45;
-	}
-
-	.stat-orange {
-		color: #ff9800;
-	}
-
-	.stat-black {
-		color: black;
 	}
 </style>
