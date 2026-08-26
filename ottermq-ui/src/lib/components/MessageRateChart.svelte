@@ -1,8 +1,7 @@
-<div>
-    <div class="chart-title">Message Rates (last 60s)</div>
+<div class="chart-container">
+    <h2>Message Rates (last 60s)</h2>
+    <div class="chart" bind:this={chartEL}></div>
 </div>
-
-<div class="chart" bind:this={chartEL}></div>
 
 
 
@@ -20,7 +19,7 @@
         chartData: MessageRatesTimeSeries | null
     }
 
-   let { chartData }: Props = $props();
+    let { chartData }: Props = $props();
 
     const options: ApexCharts.ApexOptions = {
         chart:
@@ -29,7 +28,7 @@
             height:300,
             toolbar: { show:false },
             animations: { enabled: false },
-            zoom: {enabled:false}
+            zoom: { enabled:false }
         },
         stroke: {
             curve: 'smooth',

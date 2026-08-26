@@ -1,8 +1,7 @@
-<div>
-    <div class="chart-title">Queued Messages</div>
+<div class="chart-container">
+    <h2>Queued Messages</h2>
+    <div class="chart" bind:this={chartEL}></div>
 </div>
-
-<div class="chart" bind:this={chartEL}></div>
 
 
 
@@ -16,18 +15,19 @@
     let chartEL: HTMLDivElement;
     let chart: ApexCharts | undefined;
 
+    interface Props {
+        chartData: MessageStatsTimeSeries | null
+    }
+
+    let { chartData }: Props = $props();
 
     const options: ApexCharts.ApexOptions = {
         chart:
         {
             type:"line",
             height:300,
-            toolbar: {
-                show:false
-            },
-            animations: {
-                enabled: false,
-            },
+            toolbar: { show:false },
+            animations: { enabled: false },
             zoom: {enabled:false}
         },
         stroke: {
@@ -79,13 +79,8 @@
         }
     ]
    });
-   
 
-   interface Props {
-    chartData: MessageStatsTimeSeries | null
-   }
 
-   let { chartData }: Props = $props();
 
    const windowFilter = (points:TimeSeries[]) => {
         if (!points || points.length === 0) return [];
@@ -124,5 +119,4 @@
         chart?.updateSeries(series);
     });
 
-   
 </script>

@@ -21,7 +21,7 @@
 <style>
 	.stat-card {
 		text-align: center;
-		border: 1px solid #ddd;
+		border: 1px solid var(--color-border);
 		border-radius: 4px;
 		padding: 16px;
 	}

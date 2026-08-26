@@ -54,7 +54,7 @@
 		/>
 
 </div>
-<div class=charts>
+<div class="chart-block">
 	<MessageStatsChart
 		chartData={charts?.message_stats!}
 	/>
@@ -72,5 +72,14 @@
 	h1 {
 		font-size: 34px;
 		font-weight: 600;
+	}
+	.chart-block {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+		gap: 20px;
+	}
+	/* charts are child components, so their root elements need :global() */
+	.chart-block > :global(*) {
+		min-width: 0;
 	}
 </style>
