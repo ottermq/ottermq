@@ -11,6 +11,7 @@
     import ApexCharts from 'apexcharts'
 
 	import type { MessageStatsTimeSeries, TimeSeries } from "$lib/stores/charts.svelte";
+	import { resolveThemeColors } from "$lib/theme";
 
     let chartEL: HTMLDivElement;
     let chart: ApexCharts | undefined;
@@ -33,7 +34,6 @@
             curve: 'smooth',
             width:2
         },
-        colors:['#EDC240', '#AFD8F8', '#CB4B4B'],
         xaxis:{
             type: 'datetime',
             labels:{
@@ -102,11 +102,17 @@
    }
    
  onMount(()=> {
+        options.colors = resolveThemeColors([
+            '--color-series-1',
+            '--color-series-2',
+            '--color-series-3'
+        ]);
+
         chart = new ApexCharts(chartEL,{...
             options,
             series
         });
-        
+
         chart.render()
     })
 

@@ -11,6 +11,7 @@
     import ApexCharts from 'apexcharts'
 
 	import type { MessageRatesTimeSeries, TimeSeries } from "$lib/stores/charts.svelte";
+	import { resolveThemeColors } from "$lib/theme";
 
     let chartEL: HTMLDivElement;
     let chart: ApexCharts | undefined;
@@ -20,8 +21,6 @@
     }
 
    let { chartData }: Props = $props();
-
-
 
     const options: ApexCharts.ApexOptions = {
         chart:
@@ -35,8 +34,7 @@
         stroke: {
             curve: 'smooth',
             width: 2.5
-        },    
-        colors:['#EDC240', '#1976D2', '#9C27B0', '#21BA45'],
+        },
         xaxis:{
             type: 'datetime',
             labels:{
@@ -94,11 +92,17 @@
    
    
  onMount(()=> {
+        options.colors = resolveThemeColors([
+            '--color-series-1',
+            '--color-series-8',
+            '--color-series-5',
+            '--color-series-4',
+        ]);
         chart = new ApexCharts(chartEL,{...
             options,
             series
         });
-        
+
         chart.render()
     })
 
