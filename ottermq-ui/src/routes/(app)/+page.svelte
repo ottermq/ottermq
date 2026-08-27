@@ -1,11 +1,9 @@
-<!-- routes/+page.svelte -->
 <script lang="ts">
-	import MessageStatsChart from '$lib/components/MessageStatsChart.svelte';
 	import StatCard from '$lib/components/StatCard.svelte';
 	import type { OverviewData } from '$lib/stores/overview.svelte';
 	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
 	import { fetchChartData, type ChartsData } from '$lib/stores/charts.svelte';
-	import MessageRateChart from '$lib/components/MessageRateChart.svelte';
+	import TimeSeriesChart from '$lib/components/TimeSeriesChart.svelte';
 	let data = $state<OverviewData | null>(null);
 
 	async function getData() {
@@ -55,12 +53,30 @@
 
 </div>
 <div class="chart-block">
-	<MessageStatsChart
-		chartData={charts?.message_stats!}
+	<TimeSeriesChart 
+		title="Queued Messages"
+		yAxisTitle="Messages"
+		format={(v)=>Math.round(v).toLocaleString()}
+		series={[
+			{ name: 'Ready', 	points: charts?.message_stats.ready		??[], color: '--color-series-1' },
+			{ name: 'Unacked', 	points: charts?.message_stats.unacked	??[], color: '--color-series-2' },
+			{ name: 'Total', 	points: charts?.message_stats.total		??[], color: '--color-series-3' },
+		]}
 	/>
-	<MessageRateChart
-		chartData={charts?.message_rates!}
-	/>	
+	<TimeSeriesChart 
+		title="Messages Rates"
+		yAxisTitle="Messages/s"
+		format={(val:number) => val.toFixed(1)}
+		unit="msg/s"
+		decimals={1}
+		tooltipDecimals={2}
+		series={[
+			{ name: 'Publish', 	points: charts?.message_rates.publish	??[], color: '--color-series-1' },
+			{ name: 'Deliver (auto ack)', 	points: charts?.message_rates.deliver_auto_ack	??[], color: '--color-series-8' },
+			{ name: 'Deliver (manual ack)', 	points: charts?.message_rates.deliver_manual_ack	??[], color: '--color-series-5' },
+			{ name: 'Ack', 	points: charts?.message_rates.ack	??[], color: '--color-series-4' },
+		]}
+	/>
 </div>
 
 <style>
