@@ -90,10 +90,26 @@
 	{#if data}
 		<table>
 			<tbody>
-				{#each Object.entries(data.object_totals) as [label, value]}
+				{#each Object.entries(data.object_totals) as [label, value] (label)}
 					<tr>
-						<td>{label}</td>
-						<td>{value}</td>
+						<td class="label">{label}</td>
+						<td class="value">{value}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	{/if}
+</div>
+
+<div class="object_totals">
+	<h6>Node Statistics</h6>
+	{#if data}
+		<table>
+			<tbody>
+				{#each Object.entries(data.node) as [label, value] (label)}
+					<tr>
+						<td class="label">{label}</td>
+						<td class="value">{value}</td>
 					</tr>
 				{/each}
 			</tbody>
@@ -116,10 +132,54 @@
 	.chart-block {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-		gap: 20px;
+		gap: 16px;
+		margin-top: 16px;
 	}
 	/* charts are child components, so their root elements need :global() */
 	.chart-block > :global(*) {
 		min-width: 0;
+	}
+
+	.object_totals {
+		border: 1px solid var(--color-border);
+		border-radius: 4px;
+		padding: 16px 20px;
+		margin-top: 16px;
+	}
+
+	.object_totals h6 {
+		margin: 0 0 10px;
+		font-size: large;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+
+	td {
+		padding: 7px 4px;
+	}
+
+	tr {
+		font-size: 14px;
+		font-weight: 600;
+	}
+
+	tbody tr:not(:last-child) td {
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.label {
+		color: var(--color-text-muted-hi-contrast);
+		text-transform: capitalize;
+	}
+
+	.value {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		color: var(--color-text);
 	}
 </style>

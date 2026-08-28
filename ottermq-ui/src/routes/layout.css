@@ -9,15 +9,3 @@ main {
     padding: 14px;
     min-width: 0;
 }
-
-.chart-container {
-    display: block;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 10px;
-}
-
-.chart-container h2 {
-    font-size: large;
-    font-weight: 600;
-}
