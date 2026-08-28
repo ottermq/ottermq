@@ -21,6 +21,10 @@ export interface OverviewData {
         messages_unacknowledged: number;
     };
     object_totals: {
+        connections: number;
+        channels: number;
+        exchanges: number;
+        queues: number;
         consumers: number;
     };
 }
