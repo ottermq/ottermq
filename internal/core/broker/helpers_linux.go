@@ -26,7 +26,7 @@ func getSysInfo() (Sysinfo, error) {
 	}
 
 	return Sysinfo{
-		TotalRam:  uint64(sysInfo.Totalram) * uint64(syscall.Getpagesize()),
+		TotalRam:  uint64(sysInfo.Totalram) * uint64(sysInfo.Unit),
 		Uptime:    int64(sysInfo.Uptime),
 		TotalDisk: stat.Blocks * uint64(stat.Bsize),
 		AvailDisk: stat.Bavail * uint64(stat.Bsize),
