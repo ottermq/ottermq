@@ -4,6 +4,7 @@
 	import { fetchChartData, type ChartsData } from '$lib/stores/charts.svelte';
 	import type { OverviewData } from '$lib/stores/overview.svelte';
 	import { fetchOverviewData as fetchData } from '$lib/stores/overview.svelte';
+	import {formatBytes} from '$lib/utils'
 	let data = $state<OverviewData | null>(null);
 
 	async function getData() {
@@ -24,6 +25,18 @@
 	async function getChats() {
 		charts = await fetchChartData();
 	}
+
+	const uptimeFormatter = (secs:number) => {
+		if (secs == 0) return '-'
+		const d = Math.floor(secs / 86400)
+		const h = Math.floor((secs % 86400) / 3600)
+		const m = Math.floor((secs % 3600) / 60)
+		const s = Math.floor(secs % 60 )
+		return `${d}d ${h}h ${m}m ${s}`
+	}
+	let uptime = $derived(uptimeFormatter(data?.broker.uptime_secs ?? 0))
+
+
 </script>
 
 <h1>Overview</h1>
@@ -84,37 +97,38 @@
 		]}
 	/>
 </div>
+<div class="stats">
 
-<div class="object_totals">
-	<h6>Object Totals</h6>
-	{#if data}
+	<div class="stats-card">
+		<h6>Global counts</h6>
+		{#if data}
 		<table>
 			<tbody>
 				{#each Object.entries(data.object_totals) as [label, value] (label)}
-					<tr>
-						<td class="label">{label}</td>
-						<td class="value">{value}</td>
-					</tr>
+				<tr>
+					<td class="label">{label}</td>
+					<td class="value">{value}</td>
+				</tr>
 				{/each}
 			</tbody>
 		</table>
-	{/if}
-</div>
-
-<div class="object_totals">
-	<h6>Node Statistics</h6>
-	{#if data}
+		{/if}
+	</div>
+	
+	<div class="stats-card">
+		<h6>Node Statistics</h6>
+		{#if data}
 		<table>
 			<tbody>
-				{#each Object.entries(data.node) as [label, value] (label)}
-					<tr>
-						<td class="label">{label}</td>
-						<td class="value">{value}</td>
-					</tr>
-				{/each}
+				<tr><td class="label">Name</td><td class="value">{data.node.name}</td></tr>
+				<tr><td class="label">Uptime</td><td class="value">{uptime}</td></tr>
+				<tr><td class="label">Gorotines</td><td class="value">{data.node.goroutines}</td></tr>
+				<tr><td class="label">File Descriptors</td><td class="value"><span>{data.node.fd_used} / {data.node.fd_limit} </span></td></tr>
+				<tr><td class="label">Memory</td><td class="value"><span> {formatBytes(data.node.memory_usage)} / {formatBytes(data.node.memory_limit)}</span></td></tr>
 			</tbody>
 		</table>
-	{/if}
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -140,14 +154,14 @@
 		min-width: 0;
 	}
 
-	.object_totals {
+	.stats-card {
 		border: 1px solid var(--color-border);
 		border-radius: 4px;
 		padding: 16px 20px;
 		margin-top: 16px;
 	}
 
-	.object_totals h6 {
+	.stats-card h6 {
 		margin: 0 0 10px;
 		font-size: large;
 		font-weight: 600;
@@ -168,9 +182,9 @@
 		font-weight: 600;
 	}
 
-	tbody tr:not(:last-child) td {
+	/* tbody tr:not(:last-child) td {
 		border-bottom: 1px solid var(--color-border);
-	}
+	} */
 
 	.label {
 		color: var(--color-text-muted-hi-contrast);

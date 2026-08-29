@@ -4,16 +4,18 @@ export interface BrokerData {
     product: string;
     version: string;
     go_version: string;
+    uptime_secs: number;
 }
 export interface OverviewData {
     broker: BrokerData;
     node: {
         name: string;
         uptime: number;
-        gorotines: number;
+        goroutines: number;
         fd_used: number;
         fd_limit: number;
         memory_usage: number;
+        memory_limit: number;
     }
     message_stats: {
         messages_total: number;
