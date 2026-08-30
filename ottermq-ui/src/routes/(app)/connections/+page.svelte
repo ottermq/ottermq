@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ConnectionData } from '$lib/stores/connection.svelte';
 	import { getConnections } from '$lib/stores/connection.svelte';
+	import { stateColor } from '$lib/utils';
 
 	let connections = $state<ConnectionData[] | null>(null);
 	async function getConnectionList() {
@@ -64,7 +65,9 @@
 					<td>{c.vhost}</td>
 					<td>{c.name}</td>
 					<td>{c.user_name}</td>
-					<td class="state"><span class="small-square small-square--green"></span> {c.state}</td>
+					<td class="state"
+						><span class="small-square small-square--{stateColor(c.state)}"></span> {c.state}</td
+					>
 					<td class="state"><span>{c.ssl ? '●' : '○'}</span></td>
 					<td>{c.protocol}</td>
 					<td class="num">{c.channels}</td>

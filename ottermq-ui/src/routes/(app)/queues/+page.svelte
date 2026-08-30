@@ -2,6 +2,7 @@
 	import deleteIcon from '$lib/icons/delete.svg?raw';
 	import type { QueueData } from '$lib/stores/queues.svelte';
 	import { getQueues } from '$lib/stores/queues.svelte';
+	import { stateColor } from '$lib/utils';
 
 	let queues = $state<QueueData[] | null>(null);
 	async function getQueueList() {
@@ -48,7 +49,9 @@
 				<tr>
 					<td>{q.vhost}</td>
 					<td>{q.name}</td>
-					<td class="state"><span class="small-square small-square--green"></span> {q.state}</td>
+					<td class="state"
+						><span class="small-square small-square--{stateColor(q.state)}"></span> {q.state}</td
+					>
 					<td class="num">{q.messages_ready}</td>
 					<td class="num">{q.messages_unacked}</td>
 					<td class="num">{q.messages_total}</td>
