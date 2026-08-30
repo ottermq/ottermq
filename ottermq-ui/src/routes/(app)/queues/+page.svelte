@@ -13,6 +13,17 @@
 		const interval = setInterval(getQueueList, 5000);
 		return () => clearInterval(interval);
 	});
+
+	interface FeatureBadge {
+		label: string;
+		test: (q: QueueData) => boolean;
+	}
+
+	export const featureBadges: FeatureBadge[] = [
+		{ label: 'D', test: (q) => q.durable },
+		{ label: 'AD', test: (q) => q.auto_delete },
+		{ label: 'Args', test: (q) => q.arguments !== undefined }
+	];
 </script>
 
 <h1>Queues</h1>
@@ -28,8 +39,7 @@
 				<th>Unacked</th>
 				<th>Total</th>
 				<th>Consumers</th>
-				<th>D</th>
-				<th>AD</th>
+				<th>Features</th>
 				<th>Actions</th>
 			</tr>
 		</thead>
@@ -43,8 +53,11 @@
 					<td class="num">{q.messages_unacked}</td>
 					<td class="num">{q.messages_total}</td>
 					<td class="num">{q.consumers}</td>
-					<td class="flag"><span>{q.durable ? '✓' : ' '}</span></td>
-					<td class="flag"><span>{q.auto_delete ? '✓' : ' '}</span></td>
+					<td class="features">
+						{#each featureBadges.filter((b) => b.test(q)) as badge (badge.label)}
+							<span class="badge">{badge.label}</span>
+						{/each}
+					</td>
 					<td class="action">
 						<button class="row-action" aria-label="Delete queue">
 							<!-- deleteIcon is a static, build-time-bundled asset, not user/API data -->
@@ -104,6 +117,7 @@
 
 	.flag,
 	.action,
+	.features,
 	.state {
 		text-align: center;
 	}
@@ -116,6 +130,15 @@
 		height: 1.1em;
 		border: 1px solid var(--color-border);
 		vertical-align: middle;
+	}
+
+	.features .badge {
+		font-size: 0.62rem;
+		font-weight: 500;
+		padding: 2px 6px;
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--color-surface-raised) 14%, transparent);
+		opacity: 0.85;
 	}
 
 	.row-action {
