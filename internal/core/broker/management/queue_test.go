@@ -87,6 +87,71 @@ func TestListQueues_ShowsUnackedCount(t *testing.T) {
 	assert.Equal(t, 5, dtos[0].MessagesUnacked)
 }
 
+func TestSortFunc(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b models.QueueDTO
+		want int
+	}{
+		{
+			name: "same vhost, a before b by name",
+			a:    models.QueueDTO{VHost: "/", Name: "alpha"},
+			b:    models.QueueDTO{VHost: "/", Name: "beta"},
+			want: -1,
+		},
+		{
+			name: "same vhost, a after b by name",
+			a:    models.QueueDTO{VHost: "/", Name: "beta"},
+			b:    models.QueueDTO{VHost: "/", Name: "alpha"},
+			want: 1,
+		},
+		{
+			name: "vhost takes precedence over name",
+			a:    models.QueueDTO{VHost: "a-host", Name: "zzz"},
+			b:    models.QueueDTO{VHost: "b-host", Name: "aaa"},
+			want: -1,
+		},
+		{
+			name: "identical vhost and name",
+			a:    models.QueueDTO{VHost: "/", Name: "same"},
+			b:    models.QueueDTO{VHost: "/", Name: "same"},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sortFunc(tt.a, tt.b))
+		})
+	}
+}
+
+func TestListQueues_SortedByVhostThenName(t *testing.T) {
+	broker := setupTestBroker(t)
+	service := NewService(broker)
+	require.NoError(t, broker.CreateVHost("beta-host"))
+
+	// Create queues out of order, across two vhosts, to prove ListQueues
+	// sorts its result rather than just happening to return creation order
+	// (which Go map iteration never guarantees).
+	_, err := service.CreateQueue("beta-host", "aaa-queue", models.CreateQueueRequest{})
+	require.NoError(t, err)
+	_, err = service.CreateQueue("/", "zzz-queue", models.CreateQueueRequest{})
+	require.NoError(t, err)
+	_, err = service.CreateQueue("/", "mmm-queue", models.CreateQueueRequest{})
+	require.NoError(t, err)
+
+	dtos := service.ListQueues()
+	require.Len(t, dtos, 3)
+
+	assert.Equal(t, "/", dtos[0].VHost)
+	assert.Equal(t, "mmm-queue", dtos[0].Name)
+	assert.Equal(t, "/", dtos[1].VHost)
+	assert.Equal(t, "zzz-queue", dtos[1].Name)
+	assert.Equal(t, "beta-host", dtos[2].VHost)
+	assert.Equal(t, "aaa-queue", dtos[2].Name)
+}
+
 func TestGetQueue(t *testing.T) {
 	broker := setupTestBroker(t)
 	service := NewService(broker)
@@ -184,7 +249,7 @@ func addUnackedMessages(vh *vhost.VHost, queueName string, count int) {
 	}
 	// Start from LastDeliveryTag+1 to avoid overwriting previous unacked messages
 	startTag := state.LastDeliveryTag + 1
-	for i := 0; i < count; i++ {
+	for i := range count {
 		tag := startTag + uint64(i)
 		rec := &vhost.DeliveryRecord{DeliveryTag: tag, ConsumerTag: consumerTag, QueueName: queueName}
 		state.UnackedByTag[tag] = rec

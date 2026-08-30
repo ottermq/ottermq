@@ -1,7 +1,9 @@
 package management
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 
 	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/ottermq/ottermq/internal/core/models"
@@ -19,7 +21,15 @@ func (s *Service) ListQueues() []models.QueueDTO {
 			dtos = append(dtos, dto)
 		}
 	}
+	slices.SortFunc(dtos, sortFunc)
 	return dtos
+}
+
+func sortFunc(a, b models.QueueDTO) int {
+	if c := cmp.Compare(a.VHost, b.VHost); c != 0 {
+		return c
+	}
+	return cmp.Compare(a.Name, b.Name)
 }
 
 type QueueStats struct {
