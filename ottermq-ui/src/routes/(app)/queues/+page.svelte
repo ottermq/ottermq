@@ -19,7 +19,7 @@
 		test: (q: QueueData) => boolean;
 	}
 
-	export const featureBadges: FeatureBadge[] = [
+	const featureBadges: FeatureBadge[] = [
 		{ label: 'D', test: (q) => q.durable },
 		{ label: 'AD', test: (q) => q.auto_delete },
 		{ label: 'Args', test: (q) => q.arguments !== undefined }
@@ -54,9 +54,11 @@
 					<td class="num">{q.messages_total}</td>
 					<td class="num">{q.consumers}</td>
 					<td class="features">
-						{#each featureBadges.filter((b) => b.test(q)) as badge (badge.label)}
-							<span class="badge">{badge.label}</span>
-						{/each}
+						<div class="badges">
+							{#each featureBadges.filter((b) => b.test(q)) as badge (badge.label)}
+								<span class="badge">{badge.label}</span>
+							{/each}
+						</div>
 					</td>
 					<td class="action">
 						<button class="row-action" aria-label="Delete queue">
@@ -115,21 +117,16 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.flag,
 	.action,
 	.features,
 	.state {
 		text-align: center;
 	}
-
-	.flag span {
-		display: inline-flex;
+	.features .badges {
+		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 1.1em;
-		height: 1.1em;
-		border: 1px solid var(--color-border);
-		vertical-align: middle;
+		gap: 4px;
 	}
 
 	.features .badge {
