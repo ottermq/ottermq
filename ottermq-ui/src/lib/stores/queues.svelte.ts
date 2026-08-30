@@ -20,7 +20,7 @@ export interface QueueData {
     dead_letter_routing_key?: string;
 
     message_ttl?: number;
-    max_lenght?: number; // AKA QLL
+    max_length?: number; // AKA QLL
 
     max_priority?: number;
 
