@@ -1,4 +1,5 @@
 <script lang="ts">
+	import deleteIcon from '$lib/icons/delete.svg?raw';
 </script>
 
 <h1>Queues</h1>
@@ -32,17 +33,9 @@
 				<td class="flag">x</td>
 				<td class="action">
 					<button class="row-action" aria-label="Delete queue">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							height="24px"
-							viewBox="0 -960 960 960"
-							width="24px"
-							fill="currentColor"
-						>
-							<path
-								d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
-							/>
-						</svg>
+						<!-- deleteIcon is a static, build-time-bundled asset, not user/API data -->
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html deleteIcon}
 					</button>
 				</td>
 			</tr>
@@ -98,5 +91,27 @@
 	.action,
 	.status {
 		text-align: center;
+	}
+
+	.row-action {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		padding: 4px;
+		border-radius: 4px;
+		color: var(--color-text-muted);
+		cursor: pointer;
+	}
+
+	.row-action :global(svg) {
+		width: 18px;
+		height: 18px;
+	}
+
+	.row-action:hover {
+		/* background: var(--color-border); */
+		color: var(--color-text);
 	}
 </style>
