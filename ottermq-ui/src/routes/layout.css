@@ -7,3 +7,28 @@ main {
     padding: 14px;
     min-width: 0;
 }
+
+.small-square {
+    height: .7em;
+    width: .7em;
+    border: 1px solid lightslategray;
+    padding: 2px;
+    margin-right: 4px;
+    display: inline-block;
+}
+
+.small-square--green {
+    background-color: #0f0;
+}
+
+.small-square--yellow {
+    background-color: #ff9800;
+}
+
+.small-square--red {
+    background-color: #c10015;
+}
+
+.small-square--gray {
+    background-color: #9e9e9e;
+}
