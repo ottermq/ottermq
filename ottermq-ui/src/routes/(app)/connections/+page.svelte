@@ -83,53 +83,6 @@
 </div>
 
 <style>
-	.table-card {
-		border: 1px solid var(--color-border);
-		border-radius: 4px;
-		margin-top: 16px;
-		overflow-x: auto;
-	}
-
-	table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-
-	th,
-	td {
-		padding: 8px 16px;
-	}
-
-	th {
-		font-size: 12px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
-		color: var(--color-text-muted);
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	thead th:not(:last-child) {
-		border-right: 1px solid var(--color-border);
-	}
-
-	tbody tr:not(:last-child) td {
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	tbody td:not(:last-child) {
-		border-right: 1px solid var(--color-border);
-	}
-
-	.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.state {
-		text-align: center;
-	}
-
 	.show-time {
 		font-size: 1em;
 		margin-bottom: 2px;
