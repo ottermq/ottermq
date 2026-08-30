@@ -43,8 +43,8 @@
 					<td class="num">{q.messages_unacked}</td>
 					<td class="num">{q.messages_total}</td>
 					<td class="num">{q.consumers}</td>
-					<td class="flag">{q.durable}</td>
-					<td class="flag">{q.auto_delete}</td>
+					<td class="flag"><span>{q.durable ? '✓' : ' '}</span></td>
+					<td class="flag"><span>{q.auto_delete ? '✓' : ' '}</span></td>
 					<td class="action">
 						<button class="row-action" aria-label="Delete queue">
 							<!-- deleteIcon is a static, build-time-bundled asset, not user/API data -->
@@ -106,6 +106,16 @@
 	.action,
 	.state {
 		text-align: center;
+	}
+
+	.flag span {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.1em;
+		height: 1.1em;
+		border: 1px solid var(--color-border);
+		vertical-align: middle;
 	}
 
 	.row-action {
