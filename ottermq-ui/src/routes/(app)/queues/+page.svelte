@@ -1,5 +1,18 @@
 <script lang="ts">
 	import deleteIcon from '$lib/icons/delete.svg?raw';
+	import type { QueueData } from '$lib/stores/queues.svelte';
+	import { getQueues } from '$lib/stores/queues.svelte';
+
+	let queues = $state<QueueData[] | null>(null);
+	async function getQueueList() {
+		queues = await getQueues();
+	}
+
+	$effect(() => {
+		getQueueList();
+		const interval = setInterval(getQueueList, 5000);
+		return () => clearInterval(interval);
+	});
 </script>
 
 <h1>Queues</h1>
@@ -10,7 +23,7 @@
 			<tr>
 				<th>Virtual Host</th>
 				<th>Name</th>
-				<th>Status</th>
+				<th>State</th>
 				<th>Ready</th>
 				<th>Unacked</th>
 				<th>Total</th>
@@ -21,24 +34,26 @@
 			</tr>
 		</thead>
 		<tbody>
-			<tr>
-				<td>/</td>
-				<td>bonjour</td>
-				<td class="status"><span class="small-square small-square--green"></span> online</td>
-				<td class="num">0</td>
-				<td class="num">0</td>
-				<td class="num">0</td>
-				<td class="num">0</td>
-				<td class="flag">x</td>
-				<td class="flag">x</td>
-				<td class="action">
-					<button class="row-action" aria-label="Delete queue">
-						<!-- deleteIcon is a static, build-time-bundled asset, not user/API data -->
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html deleteIcon}
-					</button>
-				</td>
-			</tr>
+			{#each queues as q (q.vhost + q.name)}
+				<tr>
+					<td>{q.vhost}</td>
+					<td>{q.name}</td>
+					<td class="state"><span class="small-square small-square--green"></span> {q.state}</td>
+					<td class="num">{q.messages_ready}</td>
+					<td class="num">{q.messages_unacked}</td>
+					<td class="num">{q.messages_total}</td>
+					<td class="num">{q.consumers}</td>
+					<td class="flag">{q.durable}</td>
+					<td class="flag">{q.auto_delete}</td>
+					<td class="action">
+						<button class="row-action" aria-label="Delete queue">
+							<!-- deleteIcon is a static, build-time-bundled asset, not user/API data -->
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html deleteIcon}
+						</button>
+					</td>
+				</tr>
+			{/each}
 		</tbody>
 	</table>
 </div>
@@ -89,7 +104,7 @@
 
 	.flag,
 	.action,
-	.status {
+	.state {
 		text-align: center;
 	}
 
