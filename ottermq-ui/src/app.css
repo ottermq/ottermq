@@ -20,3 +20,11 @@
 		--color-series-8: #1976d2;
 		--color-series-9: #ff9800;
 	}
+
+	@layer base {
+		h1 {
+			font-size: 34px;
+			font-weight: 600;
+			color: var(--color-text)
+		}
+	}
