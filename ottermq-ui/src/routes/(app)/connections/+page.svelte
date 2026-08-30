@@ -1,18 +1,9 @@
 <script lang="ts">
-	import type { ConnectionData } from '$lib/stores/connection.svelte';
+	import { usePolledList } from '$lib/pooling.svelte';
 	import { getConnections } from '$lib/stores/connection.svelte';
 	import { stateColor } from '$lib/utils';
 
-	let connections = $state<ConnectionData[] | null>(null);
-	async function getConnectionList() {
-		connections = await getConnections();
-	}
-
-	$effect(() => {
-		getConnectionList();
-		const interval = setInterval(getConnectionList, 5000);
-		return () => clearInterval(interval);
-	});
+	const connections = usePolledList(getConnections);
 
 	function heartbeatDeltaSeconds(last: string) {
 		const lastDate = new Date(last).getTime();
@@ -60,7 +51,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each connections as c (c.vhost + c.name)}
+			{#each connections.items as c (c.vhost + c.name)}
 				<tr>
 					<td>{c.vhost}</td>
 					<td>{c.name}</td>

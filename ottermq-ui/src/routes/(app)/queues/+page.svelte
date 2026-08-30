@@ -1,19 +1,11 @@
 <script lang="ts">
 	import deleteIcon from '$lib/icons/delete.svg?raw';
+	import { usePolledList } from '$lib/pooling.svelte';
 	import type { QueueData } from '$lib/stores/queues.svelte';
 	import { getQueues } from '$lib/stores/queues.svelte';
 	import { stateColor } from '$lib/utils';
 
-	let queues = $state<QueueData[] | null>(null);
-	async function getQueueList() {
-		queues = await getQueues();
-	}
-
-	$effect(() => {
-		getQueueList();
-		const interval = setInterval(getQueueList, 5000);
-		return () => clearInterval(interval);
-	});
+	const queues = usePolledList(getQueues);
 
 	interface FeatureBadge {
 		label: string;
@@ -45,7 +37,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each queues as q (q.vhost + q.name)}
+			{#each queues.items as q (q.vhost + q.name)}
 				<tr>
 					<td>{q.vhost}</td>
 					<td>{q.name}</td>
