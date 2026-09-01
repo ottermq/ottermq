@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { usePolledList } from '$lib/pooling.svelte';
-	import { getConnections } from '$lib/stores/connection.svelte';
+	import { getConnections } from '$lib/stores/connections.svelte';
 	import { stateColor } from '$lib/utils';
 
 	const connections = usePolledList(getConnections);
