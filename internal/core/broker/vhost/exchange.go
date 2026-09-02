@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,6 +25,16 @@ func (e *Exchange) NameOrAlias() string {
 		return alias
 	}
 	return e.Name
+}
+
+// resolveExchangeAlias normalises any form of the default exchange name
+// ("", "amq.default", "(AMQP default)") to the canonical internal key
+// used in vh.Exchanges. Non-default names are returned unchanged.
+func resolveExchangeAlias(name string) string {
+	if name == EMPTY_EXCHANGE || name == DEFAULT_EXCHANGE_ALIAS || name == DEFAULT_EXCHANGE {
+		return DEFAULT_EXCHANGE
+	}
+	return name
 }
 
 type Exchange struct {
@@ -137,11 +147,6 @@ func (vh *VHost) createMandatoryExchanges() {
 			log.Error().Err(err).Str("exchange", mandatoryExchange.Name).Msg("Failed to create mandatory exchange")
 		}
 	}
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	if defaultExchange, exists := vh.Exchanges[DEFAULT_EXCHANGE]; exists {
-		vh.Exchanges[EMPTY_EXCHANGE] = defaultExchange
-	}
 }
 
 // CreateExchange creates a new exchange with the given name, type, and properties and wires it into the vhost.
@@ -179,6 +184,7 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 	}
 
 	vh.Exchanges[name] = NewExchange(name, typ, props)
+	log.Debug().Str("exchange", name).Str("type", string(typ)).Msg("Created exchange")
 	// Handle durable property
 	if props != nil && props.Durable {
 		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
@@ -217,6 +223,7 @@ func (vh *VHost) deleteExchangeUnlocked(name string) error {
 	durable := exchange.Props.Durable
 
 	delete(vh.Exchanges, name)
+	vh.collector.RemoveExchange(name)
 	// Verify if exchange is durable
 	if durable {
 		// Handle durable property

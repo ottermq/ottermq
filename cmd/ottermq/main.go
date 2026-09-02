@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,12 +10,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
-	"github.com/andrelcunha/ottermq/pkg/logger"
-	"github.com/andrelcunha/ottermq/web"
 	"github.com/gofiber/fiber/v2"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/pkg/logger"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/web"
+	"github.com/ottermq/ottermq/web/prometheus"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,47 +40,23 @@ func main() {
 	// Initialize logger with configured log level
 	logger.Init(cfg.LogLevel)
 
-	// Determine the directory of the running binary
-	dataDir := filepath.Join("data")
-
-	// Ensure the data directory exists
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		log.Info().Msg("Data directory not found. Creating a new one...")
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatal().Err(err).Msg("Failed to create data directory")
-		}
-	}
+	dataDir := getOrCreateDataDir(cfg.DataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	b := broker.NewBroker(cfg, ctx, cancel)
 
-	// Verify if the database file exists
-	log.Info().Msg("Searching for database...")
-	dbPath := filepath.Join(dataDir, "ottermq.db")
-	persistdb.SetDbPath(dbPath)
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Info().Msg("Database file not found. Creating a new one...")
-		persistdb.InitDB()
-		persistdb.AddDefaultRoles()
-		persistdb.AddDefaultPermissions()
-		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
-		if err := persistdb.AddUser(user); err != nil {
-			log.Error().Err(err).Msg("Failed to add user")
-		}
-		persistdb.CloseDB()
-	}
-	if err := persistdb.OpenDB(); err != nil {
-		log.Error().Err(err).Msg("Failed to open database")
-	}
-	user, err := persistdb.GetUserByUsername(cfg.Username)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to get user")
-	}
-	if user.RoleID != 1 {
-		log.Fatal().Msg("User is not an admin")
-	}
-	persistdb.CloseDB()
+	// Initialize metrics collector before broker setup to ensure vhosts receive it.
+	mtrx := initializeMetricsCollector(cfg, ctx)
+
+	b := broker.NewBroker(cfg, ctx, cancel, mtrx)
+
+	//Get or create the user in the database
+	user, err := setupUserDatabase(dataDir, cfg)
 	b.VHosts["/"].Users[user.Username] = &user
+
+	var promServer *prometheus.Server = nil
+	if cfg.EnableMetrics && mtrx != nil {
+		promServer = initializePrometheusServer(cfg, mtrx.(*metrics.Collector))
+	}
 
 	// Start the broker in a goroutine
 	go func() {
@@ -87,57 +66,9 @@ func main() {
 		}
 	}()
 
-	// Conditionally start web server based on EnableWebAPI flag
-	var webServer *web.WebServer
-	var app interface{ ShutdownWithContext(context.Context) error }
-	var logfile *os.File
-
-	<-b.Ready
-	if cfg.EnableWebAPI {
-		log.Info().Msg("Web API enabled - initializing web server...")
-
-		// // Wait for broker to be ready before initializing web server
-		// log.Info().Msg("Broker ready signal received, initializing web server...")
-
-		// Initialize the web admin server
-		webConfig := &web.Config{
-			BrokerHost:    cfg.BrokerHost,
-			BrokerPort:    cfg.BrokerPort,
-			Username:      cfg.Username,
-			Password:      cfg.Password,
-			JwtKey:        cfg.JwtSecret,
-			WebServerPort: cfg.WebPort,
-			EnableUI:      cfg.EnableUI,
-			EnableSwagger: cfg.EnableSwagger,
-			SwaggerPrefix: cfg.SwaggerPath,
-			ApiPrefix:     cfg.WebAPIPath,
-		}
-
-		webServer, err = web.NewWebServer(webConfig, b)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create web server")
-		}
-
-		// open "server.log" for appending
-		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to open log file")
-		}
+	app, logfile := initializeWebServer(b, cfg, err)
+	if logfile != nil {
 		defer logfile.Close()
-
-		app = webServer.SetupApp(logfile)
-
-		// Start the web admin server in a goroutine
-		go func() {
-			addr := fmt.Sprintf(":%s", cfg.WebPort)
-			log.Info().Str("addr", addr).Msg("Starting web server")
-			err := app.(*fiber.App).Listen(addr)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Web server error")
-			}
-		}()
-	} else {
-		log.Info().Msg("Web API disabled - skipping web server initialization")
 	}
 
 	// Handle OS signals for graceful shutdown
@@ -178,6 +109,164 @@ func main() {
 		}
 		log.Info().Msg("Web server gracefully stopped")
 	}
+
+	if promServer != nil {
+		promServer.Shutdown()
+	}
+
+	persistdb.CloseDB()
 	log.Info().Msg("Server gracefully stopped")
-	os.Exit(0) // if came so far it means the server has stopped gracefully
+}
+
+// initializeMetricsCollector sets up the metrics collector for the broker.
+func initializeMetricsCollector(cfg *config.Config, ctx context.Context) metrics.MetricsCollector {
+	if !cfg.EnableMetrics {
+		collector := metrics.NewMockCollector(nil)
+		log.Info().Msg("Metrics collection disabled")
+		return collector
+	}
+	log.Info().Msg("Metrics collection enabled")
+
+	metricsCollector := metrics.NewCollector(&metrics.Config{
+		Enabled:         cfg.EnableMetrics,
+		WindowSize:      cfg.WindowSize,
+		MaxSamples:      cfg.MaxSamples,
+		SamplesInterval: cfg.SamplesInterval,
+	}, ctx)
+
+	return metricsCollector
+
+}
+
+func initializePrometheusServer(cfg *config.Config, metricsCollector *metrics.Collector) *prometheus.Server {
+	if !cfg.EnablePrometheus {
+		return nil
+	}
+	log.Info().Msg("Prometheus metrics server enabled - initializing...")
+	promConfig := &prometheus.Config{
+		Enabled:        true,
+		Port:           cfg.PrometheusPort,
+		UpdateInterval: cfg.PrometheusUpdateInterval,
+		Path:           cfg.PrometheusPath,
+	}
+	exporter := prometheus.NewExporter(metricsCollector, promConfig)
+	promServer := prometheus.NewServer(promConfig, exporter)
+
+	go func() {
+		if err := promServer.Start(); err != nil {
+			log.Fatal().Err(err).Msg("Prometheus server error")
+		}
+	}()
+	return promServer
+}
+
+func initializeWebServer(b *broker.Broker, cfg *config.Config, err error) (interface{ ShutdownWithContext(context.Context) error }, *os.File) {
+	var webServer *web.WebServer
+	var app interface{ ShutdownWithContext(context.Context) error }
+	var logfile *os.File
+
+	<-b.Ready
+	// Conditionally start web server based on EnableWebAPI flag
+	if cfg.EnableWebAPI {
+		log.Info().Msg("Web API enabled - initializing web server...")
+
+		// Initialize the web admin server
+		webConfig := &web.Config{
+			BrokerHost:    cfg.BrokerHost,
+			BrokerPort:    cfg.BrokerPort,
+			Username:      cfg.Username,
+			Password:      cfg.Password,
+			JwtKey:        cfg.JwtSecret,
+			WebServerPort: cfg.WebPort,
+			EnableUI:      cfg.EnableUI,
+			EnableSwagger: cfg.EnableSwagger,
+			SwaggerPrefix: cfg.SwaggerPath,
+			ApiPrefix:     cfg.WebAPIPath,
+			UIPath:        cfg.UIPath,
+		}
+
+		webServer, err = web.NewWebServer(webConfig, b)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to create web server")
+		}
+
+		// open "server.log" for appending
+		logfile, err = os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to open log file")
+		}
+
+		app = webServer.SetupApp(logfile)
+
+		// Start the web admin server in a goroutine
+		go func() {
+			addr := fmt.Sprintf(":%s", cfg.WebPort)
+			log.Info().Str("addr", addr).Msg("Starting web server")
+			err := app.(*fiber.App).Listen(addr)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Web server error")
+			}
+		}()
+	} else {
+		log.Info().Msg("Web API disabled - skipping web server initialization")
+	}
+	return app, logfile
+}
+
+func getOrCreateDataDir(dataDir string) string {
+	if dataDir == "" {
+		dataDir = filepath.Join("data")
+	}
+	// Ensure the data directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		log.Info().Msg("Data directory not found. Creating a new one...")
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			log.Fatal().Err(err).Msg("Failed to create data directory")
+		}
+	}
+	return dataDir
+}
+
+func setupUserDatabase(dataDir string, cfg *config.Config) (persistdb.User, error) {
+	// Verify if the database file exists
+	log.Info().Msg("Searching for database...")
+	dbPath := filepath.Join(dataDir, "ottermq.db")
+	_, statErr := os.Stat(dbPath)
+	dbExists := statErr == nil
+	persistdb.SetDbPath(dbPath)
+	if err := persistdb.OpenDB(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to open database")
+	}
+	// InitDB is idempotent (CREATE TABLE IF NOT EXISTS) — always run it so new
+	// tables added in later versions are created on existing databases too.
+	persistdb.InitDB()
+
+	persistdb.AddDefaultRoles()
+	persistdb.AddDefaultPermissions()
+
+	user, err := persistdb.GetUserByUsername(cfg.Username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			if !dbExists {
+				log.Info().Msg("Database file not found. Creating a new one...")
+			} else {
+				log.Info().Str("username", cfg.Username).Msg("Configured user not found in database. Bootstrapping default admin user")
+			}
+			newUser := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
+			if err := persistdb.AddUser(newUser); err != nil {
+				log.Fatal().Err(err).Msg("Failed to add user")
+			}
+			if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
+				log.Fatal().Err(err).Msg("Failed to grant default vhost access")
+			}
+			user, err = persistdb.GetUserByUsername(cfg.Username)
+		}
+	}
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to get user")
+	}
+	if user.RoleID != 1 {
+		log.Fatal().Msg("User is not an admin")
+	}
+	return user, err
 }

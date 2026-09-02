@@ -2,13 +2,12 @@
   <q-page padding>
     <div class="container">
         <div class="text-h6 q-mb-md">Queues</div>
-        <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="create">
-            <q-input v-model="newQueue" label="Queue name" dense outlined />
-            <q-btn label="Add" color="primary" type="submit" />
-          </q-form>
+        <div class="row q-gutter-sm q-mb-md">
+          <q-btn label="Add Queue" color="primary" icon="add" @click="showCreateDialog = true" />
+        </div>
 
           <q-table
-            :rows="rows"
+            :rows="filteredRows"
             :columns="columns"
             row-key="name"
             flat bordered
@@ -19,9 +18,9 @@
             <q-td :props="props">
               <span 
               class="small-square q-mx-xs"
-              :class="props.row.status === 'running'? 'small-square--green' : 'small-square--red'"
+              :class="props.row.state === 'running'? 'small-square--green' : 'small-square--red'"
               />
-              {{ props.row.status || '-' }}
+              {{ props.row.state || '-' }}
             </q-td>
           </template>
 
@@ -45,38 +44,155 @@
               </q-card-section>
             </q-card>
           </div>
+
+          <!-- Create Queue Dialog -->
+          <q-dialog v-model="showCreateDialog" persistent>
+            <q-card style="min-width: 500px">
+              <q-card-section>
+                <div class="text-h6">Create Queue</div>
+              </q-card-section>
+
+              <q-card-section class="q-pt-none">
+                <q-form @submit.prevent="createQueue">
+                  <q-input
+                    v-model="newQueue.name"
+                    label="Queue Name *"
+                    outlined
+                    dense
+                    class="q-mb-md"
+                    :rules="[val => !!val || 'Name is required']"
+                  />
+
+                  <q-select
+                    v-model="newQueue.vhost"
+                    label="Virtual Host"
+                    :options="vhostsStore.names"
+                    outlined
+                    dense
+                    class="q-mb-md"
+                  />
+
+                  <div class="row q-col-gutter-md q-mb-md">
+                    <div class="col-6">
+                      <q-checkbox v-model="newQueue.durable" label="Durable" />
+                    </div>
+                    <div class="col-6">
+                      <q-checkbox v-model="newQueue.auto_delete" label="Auto Delete" />
+                    </div>
+                  </div>
+
+                  <q-input
+                    v-model.number="newQueue.max_length"
+                    label="Max Length (optional)"
+                    type="number"
+                    outlined
+                    dense
+                    class="q-mb-md"
+                    hint="Maximum number of messages in queue"
+                  />
+
+                  <q-input
+                    v-model.number="newQueue.message_ttl"
+                    label="Message TTL (ms, optional)"
+                    type="number"
+                    outlined
+                    dense
+                    class="q-mb-md"
+                    hint="Message time-to-live in milliseconds"
+                  />
+
+                  <q-expansion-item
+                    label="Dead Letter Exchange Configuration"
+                    icon="warning"
+                    class="q-mb-md"
+                  >
+                    <q-card>
+                      <q-card-section>
+                        <q-input
+                          v-model="newQueue.x_dead_letter_exchange"
+                          label="Dead Letter Exchange"
+                          outlined
+                          dense
+                          class="q-mb-md"
+                          hint="Exchange to route expired/rejected messages"
+                        />
+                        <q-input
+                          v-model="newQueue.x_dead_letter_routing_key"
+                          label="Dead Letter Routing Key"
+                          outlined
+                          dense
+                          hint="Routing key for dead lettered messages"
+                        />
+                      </q-card-section>
+                    </q-card>
+                  </q-expansion-item>
+
+                  <q-card-actions align="right">
+                    <q-btn flat label="Cancel" color="primary" v-close-popup @click="resetForm" />
+                    <q-btn label="Create" type="submit" color="primary" :loading="creating" />
+                  </q-card-actions>
+                </q-form>
+              </q-card-section>
+            </q-card>
+          </q-dialog>
       </div>
   </q-page>
 </template>
 
 <script setup>
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useQueuesStore } from 'src/stores/queues'
+import { useVHostsStore } from 'src/stores/vhosts'
+import { Notify } from 'quasar'
 
 const store = useQueuesStore()
-const newQueue = ref('')
+const vhostsStore = useVHostsStore()
 const selectedName = ref('')
+const showCreateDialog = ref(false)
+const creating = ref(false)
+
+const newQueue = ref({
+  name: '',
+  vhost: vhostsStore.selected,
+  durable: false,
+  auto_delete: false,
+  max_length: null,
+  message_ttl: null,
+  x_dead_letter_exchange: '',
+  x_dead_letter_routing_key: ''
+})
 
 const columns = [
   { name: 'vhost', label: 'VHost', field: 'vhost' },
-  { name: 'name', label: 'Name', field: 'name' },
-  { name: 'status', label: 'Status', field: 'status' },
-  { name: 'messages', label: 'Ready', field: 'messages', align: 'right' },
-  { name: 'unacked', label: 'Unacked', field: 'unacked', align: 'right' },
-  { name: 'persisted', label: 'Persisted', field: 'persisted', align: 'right' },
-  { name: 'total', label: 'Total', field: 'total', align: 'right' },
-  { name: 'actions', label: 'Actions', field: 'actions' }
+  { name: 'name', label: 'Name', field: 'name', align: 'left' },
+  { name: 'status', label: 'Status', field: 'state' },
+  { name: 'messages_ready', label: 'Ready', field: 'messages_ready', align: 'right' },
+  { name: 'messages_unacked', label: 'Unacked', field: 'messages_unacked', align: 'right' },
+  { name: 'messages_total', label: 'Total', field: 'messages_total', align: 'right' },
+  { name: 'consumers', label: 'Consumers', field: 'consumers', align: 'right' },
+  { name: 'durable', label: 'D', field: 'durable', align: 'center' },
+  { name: 'auto_delete', label: 'AD', field: 'auto_delete', align: 'center' },
+  { name: 'actions', label: 'Actions', field: 'actions', align: 'center' }
 ]
 
 const rows = computed(() =>
   store.items.map(q => ({
     ...q,
-    status: 'running',
-    unacked: (q.unacked || 0),
-    persisted: (q.messages_persistent || 0),
-    total: (q.messages || 0)
+    durable: q.durable ? '✓' : '',
+    auto_delete: q.auto_delete ? '✓' : ''
   }))
 )
+
+// Only show queues that belong to the active vhost
+const filteredRows = computed(() =>
+  rows.value.filter(q => q.vhost === vhostsStore.selected)
+)
+
+// When the active vhost changes, refetch and clear selection
+watch(() => vhostsStore.selected, () => {
+  store.selected = null
+  store.fetch()
+})
 
 function select(row) {
   store.select(row.name)
@@ -84,22 +200,53 @@ function select(row) {
 
 watch(() => store.selected, v => { selectedName.value = v || '' })
 
-async function create() {
-  if (!newQueue.value) return
-  await store.addQueue(newQueue.value)
-  newQueue.value = ''
+function resetForm() {
+  newQueue.value = {
+    name: '',
+    vhost: vhostsStore.selected,
+    durable: false,
+    auto_delete: false,
+    max_length: null,
+    message_ttl: null,
+    x_dead_letter_exchange: '',
+    x_dead_letter_routing_key: ''
+  }
+}
+
+async function createQueue() {
+  if (!newQueue.value.name) return
+
+  creating.value = true
+  try {
+    await store.addQueue(newQueue.value)
+    showCreateDialog.value = false
+    resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create queue' })
+  } finally {
+    creating.value = false
+  }
 }
 
 async function del(name) {
-  await store.deleteQueue(name)
+  try {
+    await store.deleteQueue(name)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to delete queue' })
+  }
 }
 
 async function consume() {
   if (!selectedName.value) return
-  await store.get(selectedName.value)
+  try {
+    await store.get(selectedName.value)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to get message' })
+  }
 }
 
 onMounted(store.fetch)
+onUnmounted(() => { store.lastMessage = null })
 </script>
 
 <style scoped lang="scss">

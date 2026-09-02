@@ -14,14 +14,23 @@
           </div>
         </q-toolbar-title>
 
+        <q-select
+          v-model="vhostsStore.selected"
+          :options="vhostsStore.names"
+          dense
+          outlined
+          dark
+          class="q-mr-md"
+          style="min-width: 120px"
+          label="VHost"
+          @update:model-value="vhostsStore.setSelected"
+        />
+
         <div class="q-mr-md text-subtitle1">
           User: <strong>{{username}}</strong>
         </div>
         <q-btn flat label="logout" @click="logout" />
       </q-toolbar>
-    </q-header>
-
-    <q-page-container>
       <q-tabs
         v-model="tab"
         class="bg-primary text-white"
@@ -32,10 +41,14 @@
         >
         <q-route-tab to="/overview" name="overview" label="Overview" />
         <q-route-tab to="/connections" name="connections" label="Connections" />
+        <q-route-tab to="/channels" name="channels" label="Channels" />
         <q-route-tab to="/exchanges" name="exchanges" label="Exchanges" />
         <q-route-tab to="/queues" name="queues" label="Queues" />
+        <q-route-tab v-if="auth.isAdmin" to="/admin" name="admin" label="Admin" />
       </q-tabs>
+    </q-header>
 
+    <q-page-container>
       <router-view />
     </q-page-container>
   </q-layout>
@@ -46,11 +59,13 @@ import { onMounted, ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from 'src/stores/auth'
 import { useOverviewStore } from 'src/stores/overview'
+import { useVHostsStore } from 'src/stores/vhosts'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const overview = useOverviewStore()
+const vhostsStore = useVHostsStore()
 
 const username = ref(auth.username || 'guest')
 
@@ -75,9 +90,10 @@ const goVersion = computed(() => {
   return `Go ${ver}`
 })
 
-// fetch overview data for header info
+// fetch overview data and vhost list for header
 onMounted(() => {
   overview.fetch()
+  vhostsStore.fetch()
 })
 
 

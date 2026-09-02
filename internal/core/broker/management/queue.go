@@ -3,30 +3,51 @@ package management
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
 )
 
 // ListQueues returns a list of all queues across all vhosts.
 func (s *Service) ListQueues() []models.QueueDTO {
-	// get queues from all vhosts
 	var dtos []models.QueueDTO
 	vhosts := s.broker.ListVHosts()
-	queues := []*vhost.Queue{}
-	unackedCounts := map[string]int{}
-	consumerCounts := map[string]int{}
-	for _, vh := range vhosts {
-		unackedCounts = vh.GetUnackedMessageCountsAllQueues()
-		consumerCounts = vh.GetConsumerCountsAllQueues()
-		queues = append(queues, vh.GetAllQueues()...)
 
-		// Map to DTOs
-		for _, queue := range queues {
-			dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], consumerCounts[queue.Name])
+	for _, vh := range vhosts {
+		for _, queue := range vh.GetAllQueues() {
+			stats := s.fetchQueueStatistics(vh, queue)
+			dto := s.queueToDTO(vh, queue, stats)
 			dtos = append(dtos, dto)
 		}
 	}
 	return dtos
+}
+
+type QueueStats struct {
+	Messages      int
+	UnackedCount  int
+	ConsumerCount int
+}
+
+func (*Service) fetchQueueStatistics(vh *vhost.VHost, queue *vhost.Queue) *QueueStats {
+	var messages, unackedCount, consumerCount int
+	collector := vh.GetCollector()
+	if collector != nil && collector.GetQueueSnapshot(queue.Name) != nil {
+		snapshot := collector.GetQueueSnapshot(queue.Name)
+		messages = int(snapshot.MessageCount)
+		unackedCount = int(snapshot.UnackedCount)
+		consumerCount = int(snapshot.ConsumerCount)
+	} else {
+		messages = queue.Len()
+		unackedCounts := vh.GetUnackedMessageCountsAllQueues()
+		consumerCounts := vh.GetConsumerCountsAllQueues()
+		unackedCount = unackedCounts[queue.Name]
+		consumerCount = consumerCounts[queue.Name]
+	}
+	return &QueueStats{
+		Messages:      messages,
+		UnackedCount:  unackedCount,
+		ConsumerCount: consumerCount,
+	}
 }
 
 func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error) {
@@ -41,10 +62,8 @@ func (s *Service) GetQueue(vhostName, queueName string) (*models.QueueDTO, error
 	}
 
 	// Get statistics from vhost (these methods handle locking internally)
-	unackedCounts := vh.GetUnackedMessageCountsAllQueues()
-	consumerCounts := vh.GetConsumersByQueue(queueName)
-
-	dto := s.queueToDTO(vh, queue, unackedCounts[queue.Name], len(consumerCounts))
+	stats := s.fetchQueueStatistics(vh, queue)
+	dto := s.queueToDTO(vh, queue, stats)
 	return &dto, nil
 }
 
@@ -72,7 +91,8 @@ func (s *Service) CreateQueue(vhostName, queueName string, req models.CreateQueu
 		return nil, err
 	}
 
-	dto := s.queueToDTO(vh, queue, 0, 0)
+	stats := s.fetchQueueStatistics(vh, queue)
+	dto := s.queueToDTO(vh, queue, stats)
 	return &dto, nil
 }
 
@@ -146,25 +166,26 @@ func (s *Service) PurgeQueue(vhostName, queueName string) (int, error) {
 	return int(count), err
 }
 
-func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, consumerCount int) models.QueueDTO {
-	messagesReady := queue.Len()
-	total := messagesReady + unackedCount
+func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, stats *QueueStats) models.QueueDTO {
+	total := stats.Messages + stats.UnackedCount
 
 	dto := models.QueueDTO{
 		VHost:              vh.Name,
 		Name:               queue.Name,
-		Messages:           messagesReady,
-		MessagesReady:      messagesReady,
-		MessagesUnacked:    unackedCount,
+		Messages:           stats.Messages,
+		MessagesReady:      stats.Messages,
+		MessagesUnacked:    stats.UnackedCount,
 		MessagesTotal:      total,
-		Consumers:          consumerCount,
-		ConsumersActive:    consumerCount,
+		Consumers:          stats.ConsumerCount,
 		Durable:            queue.Props.Durable,
 		AutoDelete:         queue.Props.AutoDelete,
 		Exclusive:          queue.Props.Exclusive,
 		Arguments:          queue.Props.Arguments,
 		State:              "running",
 		PersistenceEnabled: queue.IsPersistenceEnabled(),
+	}
+	if queue.Props.Arguments == nil {
+		return dto
 	}
 
 	// Extract DLX configuration
@@ -192,6 +213,14 @@ func (s *Service) queueToDTO(vh *vhost.VHost, queue *vhost.Queue, unackedCount, 
 			dto.MessageTTL = toInt64Pointer(val)
 		}
 	}
+
+	// Extract Max Priority
+	if val, ok := queue.Props.Arguments["x-max-priority"]; ok {
+		if val != nil && val != 0 {
+			dto.MaxPriority = toUint8Pointer(val)
+		}
+	}
+
 	return dto
 }
 
@@ -224,6 +253,26 @@ func toInt64Pointer(val any) *int64 {
 		return &val
 	case float64:
 		val := int64(v)
+		return &val
+	}
+	return nil
+}
+
+func toUint8Pointer(val any) *uint8 {
+	switch v := val.(type) {
+	case uint8:
+		return &v
+	case int:
+		val := uint8(v)
+		return &val
+	case int32:
+		val := uint8(v)
+		return &val
+	case int64:
+		val := uint8(v)
+		return &val
+	case float64:
+		val := uint8(v)
 		return &val
 	}
 	return nil

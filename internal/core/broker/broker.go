@@ -10,24 +10,26 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/management"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/memento"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/management"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/json"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/memento"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/andrelcunha/ottermq/internal/persistdb"
+	_ "github.com/ottermq/ottermq/internal/persistdb"
 )
 
 const (
 	PLATFORM         = "golang"
 	PRODUCT          = "OtterMQ"
 	DEFAULT_PROTOCOL = "AMQP 0-9-1"
+	DEFAULT_VHOST    = "/"
 )
 
 type Broker struct {
@@ -49,9 +51,12 @@ type Broker struct {
 	connToID      map[net.Conn]vhost.ConnectionID // Reverse map
 	connectionsMu sync.RWMutex
 	startedAt     time.Time
+
+	// Metrics collector
+	collector metrics.MetricsCollector
 }
 
-func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
+func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc, collector metrics.MetricsCollector) *Broker {
 	// Create persistence layer based on config
 	persistConfig := &persistence.Config{
 		Type:    "json", // from config or env var
@@ -74,25 +79,50 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		persist:     persist,
 		Ready:       make(chan struct{}),
 		startedAt:   time.Now(),
+		collector:   collector,
 	}
 	options := vhost.VHostOptions{
 		QueueBufferSize: config.QueueBufferSize,
+		MaxPriority:     config.MaxPriority,
 		Persistence:     b.persist,
 		EnableDLX:       config.EnableDLX,
 		EnableTTL:       config.EnableTTL,
 		EnableQLL:       config.EnableQLL,
 	}
-
-	defaultVHost := vhost.NewVhost("/", options)
-	b.VHosts["/"] = defaultVHost
-
 	b.framer = &amqp.DefaultFramer{}
-	b.VHosts["/"].SetFramer(b.framer)
+	b.SetupMetricsCollector(collector, config.EnableMetrics)
 
-	defaultVHost.SetFrameSender(b)
+	b.VHosts[DEFAULT_VHOST] = initializeVHost(DEFAULT_VHOST, options, b)
+
+	// Recover any additional vhosts that were persisted from previous runs
+	if names, err := persist.LoadAllVHosts(); err == nil {
+		for _, name := range names {
+			if name == DEFAULT_VHOST {
+				continue
+			}
+			b.VHosts[name] = initializeVHost(name, options, b)
+			log.Info().Str("vhost", name).Msg("Recovered persisted vhost")
+		}
+	}
 
 	b.Management = management.NewService(b)
 	return b
+}
+
+// SetupMetricsCollector sets up the metrics collector for the broker.
+func (b *Broker) SetupMetricsCollector(collector metrics.MetricsCollector, startSampling bool) {
+	b.collector = collector
+	if startSampling && b.collector != nil {
+		b.collector.StartPeriodicSampling()
+	}
+}
+
+func initializeVHost(vhostName string, options vhost.VHostOptions, b *Broker) *vhost.VHost {
+	vh := vhost.NewVhost(vhostName, options)
+	vh.SetFrameSender(b)
+	vh.SetFramer(b.framer)
+	vh.SetMetricsCollector(b.collector)
+	return vh
 }
 
 func (b *Broker) Start() error {
@@ -182,20 +212,21 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 		}
 		log.Debug().Str("client", conn.RemoteAddr().String()).Msg("New client waiting for connection")
 		connCtx, connCancel := context.WithCancel(b.rootCtx)
-		defer connCancel()
 		connInfo, err := b.framer.Handshake(&configurations, conn, connCtx)
 		if err != nil {
+			connCancel()
 			log.Info().Err(err).Msg("Handshake failed")
 			continue
 		}
 		b.registerConnection(conn, connInfo)
-		go b.monitorConnectionLifecycle(conn, connInfo.Client)
+		go b.monitorConnectionLifecycle(conn, connInfo.Client, connCancel)
 
 		go b.handleConnection(conn, connInfo)
 	}
 }
 
-func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient) {
+func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient, cancel context.CancelFunc) {
+	defer cancel()
 	<-client.Ctx.Done()
 	log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 	b.cleanupConnection(conn)
@@ -203,13 +234,19 @@ func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClie
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
+	if request == nil {
+		// Incomplete frame state, should not happen in normal operation
+		log.Debug().Msg("processRequest called with nil MethodFrame")
+		return nil, nil
+	}
+	b.mu.Lock()
 	connInfo, exist := b.Connections[conn]
+	b.mu.Unlock()
 	if !exist {
 		// connection terminated while processing the request
 		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 		return nil, nil
 	}
-	vh := b.VHosts[connInfo.VHostName]
 	isConnectionClosing, err := b.isConnectionClosing(conn)
 	if err != nil {
 		return nil, err
@@ -223,6 +260,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		}
 	}
+
+	// Get vhost after shutdown check to avoid nil pointer during cleanup
+	vh := b.VHosts[connInfo.VHostName]
+	if vh == nil {
+		log.Debug().Str("vhost", connInfo.VHostName).Msg("VHost not found or already cleaned up")
+		return nil, nil
+	}
+
 	// Check if the channel is in closing state (stored state, not incoming frame)
 	if request.Channel > 0 {
 		b.mu.Lock()
@@ -306,6 +351,70 @@ func (b *Broker) ListVHosts() []*vhost.VHost {
 	return vhosts
 }
 
+// CreateVHost creates a new virtual host with the given name.
+// Returns an error if the vhost already exists.
+func (b *Broker) CreateVHost(name string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, exists := b.VHosts[name]; exists {
+		return fmt.Errorf("vhost '%s' already exists", name)
+	}
+
+	options := vhost.VHostOptions{
+		QueueBufferSize: b.config.QueueBufferSize,
+		MaxPriority:     b.config.MaxPriority,
+		Persistence:     b.persist,
+		EnableDLX:       b.config.EnableDLX,
+		EnableTTL:       b.config.EnableTTL,
+		EnableQLL:       b.config.EnableQLL,
+	}
+	vh := initializeVHost(name, options, b)
+	b.VHosts[name] = vh
+
+	if b.persist != nil {
+		if err := b.persist.SaveVHostMetadata(name); err != nil {
+			delete(b.VHosts, name)
+			return fmt.Errorf("failed to persist vhost: %w", err)
+		}
+	}
+	log.Info().Str("vhost", name).Msg("Created vhost")
+	return nil
+}
+
+// DeleteVHost removes a virtual host and all its resources.
+// The default vhost "/" cannot be deleted.
+// Returns an error if the vhost has active connections.
+func (b *Broker) DeleteVHost(name string) error {
+	if name == DEFAULT_VHOST {
+		return fmt.Errorf("cannot delete the default vhost '/'")
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, exists := b.VHosts[name]; !exists {
+		return fmt.Errorf("vhost '%s' not found", name)
+	}
+
+	// Reject if there are active connections on this vhost
+	for _, connInfo := range b.Connections {
+		if connInfo.VHostName == name {
+			return fmt.Errorf("vhost '%s' has active connections", name)
+		}
+	}
+
+	delete(b.VHosts, name)
+
+	if b.persist != nil {
+		if err := b.persist.DeleteVHostMetadata(name); err != nil {
+			log.Warn().Err(err).Str("vhost", name).Msg("Failed to delete persisted vhost data")
+		}
+	}
+	log.Info().Str("vhost", name).Msg("Deleted vhost")
+	return nil
+}
+
 // ListConnections returns all active connections in the broker.
 func (b *Broker) ListConnections() []amqp.ConnectionInfo {
 	b.mu.Lock()
@@ -342,6 +451,55 @@ func (b *Broker) Shutdown() {
 	for conn := range b.Connections {
 		conn.Close()
 	}
+}
+
+// ListVhostDetails returns details of all vhosts in the broker.
+func (b *Broker) ListVhostDetails() ([]models.VHostDTO, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// create a map with vhost name to channel info
+	vhosts := make([]models.VHostDTO, 0, len(b.VHosts))
+	// channelsPerVhost := make(map[string]models.ChannelInfo)
+	for _, vh := range b.VHosts {
+		VHostDTO, err := b.CreateVhostDto(vh)
+		if err != nil {
+			return nil, err
+		}
+		vhosts = append(vhosts, VHostDTO)
+	}
+	return vhosts, nil
+}
+
+func (b *Broker) CreateVhostDto(vh *vhost.VHost) (models.VHostDTO, error) {
+	channels, err := b.ListChannels(vh.Name)
+	if err != nil {
+		return models.VHostDTO{}, err
+	}
+	var users map[string]bool = make(map[string]bool)
+	var unconfirmed_count, unacked_count int
+	var prefetch_count uint16 = 0
+	for _, ch := range channels {
+		users[ch.User] = true
+		unconfirmed_count += ch.UnconfirmedCount
+		prefetch_count += ch.PrefetchCount
+		unacked_count += ch.UnackedCount
+	}
+
+	// Convert users map keys to a slice
+	userList := make([]string, 0, len(users))
+	for user := range users {
+		userList = append(userList, user)
+	}
+
+	VHostDTO := models.VHostDTO{
+		Name:             vh.Name,
+		Users:            userList,
+		State:            "running", // Currently, if the vhost exists, it's running
+		UnconfirmedCount: unconfirmed_count,
+		PrefetchCount:    prefetch_count,
+		UnackedCount:     unacked_count,
+	}
+	return VHostDTO, nil
 }
 
 // ListChannels returns all channels across all connections.
@@ -711,4 +869,10 @@ func (b *Broker) CloseConnection(name string, reason string) error {
 	)
 	b.setConnectionClosingState(targetConn)
 	return nil
+}
+
+func (b *Broker) GetCollector() metrics.MetricsCollector {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.collector
 }

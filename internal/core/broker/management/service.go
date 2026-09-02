@@ -1,7 +1,7 @@
 package management
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/models"
 )
 
 // Service provides management operations for the broker.
@@ -85,6 +85,10 @@ type ManagementService interface {
 	ListVHosts() ([]models.VHostDTO, error)
 	// GetVHost retrieves details of a specific virtual host.
 	GetVHost(name string) (*models.VHostDTO, error)
+	// CreateVHost creates a new virtual host.
+	CreateVHost(name string) error
+	// DeleteVHost deletes a virtual host and all its resources.
+	DeleteVHost(name string) error
 
 	/* Overview/Stats */
 
@@ -92,6 +96,10 @@ type ManagementService interface {
 	GetOverview() (*models.OverviewDTO, error)
 	// GetBrokerInfo retrieves detailed broker information.
 	GetBrokerInfo() models.OverviewBrokerDetails
+
+	// Metrics related methods
+	// GetOverviewCharts retrieves time-series data for overview charts
+	GetOverviewCharts() (*models.OverviewChartsDTO, error)
 }
 
 type Service struct {

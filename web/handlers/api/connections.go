@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
 )
 

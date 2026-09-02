@@ -28,3 +28,12 @@ type UserResponse struct {
 type UnauthorizedErrorResponse struct {
 	Error string `json:"error"`
 }
+
+type PermissionDTO struct {
+	Username string `json:"username"`
+	VHost    string `json:"vhost"`
+}
+
+type PermissionListResponse struct {
+	Permissions []PermissionDTO `json:"permissions"`
+}

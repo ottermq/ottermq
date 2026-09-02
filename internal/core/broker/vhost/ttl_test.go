@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp"
 )
 
 func TestDefaultTTLManager_CheckExpiration_PerMessageTTL(t *testing.T) {

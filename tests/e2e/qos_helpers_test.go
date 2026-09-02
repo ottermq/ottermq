@@ -12,7 +12,7 @@ func TestQoS_WithHelpers_Example(t *testing.T) {
 	defer tc.Close()
 
 	// Declare test queue
-	queueName := testQueue + "-helpers-example"
+	queueName := tc.UniqueQueueName("test-qos-helpers-example")
 	tc.DeclareQueue(queueName)
 
 	// Set QoS

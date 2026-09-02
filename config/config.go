@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -22,6 +23,7 @@ type Config struct {
 	Version              string
 	Ssl                  bool
 	QueueBufferSize      int
+	MaxPriority          uint8
 
 	// Extensions
 	EnableDLX bool // Dead-Letter Exchange
@@ -34,6 +36,7 @@ type Config struct {
 	EnableSwagger bool
 
 	WebAPIPath  string
+	UIPath      string // Path to files on filesystem
 	SwaggerPath string
 
 	// Web Admin
@@ -44,6 +47,19 @@ type Config struct {
 
 	// Logging
 	LogLevel string
+
+	// Metrics
+
+	EnableMetrics   bool          // Enable or disable metrics collection
+	WindowSize      time.Duration // Time window for rate calculations
+	MaxSamples      int           // Maximum number of samples to retain
+	SamplesInterval uint8         // Interval between samples (in seconds) default 5s
+
+	// Prometheus
+	EnablePrometheus         bool
+	PrometheusPort           string
+	PrometheusPath           string
+	PrometheusUpdateInterval time.Duration
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -63,6 +79,7 @@ func LoadConfig(version string) *Config {
 		FrameMax:             getEnvAsUint32("OTTERMQ_FRAME_MAX", 131072),
 		Ssl:                  getEnvAsBool("OTTERMQ_SSL", false),
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
+		MaxPriority:          getEnvAsUint8("OTTERMQ_MAX_PRIORITY", 10), // 0-255 (default 10)
 
 		EnableDLX: getEnvAsBool("OTTERMQ_ENABLE_DLX", true),
 		EnableTTL: getEnvAsBool("OTTERMQ_ENABLE_TTL", true),
@@ -72,6 +89,7 @@ func LoadConfig(version string) *Config {
 		EnableUI:      getEnvAsBool("OTTERMQ_ENABLE_UI", true),
 		EnableSwagger: getEnvAsBool("OTTERMQ_ENABLE_SWAGGER", false),
 		WebAPIPath:    getEnv("OTTERMQ_WEB_API_PATH", "/api"),
+		UIPath:        getEnv("OTTERMQ_UI_PATH", "/usr/local/share/ottermq/ui"),
 		SwaggerPath:   getEnv("OTTERMQ_SWAGGER_PATH", "/docs"),
 
 		WebPort:   getEnv("OTTERMQ_WEB_PORT", "3000"),
@@ -81,6 +99,16 @@ func LoadConfig(version string) *Config {
 		Version:   version,
 
 		LogLevel: getEnv("LOG_LEVEL", "info"),
+
+		EnableMetrics:   getEnvAsBool("OTTERMQ_ENABLE_METRICS", true),
+		WindowSize:      getEnvAsDuration("OTTERMQ_METRICS_WINDOW_SIZE", 5*time.Minute),
+		MaxSamples:      getEnvAsInt("OTTERMQ_METRICS_MAX_SAMPLES", 60),
+		SamplesInterval: getEnvAsUint8("OTTERMQ_METRICS_SAMPLES_INTERVAL", 5), // seconds
+
+		EnablePrometheus:         getEnvAsBool("OTTERMQ_ENABLE_PROMETHEUS", false),
+		PrometheusPort:           getEnv("OTTERMQ_PROMETHEUS_PORT", "9090"),
+		PrometheusPath:           getEnv("OTTERMQ_PROMETHEUS_PATH", "/metrics"),
+		PrometheusUpdateInterval: getEnvAsDuration("OTTERMQ_PROMETHEUS_UPDATE_INTERVAL", 5*time.Second),
 	}
 }
 
@@ -117,6 +145,23 @@ func getEnvAsUint16(key string, defaultValue uint16) uint16 {
 	return uint16(value)
 }
 
+func getEnvAsUint8(key string, defaultValue uint8) uint8 {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseUint(valueStr, 10, 16)
+	if err != nil {
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %d\n", key, valueStr, defaultValue)
+		return defaultValue
+	}
+	if value > uint64(^uint8(0)) {
+		fmt.Printf("Warning: Value for %s exceeds max (%d), clamping to max value\n", key, ^uint8(0))
+		return ^uint8(0)
+	}
+	return uint8(value)
+}
+
 func getEnvAsUint32(key string, defaultValue uint32) uint32 {
 	valueStr := os.Getenv(key)
 	if valueStr == "" {
@@ -138,6 +183,19 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
 		fmt.Printf("Warning: Invalid value for %s: %s, using default: %t\n", key, valueStr, defaultValue)
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := time.ParseDuration(valueStr)
+	if err != nil {
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %s\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return value

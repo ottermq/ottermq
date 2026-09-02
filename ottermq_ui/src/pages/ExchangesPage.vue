@@ -4,14 +4,12 @@
 
       <div class="text-h6 q-mb-md">Exchanges</div>
 
-        <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="create">
-          <q-input v-model="newExchange" label="Exchange name" dense outlined />
-          <q-select v-model="type" :options="types" label="Type" dense outlined style="width: 160px" />
-          <q-btn label="Add" color="primary" type="submit" />
-        </q-form>
+        <div class="row q-gutter-sm q-mb-md">
+          <q-btn label="Add Exchange" color="primary" icon="add" @click="showCreateDialog = true" />
+        </div>
 
         <q-table
-          :rows="store.items"
+          :rows="filteredExchanges"
           :columns="columns"
           row-key="name"
           flat bordered
@@ -28,24 +26,26 @@
         <div v-if="store.selected" class="q-mt-lg">
           <div class="text-subtitle1 q-mb-sm">Bindings for <b>{{ store.selected }}</b></div>
 
-          <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="addBinding">
-            <q-input v-model="routingKey" label="Routing key" dense outlined />
-            <q-input v-model="queueName" label="Queue" dense outlined />
-            <q-btn label="Bind" color="primary" type="submit" />
-          </q-form>
+          <template v-if="!isDefaultExchange">
+            <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="addBinding">
+              <q-input v-model="routingKey" label="Routing key" dense outlined />
+              <q-input v-model="queueName" label="Queue" dense outlined />
+              <q-btn label="Bind" color="primary" type="submit" />
+            </q-form>
 
-          <q-table
-            :rows="store.bindings"
-            :columns="bindingCols"
-            row-key="routingKey-queue"
-            flat bordered
-          >
-            <template #body-cell-actions="props">
-              <q-td :props="props">
-                <q-btn size="sm" label="Unbind" @click="unbind(props.row)" />
-              </q-td>
-            </template>
-          </q-table>
+            <q-table
+              :rows="store.bindings"
+              :columns="bindingCols"
+              row-key="routingKey-queue"
+              flat bordered
+            >
+              <template #body-cell-actions="props">
+                <q-td :props="props">
+                  <q-btn size="sm" label="Unbind" @click="unbind(props.row)" />
+                </q-td>
+              </template>
+            </q-table>
+          </template>
 
           <q-separator class="q-my-md" />
 
@@ -56,16 +56,98 @@
             <q-btn label="Publish" color="primary" type="submit" />
           </q-form>
         </div>
+
+        <!-- Create Exchange Dialog -->
+        <q-dialog v-model="showCreateDialog" persistent>
+          <q-card style="min-width: 500px">
+            <q-card-section>
+              <div class="text-h6">Create Exchange</div>
+            </q-card-section>
+
+            <q-card-section class="q-pt-none">
+              <q-form @submit.prevent="createExchange">
+                <q-input
+                  v-model="newExchange.name"
+                  label="Exchange Name *"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                  :rules="[val => !!val || 'Name is required']"
+                />
+
+                <q-select
+                  v-model="newExchange.vhost"
+                  label="Virtual Host"
+                  :options="vhostsStore.names"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                />
+
+                <q-select
+                  v-model="newExchange.type"
+                  label="Exchange Type *"
+                  :options="types"
+                  outlined
+                  dense
+                  class="q-mb-md"
+                />
+
+                <div class="row q-col-gutter-md q-mb-md">
+                  <div class="col-6">
+                    <q-checkbox v-model="newExchange.durable" label="Durable" />
+                  </div>
+                  <div class="col-6">
+                    <q-checkbox v-model="newExchange.auto_delete" label="Auto Delete" />
+                  </div>
+                </div>
+
+                <q-card-actions align="right">
+                  <q-btn flat label="Cancel" color="primary" v-close-popup @click="resetForm" />
+                  <q-btn label="Create" type="submit" color="primary" :loading="creating" />
+                </q-card-actions>
+              </q-form>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
     </div>
   </q-page>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useExchangesStore } from 'src/stores/exchanges'
+import { useVHostsStore } from 'src/stores/vhosts'
 import { Notify } from 'quasar'
 
 const store = useExchangesStore()
+const vhostsStore = useVHostsStore()
+
+// The default exchange binds every queue automatically; showing the binding
+// form and list for it would be misleading.
+const isDefaultExchange = computed(() => store.selected === '(AMQP default)')
+
+// Only show exchanges that belong to the active vhost
+const filteredExchanges = computed(() =>
+  store.items.filter(e => e.vhost === vhostsStore.selected)
+)
+
+// When the active vhost changes, refetch and clear any selected exchange
+watch(() => vhostsStore.selected, () => {
+  store.selected = null
+  store.bindings = []
+  store.fetch()
+})
+
+const showCreateDialog = ref(false)
+const creating = ref(false)
+const newExchange = ref({
+  name: '',
+  vhost: vhostsStore.selected,
+  type: 'direct',
+  durable: false,
+  auto_delete: false
+})
 
 const columns = [
   { name: 'vhost', label: 'VHost', field: 'vhost' },
@@ -80,8 +162,6 @@ const bindingCols = [
   { name: 'actions', label: 'Actions', field: 'actions' }
 ]
 
-const newExchange = ref('')
-const type = ref('direct')
 const types = ['direct', 'fanout', 'topic', 'headers']
 
 const routingKey = ref('')
@@ -95,31 +175,66 @@ function select(name) {
   store.fetchBindings(name)
 }
 
-async function create() {
-  if (!newExchange.value) return
-  await store.addExchange(newExchange.value, type.value)
-  newExchange.value = ''
+function resetForm() {
+  newExchange.value = {
+    name: '',
+    vhost: vhostsStore.selected,
+    type: 'direct',
+    durable: false,
+    auto_delete: false
+  }
+}
+
+async function createExchange() {
+  if (!newExchange.value.name) return
+  
+  creating.value = true
+  try {
+    await store.addExchange(newExchange.value)
+    showCreateDialog.value = false
+    resetForm()
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to create exchange' })
+  } finally {
+    creating.value = false
+  }
 }
 
 async function del(name) {
-  await store.deleteExchange(name)
+  try {
+    await store.deleteExchange(name)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to delete exchange' })
+  }
 }
 
 async function addBinding() {
   if (!store.selected) return
-  await store.addBinding(store.selected, routingKey.value, queueName.value)
-  routingKey.value = ''; queueName.value = ''
+  try {
+    await store.addBinding(store.selected, routingKey.value, queueName.value)
+    routingKey.value = ''; queueName.value = ''
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to add binding' })
+  }
 }
 
 async function unbind(row) {
-  await store.deleteBinding(store.selected, row.routingKey, row.queue)
+  try {
+    await store.deleteBinding(store.selected, row.routingKey, row.queue)
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to remove binding' })
+  }
 }
 
 async function publish() {
   if (!store.selected) return
-  await store.publish(store.selected, pubRoutingKey.value, message.value)
-  Notify.create({ type: 'positive', message: 'Message published!' })
-  pubRoutingKey.value = ''; message.value = ''
+  try {
+    await store.publish(store.selected, pubRoutingKey.value, message.value)
+    Notify.create({ type: 'positive', message: 'Message published!' })
+    pubRoutingKey.value = ''; message.value = ''
+  } catch (err) {
+    Notify.create({ type: 'negative', message: err?.response?.data?.error || err.message || 'Failed to publish message' })
+  }
 }
 
 onMounted(store.fetch)

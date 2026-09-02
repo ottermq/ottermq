@@ -15,6 +15,201 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List every user-vhost access grant",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "permissions"
+                ],
+                "summary": "List all vhost permissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PermissionListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/permissions/{vhost}/{username}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Check whether a user has access to a specific vhost",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "permissions"
+                ],
+                "summary": "Get vhost permission for a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.PermissionDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Allow a user to connect to the specified vhost",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "permissions"
+                ],
+                "summary": "Grant vhost access to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.PermissionDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a user's access to the specified vhost",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "permissions"
+                ],
+                "summary": "Revoke vhost access from a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users": {
             "get": {
                 "security": [
@@ -102,6 +297,175 @@ const docTemplate = `{
                         "description": "Missing or invalid JWT token",
                         "schema": {
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{username}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a user by username",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserSummary"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a user by username",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Delete a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{username}/password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the password for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change user password",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UserPasswordUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
@@ -255,6 +619,68 @@ const docTemplate = `{
                         "description": "Missing or invalid JWT token",
                         "schema": {
                             "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/bindings/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all bindings for the specified vhost",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "List all bindings for a vhost",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.BindingListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid JWT token",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "VHost not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
@@ -740,6 +1166,206 @@ const docTemplate = `{
                 }
             }
         },
+        "/definitions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Export vhosts, users, permissions, exchanges, queues, and bindings as JSON.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Export all broker definitions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Import vhosts, users, permissions, exchanges, queues, and bindings from JSON. Existing resources are skipped.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Import broker definitions",
+                "parameters": [
+                    {
+                        "description": "Definitions to import",
+                        "name": "definitions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsImportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/definitions/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Export exchanges, queues, and bindings scoped to one vhost.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Export definitions for a single virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Import exchanges, queues, and bindings into the specified vhost. Existing resources are skipped.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "definitions"
+                ],
+                "summary": "Import definitions scoped to a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Definitions to import",
+                        "name": "definitions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DefinitionsImportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/exchanges": {
             "get": {
                 "security": [
@@ -1089,6 +1715,188 @@ const docTemplate = `{
                 }
             }
         },
+        "/health/checks/alarms": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns ok when no broker-wide alarms are raised. OtterMQ does not yet implement alarms, so this always returns ok.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check for broker-wide alarms",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/checks/local-alarms": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns ok when no local node alarms are raised. OtterMQ does not yet implement alarms, so this always returns ok.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check for local node alarms",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/checks/port-listener/{port}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns ok when the broker is listening on the specified port.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check if a port is being listened on",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Port number to check",
+                        "name": "port",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/checks/ready": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns ok when the broker is up and accepting new connections.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check if the broker is ready to serve clients",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/checks/virtual-hosts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns ok when all declared virtual hosts are initialised and operational.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check that all virtual hosts are running",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthCheckResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "description": "Login",
@@ -1135,6 +1943,132 @@ const docTemplate = `{
                 }
             }
         },
+        "/nodes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the list of nodes in the cluster. OtterMQ is single-node, so this always returns one entry.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "List cluster nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OverviewNodeDetails"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns details for a specific node by name (e.g. ottermq@hostname).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get node details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OverviewNodeDetails"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{name}/memory": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a detailed memory usage breakdown for the specified node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "Get node memory breakdown",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.NodeMemoryDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/overview": {
             "get": {
                 "security": [
@@ -1152,7 +2086,7 @@ const docTemplate = `{
                 "tags": [
                     "overview"
                 ],
-                "summary": "Get basic broker information",
+                "summary": "Get broker overview",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1191,6 +2125,40 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to get broker information",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/overview/charts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve time-series data for overview page charts (message stats and rates)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "overview"
+                ],
+                "summary": "Get overview charts data",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OverviewChartsDTO"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get chart data",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -1732,7 +2700,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
+                            "$ref": "#/definitions/models.MessageListResponse"
                         }
                     },
                     "400": {
@@ -1761,9 +2729,272 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/vhosts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all virtual hosts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "List all virtual hosts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vhosts/{vhost}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific virtual host",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Get a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new virtual host",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Create a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.VHostDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a virtual host and all its resources",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vhosts"
+                ],
+                "summary": "Delete a virtual host",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VHost name",
+                        "name": "vhost",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "metrics.BrokerSnapshot": {
+            "type": "object",
+            "properties": {
+                "ack_rate": {
+                    "type": "number"
+                },
+                "ackedTotal": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "channel_count": {
+                    "type": "integer"
+                },
+                "channel_rate": {
+                    "type": "number"
+                },
+                "connection_count": {
+                    "type": "integer"
+                },
+                "connection_rate": {
+                    "type": "number"
+                },
+                "consumer_count": {
+                    "type": "integer"
+                },
+                "deliveredTotal": {
+                    "description": "Sum of AutoAck + ManualAck",
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "delivery_rate": {
+                    "type": "number"
+                },
+                "exchange_count": {
+                    "type": "integer"
+                },
+                "message_count": {
+                    "description": "Current gauges",
+                    "type": "integer"
+                },
+                "nack_rate": {
+                    "type": "number"
+                },
+                "nackedTotal": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "publish_rate": {
+                    "description": "Current rates (single values for display cards)",
+                    "type": "number"
+                },
+                "publishedTotal": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "queue_count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "totalDeliverAutoAckCount": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "totalDeliverManualAckCount": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "total_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_ready_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                },
+                "total_unacked_depth": {
+                    "$ref": "#/definitions/metrics.RateTracker"
+                }
+            }
+        },
+        "metrics.RateTracker": {
+            "type": "object"
+        },
         "models.AuthRequest": {
             "type": "object",
             "properties": {
@@ -1807,6 +3038,30 @@ const docTemplate = `{
                 },
                 "source": {
                     "description": "Source = Exchange name",
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.BindingDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "destination_type": {
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                },
+                "source": {
                     "type": "string"
                 },
                 "vhost": {
@@ -1902,6 +3157,9 @@ const docTemplate = `{
                 "unconfirmed_count": {
                     "description": "Details",
                     "type": "integer"
+                },
+                "unroutable_rate": {
+                    "type": "number"
                 },
                 "user": {
                     "type": "string"
@@ -2122,6 +3380,73 @@ const docTemplate = `{
                 }
             }
         },
+        "models.DefinitionsDTO": {
+            "type": "object",
+            "properties": {
+                "bindings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.BindingDefinition"
+                    }
+                },
+                "exchanges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ExchangeDefinition"
+                    }
+                },
+                "ottermq_version": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PermissionDefinition"
+                    }
+                },
+                "queues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.QueueDefinition"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserDefinition"
+                    }
+                },
+                "vhosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VHostDefinition"
+                    }
+                }
+            }
+        },
+        "models.DefinitionsImportResponse": {
+            "type": "object",
+            "properties": {
+                "bindings_created": {
+                    "type": "integer"
+                },
+                "exchanges_created": {
+                    "type": "integer"
+                },
+                "permissions_granted": {
+                    "type": "integer"
+                },
+                "queues_created": {
+                    "type": "integer"
+                },
+                "users_created": {
+                    "type": "integer"
+                },
+                "vhosts_created": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.DeleteBindingRequest": {
             "type": "object",
             "required": [
@@ -2198,6 +3523,33 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ExchangeDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "type": "boolean"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
         "models.ExchangeListResponse": {
             "type": "object",
             "properties": {
@@ -2206,6 +3558,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.ExchangeDTO"
                     }
+                }
+            }
+        },
+        "models.HealthCheckResponse": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -2229,6 +3592,73 @@ const docTemplate = `{
                 }
             }
         },
+        "models.MessageDTO": {
+            "type": "object",
+            "properties": {
+                "delivery_tag": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "payload_text": {
+                    "type": "string"
+                },
+                "properties": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "redelivered": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.MessageListResponse": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.MessageDTO"
+                    }
+                }
+            }
+        },
+        "models.MessageRatesTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver_auto_ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "deliver_manual_ack": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "publish": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                }
+            }
+        },
         "models.MessageStats": {
             "type": "object",
             "properties": {
@@ -2246,6 +3676,29 @@ const docTemplate = `{
                 }
             }
         },
+        "models.MessageStatsTimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "ready": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "total": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                },
+                "unacked": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TimeSeriesDTO"
+                    }
+                }
+            }
+        },
         "models.NodeInfo": {
             "type": "object",
             "properties": {
@@ -2258,6 +3711,55 @@ const docTemplate = `{
                 "message_rates": {
                     "description": "message rates strategy",
                     "type": "string"
+                }
+            }
+        },
+        "models.NodeMemoryBreakdown": {
+            "type": "object",
+            "properties": {
+                "gc_sys": {
+                    "description": "bytes used for GC metadata",
+                    "type": "integer"
+                },
+                "heap_alloc": {
+                    "description": "bytes currently allocated on the heap",
+                    "type": "integer"
+                },
+                "heap_idle": {
+                    "description": "bytes in idle spans",
+                    "type": "integer"
+                },
+                "heap_inuse": {
+                    "description": "bytes in in-use spans",
+                    "type": "integer"
+                },
+                "heap_sys": {
+                    "description": "bytes obtained from the OS for the heap",
+                    "type": "integer"
+                },
+                "other_sys": {
+                    "description": "other runtime allocations",
+                    "type": "integer"
+                },
+                "stack_inuse": {
+                    "description": "bytes used by goroutine stacks",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "MemoryLimit (system RAM)",
+                    "type": "integer"
+                },
+                "used": {
+                    "description": "MemoryUsage (Go heap from OS)",
+                    "type": "integer"
+                }
+            }
+        },
+        "models.NodeMemoryDTO": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "$ref": "#/definitions/models.NodeMemoryBreakdown"
                 }
             }
         },
@@ -2290,6 +3792,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "models.OverviewChartsDTO": {
+            "type": "object",
+            "properties": {
+                "message_rates": {
+                    "$ref": "#/definitions/models.MessageRatesTimeSeriesDTO"
+                },
+                "message_stats": {
+                    "$ref": "#/definitions/models.MessageStatsTimeSeriesDTO"
                 }
             }
         },
@@ -2330,6 +3843,9 @@ const docTemplate = `{
                 },
                 "message_stats": {
                     "$ref": "#/definitions/models.OverviewMessageStats"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/metrics.BrokerSnapshot"
                 },
                 "node": {
                     "$ref": "#/definitions/models.OverviewNodeDetails"
@@ -2428,6 +3944,39 @@ const docTemplate = `{
                 }
             }
         },
+        "models.PermissionDTO": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PermissionDefinition": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PermissionListResponse": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PermissionDTO"
+                    }
+                }
+            }
+        },
         "models.PublishMessageRequest": {
             "type": "object",
             "required": [
@@ -2498,9 +4047,6 @@ const docTemplate = `{
                     "description": "Consumers stats",
                     "type": "integer"
                 },
-                "consumers_active": {
-                    "type": "integer"
-                },
                 "dead_letter_exchange": {
                     "description": "DLX Configuration (extracted for convenience)",
                     "type": "string"
@@ -2517,6 +4063,10 @@ const docTemplate = `{
                 },
                 "max_length": {
                     "description": "Queue Length Limit (QLL AKA Max Length)",
+                    "type": "integer"
+                },
+                "max_priority": {
+                    "description": "Priority queue configuration",
                     "type": "integer"
                 },
                 "message_ttl": {
@@ -2561,6 +4111,27 @@ const docTemplate = `{
                 }
             }
         },
+        "models.QueueDefinition": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "auto_delete": {
+                    "type": "boolean"
+                },
+                "durable": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
         "models.QueueListResponse": {
             "type": "object",
             "properties": {
@@ -2597,6 +4168,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.TimeSeriesDTO": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
         "models.UnauthorizedErrorResponse": {
             "type": "object",
             "properties": {
@@ -2622,6 +4204,21 @@ const docTemplate = `{
                 }
             }
         },
+        "models.UserDefinition": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "password_hash": {
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "role name, e.g. \"administrator\"",
+                    "type": "string"
+                }
+            }
+        },
         "models.UserListResponse": {
             "type": "object",
             "properties": {
@@ -2630,6 +4227,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.UserSummary"
                     }
+                }
+            }
+        },
+        "models.UserPasswordUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "confirm_password": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
                 }
             }
         },
@@ -2647,6 +4255,53 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "models.VHostDTO": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "prefetch_count": {
+                    "type": "integer"
+                },
+                "state": {
+                    "description": "\"running\", \"idle\"",
+                    "type": "string"
+                },
+                "unacked_count": {
+                    "type": "integer"
+                },
+                "unconfirmed_count": {
+                    "type": "integer"
+                },
+                "users": {
+                    "description": "list of users with access to this vhost",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "models.VHostDefinition": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.VHostListResponse": {
+            "type": "object",
+            "properties": {
+                "vhosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VHostDTO"
+                    }
                 }
             }
         }

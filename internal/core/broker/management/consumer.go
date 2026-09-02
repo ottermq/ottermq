@@ -3,8 +3,8 @@ package management
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/models"
 )
 
 // ListConsumers lists all consumers.

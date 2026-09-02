@@ -73,7 +73,7 @@ type AckType string
 
 const (
 	Ack           AckType = "ack"            // automatic ack
-	NoAck         AckType = "no_ack"         // no ack, requeue=ttrue
+	NoAck         AckType = "no_ack"         // no ack, requeue=true
 	Reject        AckType = "reject"         // reject, requeue=false
 	RejectRequeue AckType = "reject_requeue" // reject, requeue=true
 )

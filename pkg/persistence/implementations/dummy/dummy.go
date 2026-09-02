@@ -1,6 +1,6 @@
 package dummy
 
-import "github.com/andrelcunha/ottermq/pkg/persistence"
+import "github.com/ottermq/ottermq/pkg/persistence"
 
 // DummyPersistence implements persistence.Persistence with no-ops for testing.
 // It can optionally track DeleteMessage calls for test assertions.
@@ -47,8 +47,11 @@ func (d *DummyPersistence) LoadAllExchanges(vhost string) ([]persistence.Exchang
 func (d *DummyPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
 	return nil, nil
 }
-func (d *DummyPersistence) Initialize() error { return nil }
-func (d *DummyPersistence) Close() error      { return nil }
+func (d *DummyPersistence) SaveVHostMetadata(name string) error  { return nil }
+func (d *DummyPersistence) DeleteVHostMetadata(name string) error { return nil }
+func (d *DummyPersistence) LoadAllVHosts() ([]string, error)      { return nil, nil }
+func (d *DummyPersistence) Initialize() error                     { return nil }
+func (d *DummyPersistence) Close() error                          { return nil }
 
 // LoadMessages returns an empty slice
 func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]persistence.Message, error) {

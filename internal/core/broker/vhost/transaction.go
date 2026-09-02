@@ -3,7 +3,7 @@ package vhost
 import (
 	"sync"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp"
 )
 
 type ChannelTransactionState struct {

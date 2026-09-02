@@ -1,6 +1,6 @@
 package models
 
-import "github.com/andrelcunha/ottermq/internal/persistdb"
+import "github.com/ottermq/ottermq/internal/persistdb"
 
 // From the DTO your DB layer already returns
 func FromPersistUserListDTO(dto persistdb.UserListDTO) UserSummary {

@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import api from 'src/services/api'
+import { useVHostsStore } from 'src/stores/vhosts'
+
 
 export const useExchangesStore = defineStore('exchanges', {
   state: () => ({
@@ -38,47 +40,76 @@ export const useExchangesStore = defineStore('exchanges', {
         this.loading = false 
       }
     },
-    async addExchange(name, type = 'direct') {
-      await api.post('/exchanges', {exchange_name: name, exchange_type: type})
+    async addExchange(exchangeData) {
+      const payload = {
+        type: exchangeData.type || 'direct',
+        passive: false,
+        durable: exchangeData.durable || false,
+        auto_delete: exchangeData.auto_delete || false,
+        no_wait: false,
+        arguments: {}
+      }
+
+      const vhost = useVHostsStore().selected
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedName = encodeURIComponent(exchangeData.name)
+      
+      await api.post(`/exchanges/${encodedVhost}/${encodedName}`, payload)
       await this.fetch()
     },
     async deleteExchange(name) {
-      await api.delete(`/exchanges/${encodeURIComponent(name)}`)
+      const vhost = useVHostsStore().selected
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedName = encodeURIComponent(name)
+      await api.delete(`/exchanges/${encodedVhost}/${encodedName}`)
       await this.fetch()
     },
     async fetchBindings(exchange) {
-        const {data} = await api.get(`/bindings/${encodeURIComponent(exchange)}`)
-        const list = Array.isArray(data?.bindings) 
-        ? data.bindings.map(b => ({
-            source: b.source,
-            destination_type: b.destination_type,
-            queue: b.destination,
-            routingKey: b.routing_key,
-            arguments: b.arguments,
-            propertiesKey: b.properties_key,
-        })) : []
-        this.bindings = list
+        const vhost = useVHostsStore().selected
+        const encodedVhost = encodeURIComponent(vhost)
+        const encodedExchange = encodeURIComponent(exchange)
+        try {
+          const {data} = await api.get(`/exchanges/${encodedVhost}/${encodedExchange}/bindings/source`)
+          this.bindings = Array.isArray(data?.bindings)
+            ? data.bindings.map(b => ({
+                source: b.source,
+                destination_type: b.destination_type,
+                queue: b.destination,
+                routingKey: b.routing_key,
+                arguments: b.arguments,
+                propertiesKey: b.properties_key,
+            })) : []
+        } catch (err) {
+          this.error = err?.response?.data?.error || err.message
+          this.bindings = []
+        }
     },
     async addBinding(exchange, routingKey, queue) {
       await api.post(`/bindings`, {
-        source: exchange, routing_key: routingKey, destination: queue
+        vhost: useVHostsStore().selected,
+        source: exchange,
+        routing_key: routingKey,
+        destination: queue,
+        arguments: {}
       })
       await this.fetchBindings(exchange)
     },
     async deleteBinding(exchange, routingKey, queue) {
-      await api.delete(`/bindings`, { data: { 
-        vhost: "/",
-        source: exchange, 
-        routing_key: routingKey, 
+      await api.delete(`/bindings`, { data: {
+        vhost: useVHostsStore().selected,
+        source: exchange,
+        routing_key: routingKey,
         destination: queue,
         arguments: {},
       } })
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
-      await api.post(`/messages`, {
-        vhost: "/",
-        exchange: exchange, 
+      const vhost = useVHostsStore().selected
+      const encodedVhost = encodeURIComponent(vhost)
+      const encodedExchange = encodeURIComponent(exchange)
+
+      await api.post(`/exchanges/${encodedVhost}/${encodedExchange}/publish`, {
         routing_key: routingKey, 
         payload: message,
         content_type: "text/plain",

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/pkg/persistence"
 )
 
 func TestSafeVHostName(t *testing.T) {

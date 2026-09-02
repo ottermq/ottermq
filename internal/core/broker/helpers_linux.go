@@ -1,0 +1,43 @@
+//go:build linux
+
+package broker
+
+import (
+	"os"
+	"syscall"
+
+	"github.com/rs/zerolog/log"
+)
+
+func getSysInfo() (Sysinfo, error) {
+	// get total system memory
+	var sysInfo syscall.Sysinfo_t
+	err := syscall.Sysinfo(&sysInfo)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting sysinfo")
+		return Sysinfo{}, err
+	}
+
+	var stat syscall.Statfs_t
+	err = syscall.Statfs("/", &stat)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting disk stats")
+		return Sysinfo{}, err
+	}
+
+	return Sysinfo{
+		TotalRam:  uint64(sysInfo.Totalram) * uint64(sysInfo.Unit),
+		Uptime:    int64(sysInfo.Uptime),
+		TotalDisk: stat.Blocks * uint64(stat.Bsize),
+		AvailDisk: stat.Bavail * uint64(stat.Bsize),
+	}, nil
+}
+
+func getFileDescriptors() uint32 {
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		log.Error().Err(err).Msg("Error reading fd dir")
+		return 0
+	}
+	return uint32(len(entries))
+}

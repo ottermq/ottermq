@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -29,6 +29,10 @@ func (vh *VHost) BindToDefaultExchange(queueName string) error {
 func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string, args map[string]any, connID ConnectionID) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
+	// Resolve display alias to internal name so any caller can pass "", "amq.default",
+	// or "(AMQP default)" and get consistent behaviour.
+	exchangeName = resolveExchangeAlias(exchangeName)
 
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
@@ -107,6 +111,8 @@ func (*VHost) bindingExist(b *Binding, queueName string, routingKey string, args
 func (vh *VHost) UnbindQueue(exchangeName, queueName, routingKey string, args map[string]interface{}, connID ConnectionID) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
+	exchangeName = resolveExchangeAlias(exchangeName)
 
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]

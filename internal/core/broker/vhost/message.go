@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/pkg/persistence"
 )
 
 type SaveMessageRequest struct {
@@ -134,6 +134,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, msg *Message) (string,
 // publishUnlocked performs message publishing without acquiring vh.mu
 // MUST be called with vh.mu already locked
 func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) (string, error) {
+	exchangeName = resolveExchangeAlias(exchangeName)
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
@@ -189,6 +190,9 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 			log.Debug().Str("routing_key", routingKey).
 				Str("exchange", exchangeName).
 				Msg("No matching bindings for routing key")
+			if vh.collector != nil {
+				vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
+			}
 			return msg.ID, nil
 		}
 
@@ -215,13 +219,32 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 		}
 	}
 
+	// Record exchange publish before releasing lock
+	if vh.collector != nil {
+		vh.collector.RecordExchangePublish(exchange.Name, string(exchange.Typ))
+	}
+
 	// Release lock BEFORE calling queue.Push() to avoid deadlock during QLL enforcement
 	vh.mu.Unlock()
+
+	// If anything panics between the manual Unlock above and the manual Lock below,
+	// the caller's deferred vh.mu.Unlock() would fire on an already-unlocked mutex.
+	// Re-acquire the lock before re-panicking so the caller's defer stays consistent.
+	defer func() {
+		if r := recover(); r != nil {
+			vh.mu.Lock()
+			panic(r)
+		}
+	}()
 
 	// Push messages to queues without holding vh.mu
 	// This allows EnforceMaxLength -> handleDeadLetter -> DeadLetter.Publish to work
 	for _, queue := range targetQueues {
 		queue.Push(*msg)
+		if vh.collector != nil {
+			vh.collector.RecordQueuePublish(queue.Name)
+			vh.collector.RecordExchangeDelivery(exchange.Name) // Messages delivered (routed)
+		}
 	}
 
 	// Re-acquire lock before returning (caller expects lock to still be held due to defer)
@@ -231,7 +254,7 @@ func (vh *VHost) publishUnlocked(exchangeName, routingKey string, msg *Message) 
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) GetMessage(queueName string) *Message {
+func (vh *VHost) GetMessage(queueName string, autoAck bool) *Message {
 	vh.mu.Lock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
@@ -240,6 +263,9 @@ func (vh *VHost) GetMessage(queueName string) *Message {
 		return nil
 	}
 	msg := queue.Pop()
+	if vh.collector != nil {
+		vh.collector.RecordQueueDelivery(queue.Name, autoAck)
+	}
 	if msg == nil {
 		vh.mu.Unlock()
 		log.Debug().Str("queue", queueName).Msg("No messages in queue")
@@ -267,9 +293,9 @@ func (vh *VHost) GetMessageCount(queueName string) (int, error) {
 	return queue.Len(), nil
 }
 
-// acknowledge removes the message with the given ID from the unackedMessages map.
+// Acknowledge removes the message with the given ID from the unackedMessages map.
 func (vh *VHost) Acknowledge(consumerID, msgID string) error {
-	panic("Not implemented")
+	return fmt.Errorf("not implemented")
 }
 
 func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
@@ -293,6 +319,7 @@ func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) (bool, er
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
+	exchangeName = resolveExchangeAlias(exchangeName)
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		return false, errors.NewChannelError(fmt.Sprintf("no exchange '%s' in vhost '%s'", exchangeName, vh.Name), uint16(amqp.NOT_FOUND), uint16(amqp.QUEUE), uint16(amqp.QUEUE_BIND))

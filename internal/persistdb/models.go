@@ -37,3 +37,8 @@ type UserCreateDTO struct {
 	ConfirmPassword string `json:"confirm_password"`
 	RoleID          int    `json:"role"`
 }
+
+type VHostPermission struct {
+	Username string `json:"username"`
+	VHost    string `json:"vhost"`
+}

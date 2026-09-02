@@ -4,10 +4,11 @@ import (
 	"context"
 	"sync"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
-	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/models"
+	"github.com/ottermq/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -27,6 +28,7 @@ type VHost struct {
 	Users              map[string]*persistdb.User `json:"users"`
 	mu                 sync.Mutex                 `json:"-"`
 	queueBufferSize    int                        `json:"-"`
+	maxPriority        uint8                      `json:"-"`
 	persist            persistence.Persistence
 	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
 	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
@@ -57,6 +59,9 @@ type VHost struct {
 
 	// injected by the broker to allow consumers to send frames
 	frameSender FrameSender
+
+	// Metrics collector
+	collector metrics.MetricsCollector
 }
 
 type FrameSender interface {
@@ -65,6 +70,7 @@ type FrameSender interface {
 
 type VHostOptions struct {
 	QueueBufferSize int
+	MaxPriority     uint8
 	Persistence     persistence.Persistence
 	EnableDLX       bool
 	EnableTTL       bool
@@ -80,6 +86,7 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 		Queues:              make(map[string]*Queue),
 		Users:               make(map[string]*persistdb.User),
 		queueBufferSize:     options.QueueBufferSize,
+		maxPriority:         options.MaxPriority,
 		persist:             options.Persistence,
 		Consumers:           make(map[ConsumerKey]*Consumer),
 		ConsumersByQueue:    make(map[string][]*Consumer),
@@ -98,6 +105,18 @@ func NewVhost(vhostName string, options VHostOptions) *VHost {
 	vh.setupExtensions(options)
 
 	return vh
+}
+
+func (vh *VHost) GetCollector() metrics.MetricsCollector {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.collector
+}
+
+func (vh *VHost) SetMetricsCollector(collector metrics.MetricsCollector) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	vh.collector = collector
 }
 
 func (vh *VHost) SetFrameSender(sender FrameSender) {
@@ -222,12 +241,7 @@ func (vh *VHost) GetAllExchanges() []*Exchange {
 func (vh *VHost) GetExchange(exchangeName string) *Exchange {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	// get actual exchange name in case an alias was used
-	actualName := exchangeName
-	if exchangeName == DEFAULT_EXCHANGE_ALIAS || exchangeName == EMPTY_EXCHANGE {
-		actualName = DEFAULT_EXCHANGE
-	}
-	return vh.Exchanges[actualName]
+	return vh.Exchanges[resolveExchangeAlias(exchangeName)]
 }
 
 // GetAllQueues returns a copy of all queues in this vhost.
@@ -277,6 +291,7 @@ func (vh *VHost) loadPersistedState() {
 		for _, msgData := range queue.Messages {
 			msg := FromPersistence(msgData)
 			vh.Queues[queue.Name].Push(msg)
+			vh.collector.RecordQueuePublish(queue.Name)
 		}
 	}
 

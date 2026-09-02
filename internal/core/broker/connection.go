@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,7 +20,10 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 
 	defer func() {
 		defer b.ActiveConns.Done()
-		if len(b.Connections) == 0 {
+		b.mu.Lock()
+		_, exists := b.Connections[conn]
+		b.mu.Unlock()
+		if !exists {
 			log.Debug().Msg("No connections to clean")
 			return
 		}
@@ -80,7 +83,19 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			} else if newState.Body != nil {
 				log.Trace().Interface("body", newState.Body).Msg("Body")
 			}
-			if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
+
+			// check if connection still exists
+			b.mu.Lock()
+			connInfo, exists := b.Connections[conn]
+			b.mu.Unlock()
+
+			if !exists {
+				log.Debug().Msg("Connection already cleaned up, stopping frame processing")
+				client.Cancel()
+				return
+			}
+
+			if previousState, exists := connInfo.Channels[channelNum]; exists {
 				newState.MethodFrame = previousState.MethodFrame
 				log.Trace().Interface("method_frame", previousState.MethodFrame).Msg("Recovered method frame")
 			} else {
@@ -121,6 +136,8 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 	b.connections[connID] = conn
 	b.connToID[conn] = connID
 	b.connectionsMu.Unlock()
+
+	b.collector.RecordConnection()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
@@ -148,6 +165,8 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 		vh.CleanupConnection(connID)
 		log.Debug().Str("vhost", vhName).Str("conn_id", string(connID)).Msg("Cleaned up connection consumers and channels from vhost")
 	}
+
+	b.collector.RecordConnectionClose()
 }
 
 // closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame

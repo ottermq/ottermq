@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# PROVIDE: ottermq
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+
+. /etc/rc.subr
+
+name="ottermq"
+rcvar="ottermq_enable"
+
+load_rc_config "$name"
+
+: ${ottermq_enable:="NO"}
+: ${ottermq_env_file:="/usr/local/etc/ottermq/ottermq.env"}
+: ${ottermq_pidfile:="/var/run/ottermq.pid"}
+: ${ottermq_logfile:="/var/log/ottermq.log"}
+
+pidfile="${ottermq_pidfile}"
+command="/usr/sbin/daemon"
+command_args="-f -P ${pidfile} -o ${ottermq_logfile} /usr/local/bin/ottermq"
+
+
+start_precmd="ottermq_prestart"
+
+
+ottermq_prestart()
+{
+  if [ -f "$ottermq_env_file" ]; then
+    set -a 
+    . "$ottermq_env_file"
+    set +a
+  fi
+}
+
+run_rc_command "$1"
+

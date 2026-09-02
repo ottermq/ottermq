@@ -36,6 +36,20 @@ textarea {
     padding: 2px; 
     margin-right: 4px; 
     display: inline-block; 
+
+  &--green {
+    background-color: #0f0;
+  }
+  
+  &--yellow {
+    background-color: #ff9800;
+  }
+  
+  &--red {
+    background-color: #c10015;
+  }
+  
+  &--gray {
+    background-color: #9e9e9e;
+  }
 }
-.small-square--green { background: #0f0}
-.small-square--red { background: #c10015}

@@ -3,7 +3,7 @@ package management
 import (
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

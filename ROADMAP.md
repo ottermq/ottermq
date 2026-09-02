@@ -60,6 +60,43 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### ⚡ **Recently Completed**
 
+- [x] **Priority Queues** - Full AMQP 0.9.1 priority queue implementation (v0.16.0)
+  - [x] Queue-level priority support via `x-max-priority` argument (1-255 range, default limit: 10)
+  - [x] Message priority field (0-255) with higher priority delivered first
+  - [x] FIFO ordering maintained within same priority level
+  - [x] Map-of-channels architecture with lazy allocation
+  - [x] Configurable via `OTTERMQ_MAX_PRIORITY` environment variable
+  - [x] Zero overhead for non-priority queues (backward compatible)
+  - [x] Integration with DLX (priority preserved in dead letters)
+  - [x] Integration with TTL (expiration works with priority)
+  - [x] Integration with QLL (max-length works with priority)
+  - [x] O(P) priority scan where P = max_priority (negligible for P ≤ 10)
+  - [x] Lazy channel allocation for memory efficiency
+  - [x] Comprehensive test coverage (5+ e2e tests)
+- [x] **Queue Length Limits (QLL)** - Max-length enforcement with dead lettering
+  - [x] `x-max-length` queue argument configuration
+  - [x] Drop-head strategy (evicts oldest messages when limit exceeded)
+  - [x] Dead letter integration with `REASON_MAX_LENGTH`
+  - [x] Proper lock management to prevent deadlocks
+  - [x] Integration with queue Push operations
+- [x] **Management API Refactoring** - Professional service layer architecture (v0.15.0)
+  - [x] Complete separation of HTTP handlers from broker logic
+  - [x] Service layer in `internal/core/broker/management/` with 11 service modules
+  - [x] Zero AMQP protocol overhead for management operations
+  - [x] Full feature exposure: Queues, Exchanges, Bindings, Consumers, Channels, Connections, Messages
+  - [x] Complete DTOs with all properties (TTL, DLX, QLL, QoS, consumer counts, unacked messages)
+  - [x] Structured binding operations (no raw maps)
+  - [x] Consumer visibility API (list all, list by queue, detailed consumer info)
+  - [x] Channel monitoring (list all, list by connection, channel details)
+  - [x] Message operations with full AMQP properties (publish with TTL/priority/headers, get with ack modes)
+  - [x] Connection management (list, get details, close connections)
+  - [x] VHost operations with statistics
+  - [x] Overview endpoint (broker/node/object totals, message stats, connection stats)
+  - [x] BrokerProvider interface pattern to avoid circular dependencies
+  - [x] Thread-safe operations with proper lock management
+  - [x] Comprehensive test coverage (52 tests, 66% coverage)
+  - [x] Updated Swagger documentation
+  - [x] API examples in README with curl commands
 - [x] **Message TTL and Expiration** - RabbitMQ-compatible time-to-live for messages (v0.13.0)
   - [x] Per-message TTL via `Expiration` property (relative milliseconds)
   - [x] Per-queue TTL via `x-message-ttl` argument
@@ -109,16 +146,43 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 - [x] **Consumer management** - Push/pull consumption with QoS support
 - [x] **Message acknowledgments** - ACK, NACK, REJECT, and RECOVER
 
+### ✅ **Recently Completed**
+
+#### **CLI Admin Tool (`ottermqadmin`) — Phase 1 (COMPLETED)**
+
+- [x] Cobra-based CLI application
+- [x] Shared typed HTTP client (`pkg/adminapi/client`)
+- [x] Authentication via login/JWT flow
+- [x] Human-readable and `--json` output modes
+- [x] Commands: `overview`, `queues`, `exchanges`, `bindings`, `publish`, `connections`, `channels`, `consumers`
+- [x] Commands: `vhosts`, `health`, `definitions`, `nodes`
+- [x] CLI-focused integration tests
+
+#### **Metrics & Observability — Phase 1 + 2 (COMPLETED)**
+
+- [x] Internal metrics with ring buffers (per-queue, per-channel, per-exchange rates)
+- [x] Prometheus `/metrics` exporter
+- [x] Real-time rate charts in the Web UI
+
 ### ❌ **Missing Features**
 
-#### **Phase 1: Advanced Features (High Priority)**
+#### **CLI Admin Tool — Remaining (Next Priority)**
 
-- [ ] **Queue length limits**
-  - [ ] Max-length configuration
-  - [ ] Max-length dead lettering (maxlen reason)
-- [ ] **Priority queues**
+- [ ] `users` commands: list, get, create, delete, change-password
+- [ ] `permissions` commands: list, get, set, revoke
 
-#### **Phase 2: Clustering (Lower Priority)**
+#### **Phase 2: Broker/Product Improvements**
+
+- [ ] **Swappable Persistence Architecture**
+  - [ ] Configuration-based persistence selection
+  - [ ] Fully decouple active backend creation from broker startup
+- [ ] **Recovery system**
+  - [ ] Durable queues and exchanges
+  - [ ] Persistent message recovery
+- [ ] **Observability Phase 3**
+  - [ ] OpenTelemetry distributed tracing
+
+#### **Phase 3: Clustering & Federation (Lowest Priority)**
 
 - [ ] **Cluster support**
 - [ ] **Queue mirroring**
@@ -293,13 +357,13 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 9: Queue Length Limits**. Contributors should focus on:
+The highest priority is **finishing the `ottermqadmin` CLI tool** (`users` and `permissions` command groups), followed by persistence durability improvements.
 
-1. Max-length configuration via `x-max-length` argument
-2. Message drop strategy (drop-head vs reject-publish)
-3. Max-length dead lettering with `maxlen` reason
-4. Integration with existing message routing
-5. Testing with RabbitMQ client compatibility
+1. `users` and `permissions` CLI commands
+2. Swappable persistence architecture refactoring
+3. Durable queue and exchange recovery
+4. Performance benchmarking and optimization
+5. Memory management for high-throughput scenarios
 
 ### **Getting Started**
 
@@ -320,10 +384,10 @@ The highest priority is **Phase 9: Queue Length Limits**. Contributors should fo
 
 ## Progress Tracking
 
-**Last Updated**: November 16, 2025  
-**Current Focus**: Phase 9 - Queue Length Limits  
-**Completed**: All CONNECTION, CHANNEL (including flow control), EXCHANGE (including topic pattern matching), QUEUE, BASIC, TX class methods, Dead Letter Exchanges, and Message TTL  
-**Latest Release**: v0.13.0 - Message TTL and Expiration Support  
-**Next Milestone**: Queue length limits with max-length dead lettering
+**Last Updated**: April 13, 2026  
+**Current Focus**: `ottermqadmin` CLI — `users` and `permissions` commands  
+**Completed**: All AMQP 0.9.1 classes, RabbitMQ extensions (DLX, TTL, QLL, priority queues), metrics (Phase 1+2), management API, CLI tool (all commands except `users`/`permissions`)  
+**Latest Release**: v0.17.0 - Metrics & Observability  
+**Next Milestone**: `users` and `permissions` CLI commands
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

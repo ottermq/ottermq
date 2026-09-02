@@ -3,9 +3,9 @@ package vhost
 import (
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	amqperr "github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	amqperr "github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 func TestPurgeQueue_DeletesPersistentMessagesFromPersistence(t *testing.T) {

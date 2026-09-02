@@ -12,7 +12,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/andrelcunha/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/internal/persistdb"
 )
 
 func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Context) (*ConnectionInfo, error) {
@@ -75,7 +75,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Started\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	log.Debug().Str("remote", conn.RemoteAddr().String()).Str("local", conn.LocalAddr().String()).Msg("Handshake - Started")
 
 	heartbeat, _ := (*configurations)["heartbeatInterval"].(uint16)
 	frameMax, _ := (*configurations)["frameMax"].(uint32)
@@ -120,7 +120,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	config := NewAmqpClientConfig(configurations)
 	connCtx, cancel := context.WithCancel(connCtx)
 	client := NewAmqpClient(conn, config, connCtx, cancel)
-	log.Printf("[DEBUG] Connection successfully tunned")
+	log.Debug().Msg("Connection successfully tuned")
 
 	client.StartHeartbeat()
 
@@ -143,16 +143,19 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	}
 
 	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpen)
-	// TODO: #121 validate if the vhost exists - if not, raise connection exception - 402
-	// The challenge is that at this point we don't have access to the Broker struct
-	// We can return the VHostName in the ConnectionInfo struct and let the Broker handle it
-	// We could also pass a callback function to the handshake function to validate the vhost
-	// Or a list of valid vhosts in the configurations map
-
 	if openFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionOpenFrame failed")
 	}
 	VHostName := openFrame.VirtualHost
+
+	// Enforce vhost membership: check that the authenticated user is allowed on this vhost.
+	username, _ := (*configurations)["username"].(string)
+	if username != "" {
+		ok, err := persistdb.HasVHostAccess(username, VHostName)
+		if err != nil || !ok {
+			return nil, fmt.Errorf("access to vhost '%s' denied for user '%s'", VHostName, username)
+		}
+	}
 
 	connInfo := NewConnectionInfo(VHostName)
 	connInfo.Client = client
@@ -162,8 +165,8 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err := sendFrame(conn, openOkFrame); err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
-	log.Printf("[DEBUG] Handshake Completed")
+	log.Debug().Str("remote", conn.RemoteAddr().String()).Str("local", conn.LocalAddr().String()).Msg("Handshake - Opened")
+	log.Debug().Msg("Handshake Completed")
 
 	return connInfo, nil
 }
@@ -176,7 +179,7 @@ func processStartOkContent(configurations *map[string]any, startOkFrame *Connect
 	// parse username and password from startOkFrame.Response
 	log.Printf("Response: '%s'\n", startOkFrame.Response)
 	credentials := strings.Split(strings.Trim(startOkFrame.Response, " "), " ")
-	log.Printf("[DEBUG] Credentials: username: '%s' password: '%s'\n", credentials[0], credentials[1])
+	log.Debug().Str("username", credentials[0]).Msg("Credentials parsed")
 	if len(credentials) != 2 {
 		return fmt.Errorf("failed to parse credentials: invalid format")
 	}

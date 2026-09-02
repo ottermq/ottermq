@@ -24,8 +24,16 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 - Quality of Service (QoS) with prefetch limits
 - Transactions (TX class) - Atomic commit/rollback
 - Channel Flow Control for backpressure management
+- Message TTL (per-message and per-queue)
+- Queue Length Limits with drop-head strategy
+- Priority Queues (0–255 range)
+- Virtual Hosts with multi-tenant isolation
 - Pluggable Persistence Layer (JSON files, Memento WAL planned)
-- Management Interface (Vue + Quasar)
+- User & Permission Management (SQLite + JWT)
+- Internal Metrics (ring buffers, per-queue/channel/exchange rates)
+- Prometheus `/metrics` exporter
+- Management Interface (Vue + Quasar) with real-time charts
+- `ottermqadmin` CLI tool (Cobra-based)
 - Docker Support via `docker-compose`
 - RabbitMQ Client Compatibility
 
@@ -53,7 +61,7 @@ quasar dev
 ### Production Mode (Integrated UI)
 
 ```sh
-# Build everything (UI + broker):
+# Build everything (UI + broker + CLI):
 make build-all
 
 # Run the integrated server:
@@ -64,8 +72,11 @@ make run
 
 ```sh
 make build           # Build broker only
-make build-all       # Build UI and broker (production ready)
+make build-admin     # Build ottermqadmin only
+make build-all       # Build UI, broker, and CLI
+make install-admin   # Install ottermqadmin into GOPATH/bin
 make run            # Run broker (with embedded UI if built)
+make test-cli       # Run focused CLI tests
 make run-dev        # Run broker in development mode
 make test           # Run all tests
 make lint           # Run code quality checks
@@ -78,6 +89,50 @@ OtterMq uses:
 - Port **5672** for the AMQP broker
 
 - Port **3000** for the management UI
+
+## 🖥️ CLI Admin Tool
+
+OtterMQ now includes `ottermqadmin`, a Cobra-based admin CLI that talks to the same HTTP management API used by the web UI.
+
+### Build and Install
+
+```sh
+make build-admin
+make install-admin
+```
+
+Or run it directly from the repo:
+
+```sh
+go run ./cmd/ottermqadmin --help
+```
+
+### Quick Start
+
+```sh
+go run ./cmd/ottermqadmin overview --username guest --password guest
+go run ./cmd/ottermqadmin queues list --username guest --password guest
+go run ./cmd/ottermqadmin exchanges list --username guest --password guest
+go run ./cmd/ottermqadmin bindings list --username guest --password guest
+```
+
+### Example Commands
+
+```sh
+go run ./cmd/ottermqadmin queues create / jobs --durable --username guest --password guest
+go run ./cmd/ottermqadmin publish / "" --routing-key jobs --body "hello" --username guest --password guest
+go run ./cmd/ottermqadmin queues get-messages / jobs --count 5 --ack-mode ack --username guest --password guest
+go run ./cmd/ottermqadmin connections list --username guest --password guest
+go run ./cmd/ottermqadmin channels list --username guest --password guest
+go run ./cmd/ottermqadmin consumers list --username guest --password guest
+```
+
+Notes:
+
+- `ottermqadmin` targets the management API, so the OtterMQ web API must be enabled and reachable.
+- The default management URL is `http://localhost:3000`.
+- Use `""` or `"(AMQP default)"` as the exchange argument when publishing to the AMQP default exchange.
+- Add `--json` to any command for machine-readable output.
 
 ## ⚙️ Configuration
 
@@ -140,12 +195,15 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 ## 🚧 Development Status
 
-OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
+OtterMq is under active development. All core AMQP 0.9.1 features, RabbitMQ extensions, observability, and the management API are complete. Active work is on finishing the `ottermqadmin` CLI tool.
 
-- Message TTL and expiration
-- Queue length limits with dead lettering
-- Priority queues
-- Memento WAL persistence engine (planned)
+**Remaining CLI commands**: `users` and `permissions` (the HTTP API for both already exists).
+
+**Longer-term planned work**:
+
+- Memento WAL persistence engine (append-only transaction log)
+- OpenTelemetry distributed tracing (Phase 3 observability)
+- Clustering / Federation (lowest priority)
 
 **All core AMQP 0.9.1 message operations are now fully implemented**, including:
 
@@ -161,6 +219,8 @@ OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, s
 
 - Dead Letter Exchanges (DLX) with `x-death` tracking
 - Message TTL and Expiration with per-message and per-queue support
+- Queue length limits with dead lettering
+- Priority queues
 
 Basic compatibility with RabbitMQ clients is functional and tested. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 
@@ -177,6 +237,136 @@ make docs
 ```
 
 This will update the Swagger spec and refresh the documentation served at `/docs`.
+
+### Management API Examples
+
+OtterMQ provides a comprehensive REST API for managing queues, exchanges, bindings, and monitoring broker state. The API supports all broker features including TTL, DLX, QLL, and QoS.
+
+#### Queue Management
+
+**Create a queue with TTL and DLX:**
+
+```sh
+curl -X POST http://localhost:3000/api/queues/my-vhost/my-queue \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "durable": true,
+    "auto_delete": false,
+    "arguments": {
+      "x-message-ttl": 60000,
+      "x-dead-letter-exchange": "dlx-exchange",
+      "x-max-length": 10000
+    }
+  }'
+```
+
+**List all queues:**
+
+```sh
+curl http://localhost:3000/api/queues \
+  -H "Authorization: Bearer <token>"
+```
+
+**Get queue details:**
+
+```sh
+curl http://localhost:3000/api/queues/my-vhost/my-queue \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Exchange Management
+
+**Create a topic exchange:**
+
+```sh
+curl -X POST http://localhost:3000/api/exchanges/my-vhost/my-exchange \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "topic",
+    "durable": true,
+    "auto_delete": false,
+    "internal": false
+  }'
+```
+
+#### Binding Management
+
+**Bind a queue to an exchange:**
+
+```sh
+curl -X POST http://localhost:3000/api/bindings \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vhost": "my-vhost",
+    "source": "my-exchange",
+    "destination": "my-queue",
+    "routing_key": "events.#"
+  }'
+```
+
+#### Message Operations
+
+**Publish a message:**
+
+```sh
+curl -X POST http://localhost:3000/api/exchanges/my-vhost/my-exchange/publish \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routing_key": "events.user.created",
+    "payload": "Hello, OtterMQ!",
+    "content_type": "text/plain",
+    "delivery_mode": 2,
+    "priority": 5
+  }'
+```
+
+**Get messages from a queue:**
+
+```sh
+curl -X POST http://localhost:3000/api/queues/my-vhost/my-queue/get \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_count": 10,
+    "ack_mode": "ack"
+  }'
+```
+
+#### Monitoring & Statistics
+
+**Get broker overview:**
+
+```sh
+curl http://localhost:3000/api/overview \
+  -H "Authorization: Bearer <token>"
+```
+
+**List active consumers:**
+
+```sh
+curl http://localhost:3000/api/consumers \
+  -H "Authorization: Bearer <token>"
+```
+
+**List active connections:**
+
+```sh
+curl http://localhost:3000/api/connections \
+  -H "Authorization: Bearer <token>"
+```
+
+**List channels:**
+
+```sh
+curl http://localhost:3000/api/channels \
+  -H "Authorization: Bearer <token>"
+```
+
+For complete API reference, see the Swagger documentation at `/docs`.
 
 ## 📄 Project Pages (Status & AMQP Compliance)
 

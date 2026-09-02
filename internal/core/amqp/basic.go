@@ -357,7 +357,7 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode class ID: %v", err)
 	}
-	log.Printf("[DEBUG] Class ID: %d\n", classID)
+	log.Debug().Int("class_id", int(classID)).Msg("Class ID")
 
 	weight, err := DecodeShortInt(buf)
 	if err != nil {

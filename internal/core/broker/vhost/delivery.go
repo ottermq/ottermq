@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp"
 	"github.com/rs/zerolog/log"
 )
 
@@ -144,6 +144,10 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg Message, redelivered 
 		}
 		return err
 	}
+
+	vh.collector.RecordQueueDelivery(consumer.QueueName, consumer.Props.NoAck)
+	connName := consumer.ConnectionID.String()
+	vh.collector.RecordChannelDeliver(connName, vh.Name, consumer.Channel, consumer.Props.NoAck)
 
 	// Persistence
 	if consumer.Props.NoAck && vh.persist != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {

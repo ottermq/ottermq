@@ -4,10 +4,11 @@ import (
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/testutil"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/testutil"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // Test Suite: Broker-Level Channel Flow Control
@@ -26,11 +27,13 @@ import (
 // TestHandleChannelFlow_ClientRequest tests handling of client-initiated channel.flow
 func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 	mockFramer := &testutil.MockFramer{}
+	mockCollector := metrics.NewMockCollector(nil)
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
+		collector:   mockCollector,
 	}
 
 	var options = vhost.VHostOptions{
@@ -38,6 +41,7 @@ func TestHandleChannelFlow_ClientRequest(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(mockCollector)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{
@@ -146,8 +150,10 @@ func TestHandleChannelFlow_InvalidContent(t *testing.T) {
 // TestHandleChannelFlow_NonExistentChannel tests handling flow on non-opened channel
 func TestHandleChannelFlow_NonExistentChannel(t *testing.T) {
 	mockFramer := &testutil.MockFramer{}
+	mockCollector := metrics.NewMockCollector(nil)
 	broker := &Broker{
 		framer:      mockFramer,
+		collector:   mockCollector,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		VHosts:      make(map[string]*vhost.VHost),
 	}
@@ -157,6 +163,7 @@ func TestHandleChannelFlow_NonExistentChannel(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(mockCollector)
 	broker.VHosts["test-vhost"] = vh
 
 	conn := &MockConnection{

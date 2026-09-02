@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/persistdb"
-	"github.com/andrelcunha/ottermq/pkg/logger"
+	"github.com/ottermq/ottermq/config"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/persistdb"
+	"github.com/ottermq/ottermq/pkg/logger"
+	"github.com/ottermq/ottermq/pkg/metrics"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -76,6 +77,7 @@ func setupBroker() error {
 		Password:        "guest",
 		LogLevel:        "warn",
 		QueueBufferSize: 100000,
+		MaxPriority:     10, // Enable priority queues (default: 10, max: 255)
 		JwtSecret:       "test-secret",
 		WebPort:         "3001", // Different port to avoid conflicts
 		DataDir:         testDataDir,
@@ -89,6 +91,9 @@ func setupBroker() error {
 	// Setup database for tests
 	dbPath := filepath.Join(testDataDir, "ottermq-test.db")
 	persistdb.SetDbPath(dbPath)
+	if err := persistdb.OpenDB(); err != nil {
+		return fmt.Errorf("failed to open test database: %w", err)
+	}
 	persistdb.InitDB()
 	persistdb.AddDefaultRoles()
 	persistdb.AddDefaultPermissions()
@@ -100,20 +105,18 @@ func setupBroker() error {
 	if err := persistdb.AddUser(user); err != nil {
 		return fmt.Errorf("failed to add test user: %w", err)
 	}
-	persistdb.CloseDB()
-
-	if err := persistdb.OpenDB(); err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+	if err := persistdb.GrantVHostAccess(cfg.Username, "/"); err != nil {
+		return fmt.Errorf("failed to grant vhost access: %w", err)
 	}
 	dbUser, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
-	persistdb.CloseDB()
 
 	// Create broker
 	testBrokerCtx, testBrokerStop = context.WithCancel(context.Background())
-	testBroker = broker.NewBroker(cfg, testBrokerCtx, testBrokerStop)
+	collector := metrics.NewMockCollector(nil)
+	testBroker = broker.NewBroker(cfg, testBrokerCtx, testBrokerStop, collector)
 	testBroker.VHosts["/"].Users[dbUser.Username] = &dbUser
 
 	// Start broker in background
@@ -150,6 +153,8 @@ func waitForBroker(timeout time.Duration) error {
 }
 
 func teardownBroker() {
+	defer persistdb.CloseDB()
+
 	if testBrokerStop != nil {
 		log.Info().Msg("Shutting down test broker...")
 		testBrokerStop()

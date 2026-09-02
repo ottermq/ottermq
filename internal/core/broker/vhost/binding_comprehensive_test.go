@@ -3,9 +3,10 @@ package vhost
 import (
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // ========== FANOUT EXCHANGE TESTS ==========
@@ -17,6 +18,7 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	exchangeName := "test-fanout"
@@ -52,8 +54,7 @@ func TestFanoutPublish_DistributesToAllQueues(t *testing.T) {
 		if count != 1 {
 			t.Errorf("Queue %s expected 1 message, got %d", qName, count)
 		}
-
-		receivedMsg := vh.GetMessage(qName)
+		receivedMsg := vh.GetMessage(qName, false)
 		if receivedMsg == nil {
 			t.Errorf("Queue %s should have a message", qName)
 		} else if string(receivedMsg.Body) != "test message" {
@@ -95,6 +96,7 @@ func TestFanoutPublish_IgnoresRoutingKey(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 
 	exchangeName := "test-fanout"
@@ -133,6 +135,7 @@ func TestFanoutUnbind_RemovesSpecificQueue(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -193,6 +196,7 @@ func TestFanoutUnbind_AutoDeleteExchange(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-fanout-autodel"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{
@@ -228,6 +232,7 @@ func TestFanoutUnbind_IgnoresRoutingKey(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -257,6 +262,7 @@ func TestBindQueue_DifferentArguments_CreatesMultipleBindings(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -299,6 +305,7 @@ func TestBindQueue_DuplicateBinding_FailsWithPreconditionFailed(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -330,6 +337,7 @@ func TestUnbindQueue_RequiresMatchingArguments(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -376,6 +384,7 @@ func TestUnbindQueue_RemovesOnlyMatchingArgumentBinding(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -422,6 +431,7 @@ func TestBindQueue_NilArguments(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-exchange"
 	queueName := "test-queue"
@@ -466,6 +476,7 @@ func TestDirectPublish_OnlyMatchingRoutingKey(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -517,6 +528,7 @@ func TestDirectPublish_NonExistentRoutingKey(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 	connID := newTestConsumerConnID()
 	exchangeName := "test-direct"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{Durable: false})
@@ -548,6 +560,7 @@ func TestAutoDelete_OnlyWhenAllBindingsRemoved(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -586,6 +599,7 @@ func TestAutoDelete_MultipleRoutingKeys(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-autodel"
 	vh.CreateExchange(exchangeName, DIRECT, &ExchangeProperties{
@@ -626,6 +640,7 @@ func TestHasRoutingForMessage_Fanout(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	exchangeName := "test-fanout"
 	vh.CreateExchange(exchangeName, FANOUT, &ExchangeProperties{Durable: false})
@@ -663,6 +678,7 @@ func TestHasRoutingForMessage_Direct(t *testing.T) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := NewVhost("/", options)
+	vh.SetMetricsCollector(metrics.NewMockCollector(nil))
 
 	connID := newTestConsumerConnID()
 	exchangeName := "test-direct"

@@ -59,6 +59,16 @@
       </div>
     </div>
 
+    <!-- Charts Section -->
+    <div class="row q-col-gutter-md q-mb-lg">
+      <div class="col-12 col-md-6">
+        <MessageStatsChart :chart-data="store.chartsData?.message_stats" />
+      </div>
+      <div class="col-12 col-md-6">
+        <MessageRatesChart :chart-data="store.chartsData?.message_rates" />
+      </div>
+    </div>
+
     <!-- Object Totals Grid -->
     <div class="row q-col-gutter-md q-mb-lg">
       <div class="col-12 col-md-6">
@@ -146,6 +156,8 @@
 <script setup>
 import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useOverviewStore } from 'src/stores/overview'
+import MessageStatsChart from 'src/components/MessageStatsChart.vue'
+import MessageRatesChart from 'src/components/MessageRatesChart.vue'
 // import { formatBytes } from 'src/utils/filters' // optional, or inline
 
 const store = useOverviewStore()
@@ -153,7 +165,11 @@ let timer = null
 
 onMounted(async () => {
   await store.fetch()
-  timer = setInterval(store.fetch, 10000) // refresh every 10 seconds
+  await store.fetchCharts()
+  timer = setInterval(async () => {
+    await store.fetch()
+    await store.fetchCharts()
+  }, 5000) // refresh every 5 seconds
 })
 
 onBeforeUnmount(() => {

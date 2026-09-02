@@ -16,6 +16,10 @@ type ChannelListResponse struct {
 	Channels []ChannelDetailDTO `json:"channels"`
 }
 
+type VHostListResponse struct {
+	VHosts []VHostDTO `json:"vhosts"`
+}
+
 type ExchangeListResponse struct {
 	Exchanges []ExchangeDTO `json:"exchanges"`
 }
@@ -34,4 +38,13 @@ type BindingListResponse struct {
 
 type ConsumerListResponse struct {
 	Consumers []ConsumerDTO `json:"consumers"`
+}
+
+type MessageListResponse struct {
+	Messages []MessageDTO `json:"messages"`
+}
+
+type HealthCheckResponse struct {
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }

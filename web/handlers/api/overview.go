@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/internal/core/broker"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,8 +19,8 @@ func GetBasicBrokerInfo(c *fiber.Ctx, b *broker.Broker) error {
 	return c.Status(fiber.StatusOK).JSON(info)
 }
 
-// GetBasicBrokerInfo godoc
-// @Summary Get basic broker information
+// GetOverview godoc
+// @Summary Get broker overview
 // @Description Retrieve basic information about the message broker
 // @Tags overview
 // @Accept json
@@ -37,4 +37,24 @@ func GetOverview(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(overview)
+}
+
+// GetOverviewCharts godoc
+// @Summary Get overview charts data
+// @Description Retrieve time-series data for overview page charts (message stats and rates)
+// @Tags overview
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.OverviewChartsDTO
+// @Failure 500 {object} models.ErrorResponse "Failed to get chart data"
+// @Router /overview/charts [get]
+// @Security BearerAuth
+func GetOverviewCharts(c *fiber.Ctx, b *broker.Broker) error {
+	charts, err := b.Management.GetOverviewCharts()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get chart data: " + err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(charts)
 }

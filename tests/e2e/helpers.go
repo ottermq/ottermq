@@ -179,6 +179,11 @@ func (tc *TestConnection) UniqueQueueName(prefix string) string {
 	return fmt.Sprintf("%s-%s", prefix, safeName)
 }
 
+// UniqueName generates a unique resource name based on the test name.
+func (tc *TestConnection) UniqueName(prefix string) string {
+	return tc.UniqueQueueName(prefix)
+}
+
 // UniqueConsumerTag generates a unique consumer tag based on the test name
 func (tc *TestConnection) UniqueConsumerTag(prefix string) string {
 	testName := tc.t.Name()

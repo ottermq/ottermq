@@ -67,7 +67,7 @@ When all tests pass, you should see:
 === RUN   TestQoS_WithHelpers_Example
 --- PASS: TestQoS_WithHelpers_Example (1.23s)
 PASS
-ok      github.com/andrelcunha/ottermq/tests/e2e        15.627s
+ok      github.com/ottermq/ottermq/tests/e2e        15.627s
 ```
 
 ## Troubleshooting

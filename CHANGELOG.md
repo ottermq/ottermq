@@ -7,40 +7,292 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note:** Prior to establishing this CHANGELOG.md file, release notes were maintained directly in [GitHub Releases](https://github.com/ottermq/ottermq/releases). Going forward, all changes will be tracked here and synchronized with releases.
 
-## [Unreleased]
+## [v0.19.3-2]
+
+### Fixed
+
+- **Metrics: negative queue message rate** — `PublishRate` and `DeliveryRate` per-queue rate trackers were being sampled with the current queue depth, which decreases as messages are consumed and produces negative rates. Added `PublishCount` and `DeliveryCount` monotonically increasing counters to `QueueMetrics`; rate trackers now sample these cumulative values (same pattern as `AckCount`).
+- **Prometheus: stale queue metrics after deletion** — per-queue `GaugeVec` label sets (`ottermq_queue_depth`, `ottermq_queue_message_rate`, `ottermq_queue_delivery_rate`, `ottermq_queue_ack_rate`, `ottermq_queue_consumers`, `ottermq_queue_unacked`) were never removed when a queue was deleted, causing Grafana to display the last-known value (e.g. a non-zero depth) indefinitely. The exporter now tracks the active queue set each cycle and calls `DeleteLabelValues` for any queue that no longer exists.
+
+## [v0.19.3-1]
+
+### Fixed
+
+- **Critical: queue name corruption via Fiber unsafe string aliasing** — Fiber's default mode uses `utils.UnsafeString` to extract path parameters, returning a zero-copy string backed directly by fasthttp's reused request buffer. Queue names stored from `c.Params("queue")` were silently overwritten when fasthttp recycled that buffer on the next request, producing corrupted names such as `"2F/(AMQ"` (bytes from a subsequent exchange URL). Fixed by enabling `Immutable: true` in the Fiber config, which forces proper copies of all request-derived strings.
+- **UI: "Get message" block persists after navigation or queue deletion** — `store.lastMessage` was never cleared when switching to a different queue, navigating away from the Queues page, or deleting the selected queue. The queue store's `select` action now resets `lastMessage` on queue change; `deleteQueue` clears both `selected` and `lastMessage` when the deleted queue was selected; and `QueuesPage` clears `lastMessage` on unmount.
+- **UI: no feedback on message publish** — Quasar's `Notify` plugin was not registered in `quasar.config.js` (`plugins: []`), causing all `Notify.create()` calls (success and error toasts) to silently no-op across the entire application. Added `'Notify'` to the plugins list.
+
+## [v0.19.3] - 2026-05-15
+
+### Fixed
+
+- **`queue.delete` AMQP compliance** — `if-unused` and `if-empty` flags are now enforced with `PRECONDITION_FAILED` channel errors; exclusive queue ownership is validated and returns `ACCESS_REFUSED` when a foreign connection attempts deletion
+- **Publish deadlock under QLL** — `publishUnlocked` now manually releases `vh.mu` before calling `queue.Push()` so that QLL enforcement (which may dead-letter back through `publishUnlocked`) cannot deadlock; a deferred panic recovery re-acquires the lock before re-panicking to keep the caller's `defer mu.Unlock()` consistent
+- **Default exchange alias resolution** — `resolveExchangeAlias` centralises normalisation of `""`, `"amq.default"`, and `"(AMQP default)"` to a single canonical key, fixing routing and binding operations that previously diverged depending on how the default exchange was named
+- **Prometheus: stale delta entries on exchange deletion** — `updateExchanges` now prunes `lastExchangePublished` entries for exchanges that no longer exist, preventing unbounded map growth and incorrect counter increments if an exchange is recreated with the same name
+- **Management queue statistics** — `fetchQueueStatistics` now prefers the metrics collector snapshot (depth, unacked, consumer count) when available, falling back to direct vhost queries only when metrics are disabled
+
+## [v0.19.2] - 2026-05-11
+
+### Fixed
+
+- **Docker Image CI workflow** — updated to publish container image to GitHub Container Registry (`ghcr.io/ottermq/ottermq`) on merge to `main`; images are tagged with the git version, minor alias, and `latest`
+
+## [v0.19.1] - 2026-04-14
 
 ### Added
 
-- **Management API Refactoring (Phase 1-2)**: Professional service layer architecture
+- **Vhost Pinia store** (`ottermq_ui/src/stores/vhosts.js`) — groundwork for the vhost switcher; fetches available vhosts, preserves selection across refreshes, falls back to `/`
+
+### Fixed
+
+- **Broker panic on dead-letter to deleted queue** — added a `stopped` flag on `Queue` to guard `push()`/`pushPriority()` against sends on a closed channel; added a deferred recovery in `publishUnlocked` to re-acquire the mutex before re-panicking, preventing a secondary "unlock of unlocked mutex" fatal error
+- **UnackedCount underflow on nack** — `popUnackedRecords` was calling `RecordQueueAck` for all pops (including nacks), causing a double-decrement; recording is now the caller's responsibility. `RecordQueueNack` gains a `discard bool` parameter to correctly track message removal vs requeue in broker-level counters
+- **Exchange page: wrong API endpoints** — `fetchBindings` was calling `/bindings/:vhost/:exchange` instead of `/exchanges/:vhost/:exchange/bindings/source`; `publish` was calling `/messages/:vhost/:exchange` instead of `/exchanges/:vhost/:exchange/publish`
+- **Exchange page: binding operations for `(AMQP default)`** — `addBinding`/`deleteBinding` were sending the display alias as the exchange name; `BindQueue`/`UnbindQueue` do a direct map lookup so the alias was never resolved. Now maps `"(AMQP default)"` → `""` client-side
+- **Exchange page: silent API failures** — `addBinding`, `deleteBinding`, `del`, `unbind`, `publish`, and `fetchBindings` now surface API errors via a `Notify` toast instead of swallowing them silently
+- **Exchange page: binding UI shown for default exchange** — the binding form and list are now hidden when `(AMQP default)` is selected, since all queues are already bound to it automatically
+
+### Refactored
+
+- Replaced remaining `log.Printf("[DEBUG] ...")` calls in `internal/core/amqp/` with structured zerolog calls
+
+---
+
+## [v0.19.0] - 2026-04-14
+
+### Added
+
+- **`nodes` CLI command group** (`nodes list`, `nodes get`, `nodes memory`)
+- **Nodes client methods** in `pkg/adminapi/client/nodes.go`
+- **Nodes API handlers** (`web/handlers/api/nodes.go`) with `ListNodes`, `GetNode`, `GetNodeMemory`
+- **`NodeMemoryDTO`** model with full Go runtime memory breakdown (heap, stack, GC metadata)
+- **`definitions` CLI command group** (`definitions export`, `definitions import`)
+- **Definitions client methods** in `pkg/adminapi/client/definitions.go`
+- **Definitions export/import handlers** with full broker configuration backup/restore
+- **`health` CLI command group**: `check-alarms`, `check-local-alarms`, `check-port-listener`, `check-virtual-hosts`, `check-certificate-expiry`, `check-ready`
+- **Health check client methods** in `pkg/adminapi/client/health.go`
+- **Health check API handlers**
+- **`vhosts` CLI command group** (`vhosts list`, `vhosts get`, `vhosts create`, `vhosts delete`)
+- **VHost HTTP handlers and routes** — vhost CRUD exposed through management service
+- **User management HTTP API**: create, list, get, delete, change-password endpoints
+- **Permission management HTTP API**: grant/revoke per-user per-vhost access
+- **VHost membership enforcement** in AMQP handshake
+- **`user_vhosts` table** and CRUD in `internal/persistdb`
+- **Default user granted vhost access** on first broker run
+- **`ottermqadmin` CLI tool** (`cmd/ottermqadmin`):
+  - Cobra-based binary with shared typed management API client (`pkg/adminapi/client`)
+  - Commands: `overview`, `queues`, `exchanges`, `bindings`, `publish`, `connections`, `channels`, `consumers`
+  - JSON and human-readable output modes
+  - Focused CLI and client unit tests
+
+### Changed
+
+- **Make targets**: added `make build-admin`, `make install-admin`, `make test-cli`; `make build-all` now builds broker, UI, and CLI
+
+### Fixed
+
+- **Bootstrap**: default admin user now seeded when SQLite DB exists but has no users
+- **CLI output wiring**: commands now write to process stdout instead of being discarded
+- **Default exchange publishing**: `ottermqadmin publish / "" ...` now targets AMQP default exchange correctly
+- **Management API**: fixed exchange creation route, vhost-filtered bindings route, message retrieval DTOs
+- **JWT secret**: now wired from config into token signing
+- **Connection map**: guarded accesses with mutex
+- **Priority queue requeue**: messages requeued to priority queue on shutdown
+- **Persistent DB**: single connection reused instead of per-request open/close
+
+---
+
+## [v0.18.0] - 2025-12-22
+
+### Added
+
+- **Prometheus metrics exporter**: exposes broker metrics at a configurable `/metrics` endpoint
+  - Queue depth, message rates (publish/deliver/ack/nack) per queue
+  - Exchange publish and delivery rates per exchange
+  - Channel state and activity metrics
+  - Broker-level connection, channel, queue, and exchange counts
+  - Configurable via `OTTERMQ_ENABLE_PROMETHEUS`, `OTTERMQ_PROMETHEUS_PORT`
+- **`prometheus/` package**: dedicated Prometheus integration with `promauto`-based registration
+
+### Changed
+
+- **Broker setup**: metrics collector initialization extracted to `SetupMetricsCollector` method
+- **Main function**: improved data directory and user setup logic
+
+### Removed
+
+- **Grafana integration**: removed bundled Grafana configuration and `docker-compose` Grafana service (Prometheus endpoint is the integration point; users bring their own Grafana)
+
+---
+
+## [v0.17.0] - 2025-12-15
+
+### Added
+
+- **Metrics Collection System**: Comprehensive observability infrastructure
+  - **Core Package** (`pkg/metrics`): Lock-free, thread-safe metrics collection
+    - `Collector`: Central aggregation with `sync.Map` for concurrent access
+    - `RateTracker`: Ring buffer-based time-series for rate calculation
+    - `MetricsCollector` interface for testability
+    - Configurable retention (default: 5min window, 60 samples, 5s intervals)
+    - Periodic sampling via background goroutine (`StartPeriodicSampling`)
+  
+  - **Exchange Metrics**: Per-exchange publish and delivery rate tracking
+    - `RecordExchangePublish`, `RecordExchangeDelivery`
+    - `GetExchangeSnapshot`, `GetAllExchangeMetrics`
+    
+  - **Queue Metrics**: Comprehensive per-queue observability ✅ **Fully Integrated**
+    - Publish rate, delivery rate, ack rate, nack rate
+    - Current depth (ready messages), unacked count, consumer count
+    - Requeue tracking for message lifecycle visibility
+    - `RecordQueuePublish`, `RecordQueueDelivery`, `RecordQueueAck`, `RecordQueueNack`, `RecordQueueRequeue`
+    - `GetQueueSnapshot`, `GetAllQueueMetrics`
+    - **Integrated throughout VHost**: delivery loop, ack handling, nack handling, requeue, recovery
+    
+  - **Broker-Level Metrics**: Global broker statistics
+    - Total publish rate, delivery rate (auto-ack + manual-ack), ack rate, nack rate
+    - Connection count, channel count, queue count, exchange count
+    - Total message count, consumer count, ready depth, unacked depth
+    - `RecordConnection`, `RecordConnectionClose`
+    - `GetBrokerSnapshot`, `GetBrokerMetrics`
+    
+  - **Channel Metrics**: Per-channel activity tracking 🆕
+    - Publish rate, deliver rate, ack rate, unroutable rate per channel
+    - Channel state tracking (running, idle, flow, closing)
+    - Unacked count and prefetch count per channel
+    - User and VHost association for multi-tenant visibility
+    - `RecordChannelPublish`, `RecordChannelDeliver`, `RecordChannelAck`, `RecordChannelUnroutable`
+    - `RecordChannelFlow`, `RecordChannelOpen`, `RecordChannelClose`
+    - `GetChannelSnapshot`, `GetChannelMetrics`, `GetAllChannelMetrics`
+    - **Integrated in broker**: basic.publish, message delivery, ack handling
+    
+  - **Configuration**:
+    - `OTTERMQ_ENABLE_METRICS` - Enable/disable metrics collection (default: true)
+    - `OTTERMQ_METRICS_WINDOW_SIZE` - Time window for rate calculation (default: 5m)
+    - `OTTERMQ_METRICS_MAX_SAMPLES` - Ring buffer size (default: 60)
+    - `OTTERMQ_METRICS_SAMPLES_INTERVAL` - Sampling frequency (default: 5s)
+    - Mock collector for testing without metrics overhead
+    
+  - **Documentation**:
+    - [`pkg/metrics/README.md`](pkg/metrics/README.md) - Complete package documentation
+    - [`docs/observability-roadmap.md`](docs/observability-roadmap.md) - Multi-phase implementation plan
+    - 30+ unit tests with 80%+ coverage
+
+### Changed
+
+- **Management API - Channel Endpoints**: Now return live metrics
+  - `GET /api/channels` - Lists channels with publish/deliver/ack rates
+  - `GET /api/channels/{vhost}` - Lists vhost channels with metrics
+  - `GET /api/connections/{name}/channels` - Lists connection channels with metrics
+  - `GET /api/connections/{name}/channels/{id}` - Returns channel details with rates
+  - `ChannelDetailDTO` enhanced with: `publish_rate`, `deliver_rate`, `ack_rate`, `unroutable_rate`, `confirm_rate`
+
+- **VHost**: Added `SetMetricsCollector()` for dependency injection
+- **Broker**: Initializes metrics collector on startup, starts periodic sampling
+
+### Fixed
+
+- **Channel Metrics Sampling**: Fixed rates showing as "0" by implementing proper periodic sampling
+  - Channel counters now sampled every 5 seconds (matching queue/exchange pattern)
+  - RateTrackers calculate rates from cumulative atomic counters
+  - Removed incorrect direct `Record(1)` calls in channel methods
+
+### Performance
+
+- **Lock-free metric recording**: All `Record*` methods use atomic operations
+- **O(1) lookups**: `sync.Map` with composite keys for channel metrics
+- **Efficient sampling**: Single background goroutine, 5s interval for all metrics
+- **Zero overhead when disabled**: Mock collector replaces real collector if `OTTERMQ_ENABLE_METRICS=false`
+- **Fixed memory footprint**: Ring buffers prevent unbounded growth
+
+## [v0.16.0] - 2025-12-04
+
+### Added
+
+- **Priority Queues**: Full AMQP 0.9.1 priority queue implementation
+  - Queue-level priority support via `x-max-priority` argument (1-255 range, default limit: 10)
+  - Message priority field (0-255) with higher priority delivered first
+  - FIFO ordering maintained within same priority level
+  - Map-of-channels architecture with lazy allocation
+  - Configurable via `OTTERMQ_MAX_PRIORITY` environment variable
+  - Zero overhead for non-priority queues (backward compatible)
+  - Integration with DLX (priority preserved in dead letters)
+  - Integration with TTL (expiration works with priority)
+  - Integration with QLL (max-length works with priority)
+
+### Changed
+
+### Fixed
+
+- **E2E Tests**: Fixed `TestPriorityQueue_WithDLX` test logic - consume without auto-ack before manual rejection
+- **Delivery Loop**: Fixed priority queue delivery to process all pending messages, not just one per signal
+
+### Performance
+
+- Priority queue delivery: O(P) priority scan where P = max_priority (negligible for P ≤ 10)
+- Lazy channel allocation: Memory usage scales with actual priority levels used, not max configured
+
+## [v0.15.0] - 2025-12-01
+
+### Added
+
+- **Management API Refactoring (Phases 1-6 Complete)**: Professional service layer architecture
   - Management service layer (`internal/core/broker/management/`) separating business logic from HTTP handlers
   - `BrokerProvider` interface pattern to avoid circular dependencies
-  - Complete Queue DTOs with all properties (TTL, DLX, QLL, consumers, unacked count)
-  - Complete Exchange DTOs with properties and metadata
-  - Enhanced request models with validation tags (`CreateQueueRequest`, `CreateExchangeRequest`)
+  - **Queue Management**: Complete DTOs with all properties (TTL, DLX, QLL, consumers, unacked count)
+    - Operations: List, Get, Create, Delete, Purge with full property support
+  - **Exchange Management**: Complete DTOs with properties and metadata
+    - Operations: List, Get, Create, Delete with property configuration
+  - **Binding Management**: Structured binding operations with DTOs
+    - Operations: List, Create, Delete with source/destination/routing key
+  - **Consumer Visibility**: API endpoints for active consumer monitoring
+    - Operations: List all consumers, List by queue, with detailed consumer info
+  - **Channel Monitoring**: Channel information exposure via API
+    - Operations: List all channels, List by connection, Get channel details
+  - **Message Operations**: Publish and get messages with full AMQP properties
+    - Operations: Publish with properties (TTL, priority, headers), Get messages with ack modes
+  - **Connection Management**: Connection information and control
+    - Operations: List connections, Get connection details, Close connection
+  - **VHost Operations**: Virtual host information
+    - Operations: List vhosts, Get vhost details with statistics
+  - **Statistics & Overview**: Comprehensive broker monitoring
+    - Overview endpoint with broker/node/object totals
+    - Message statistics aggregation across all queues
+    - Connection statistics by state and protocol
+    - Broker configuration details
+  - Enhanced request models with validation tags (`CreateQueueRequest`, `CreateExchangeRequest`, `PublishMessageRequest`)
   - VHost helper methods for thread-safe statistics (`GetAllQueues()`, `GetConsumerCountsAllQueues()`)
-  - Queue operations: List, Get, Create, Delete, Purge with full property support
-  - Exchange operations: List, Get, Create, Delete with property configuration
+  - **Comprehensive test coverage**: 52 tests covering all management operations (66% coverage)
   - Added GitHub commit activity badge to README
+  - **Management API Examples** in README with curl commands for all operations
 
 ### Changed
 
-- **API Handlers Refactored**: Removed AMQP client dependency from management endpoints
-  - Queue handlers now use `management.Service` instead of `amqp091.Channel`
-  - Exchange handlers refactored for direct broker access
+- **API Handlers Refactored**: Complete removal of AMQP client dependency from web layer
+  - All handlers now use `management.Service` instead of `amqp091.Channel`
   - Proper separation of concerns: HTTP layer → Service layer → Broker core
   - Thread-safe operations with proper lock management
+  - Removed legacy `internal/core/broker/public.go` interface
+  - Removed `ManagerApi` interface and AMQP client from `web/server.go`
+  - Bindings API returns structured `BindingDTO` instead of raw maps
 
 ### Fixed
 
 - **Import Cycle Resolution**: Management service uses interface pattern for broker access
 - **Lock Management**: VHost operations handle locking internally, preventing deadlocks
 - **Encapsulation**: Removed direct `broker.mu` access from management code
+- **Consumer Cleanup**: Fixed bug where `vh.CleanupConnection()` was never called on connection close
+- **Channel Reopening**: Fixed channel state not being removed after close, preventing reopening
+- **Overview Deadlock**: Fixed `GetObjectTotalsOverview()` deadlock by holding lock throughout operation
+- **Nil Pointer Protection**: Added defensive checks in `createChannelInfo()` for nil channel states
 
 ### Performance
 
 - Direct broker access eliminates AMQP protocol overhead for management operations
 - O(1) queue/exchange lookups via map access
 - Efficient statistics gathering with dedicated VHost methods
+- No protocol serialization/deserialization for management operations
 
 ## [v0.14.0] - 2025-11-18
 
@@ -55,6 +307,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - VHost helper methods for thread-safe statistics (`GetAllQueues()`, `GetConsumerCountsAllQueues()`)
   - Queue operations: List, Get, Create, Delete, Purge with full property support
   - Exchange operations: List, Get, Create, Delete with property configuration
+- **Per-consumer unacked message tracking**: dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
+- **Consumer cancel E2E tests**: 6 comprehensive tests for consumer cancel behavior and edge cases
+- Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)
 
 ### Changed
 
@@ -63,49 +318,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Exchange handlers refactored for direct broker access
   - Proper separation of concerns: HTTP layer → Service layer → Broker core
   - Thread-safe operations with proper lock management
+- Queue delivery loop now uses WaitGroup for proper synchronization during shutdown
+- Lock ordering improved: release `vh.mu` before queue.Push operations to prevent deadlock
+- QoS counting optimized from O(N) to O(1) for per-consumer prefetch enforcement
 
 ### Fixed
 
 - **Import Cycle Resolution**: Management service uses interface pattern for broker access
 - **Lock Management**: VHost operations handle locking internally, preventing deadlocks
 - **Encapsulation**: Removed direct `broker.mu` access from management code
-
-### Performance
-
-- Direct broker access eliminates AMQP protocol overhead for management operations
-- O(1) queue/exchange lookups via map access
-- Efficient statistics gathering with dedicated VHost methods
-
-## [v0.14.0] - 2025-11-18
-
-### Added
-
-- **Per-consumer unacked message tracking**: Implemented dual-index data structure (UnackedByConsumer + UnackedByTag) for O(1) consumer operations
-- **Consumer cancel E2E tests**: Added 6 comprehensive tests for consumer cancel behavior and edge cases
-- Automatic requeue of unacked messages when consumer is canceled (AMQP 0-9-1 spec compliance)
-- Performance optimization: Consumer cancel now O(1) instead of O(N) for large prefetch scenarios
-
-### Fixed
-
 - **AMQP Spec Compliance**: Consumer cancel now properly requeues all unacked messages with redelivered flag set
 - **Race Conditions**: Fixed multiple race conditions in queue delivery loop and consumer cancellation
 - **Deadlocks**: Resolved deadlock in message publishing path when enforcing queue length limits
-- Test `TestMaxLen_RequeueRespected` re-enabled and passing after implementing consumer cancel auto-requeue feature
-- Test `TestHandleBasicNack_Multiple_Boundary_DiscardPersistent` fixed by correcting queue name mismatch
-
-### Changed
-
-- Queue delivery loop now uses WaitGroup for proper synchronization during shutdown
-- Lock ordering improved: release vh.mu before queue.Push operations to prevent deadlock
-- QoS counting optimized from O(N) to O(1) for per-consumer prefetch enforcement
 
 ### Performance
 
+- Direct broker access eliminates AMQP protocol overhead for management operations
 - Consumer cancel with 500 unacked messages: < 1ms (100-1000x improvement)
 - QoS per-consumer counting: O(1) lookup instead of O(N) scan
-- Memory overhead: Minimal (~8 bytes per unacked message for second index pointer)
 
-## [0.13.0] - 2025-11-16
+## [v0.13.0] - 2025-11-16
 
 ### Added
 
@@ -131,7 +363,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero CPU overhead for idle queues with expired messages
 - Optimized lock management to prevent contention
 
-## [0.12.0] - 2025-11-15
+## [v0.12.0] - 2025-11-15
 
 ### Added
 
@@ -154,7 +386,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced `DeadLetterer` interface for pluggable implementations
 - Added `NoOpDeadLetterer` for testing and feature flags
 
-## [0.10.0] - 2025-10-28
+## [v0.10.0] - 2025-10-28
 
 ### Added
 
@@ -163,7 +395,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Basic.QoS` handling for prefetch limits (per-consumer and global)
 - Message recovery handling improvements
 
-## [0.9.0] - 2025-10-18
+## [v0.9.0] - 2025-10-18
 
 ### Added
 
@@ -180,7 +412,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fatal error during connection cleanup
 - Exchange listing and sorting logic
 
-## [0.8.0] - 2025-10-02
+## [v0.8.0] - 2025-10-02
 
 ### Added
 
@@ -231,11 +463,19 @@ For releases prior to v0.7.1, please refer to [GitHub Releases](https://github.c
 
 ---
 
-[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.13.0...HEAD
-[0.13.0]: https://github.com/ottermq/ottermq/releases/tag/v0.13.0
-[0.12.0]: https://github.com/ottermq/ottermq/releases/tag/v0.12.0
-[0.10.0]: https://github.com/ottermq/ottermq/releases/tag/v0.10.0
-[0.9.0]: https://github.com/ottermq/ottermq/releases/tag/v0.9.0
-[0.8.0]: https://github.com/ottermq/ottermq/releases/tag/v0.8.0
-[0.7.1]: https://github.com/ottermq/ottermq/releases/tag/v0.7.1
-
+[Unreleased]: https://github.com/ottermq/ottermq/compare/v0.19.3...HEAD
+[v0.19.3]: https://github.com/ottermq/ottermq/releases/tag/v0.19.3
+[v0.19.2]: https://github.com/ottermq/ottermq/releases/tag/v0.19.2
+[v0.19.1]: https://github.com/ottermq/ottermq/releases/tag/v0.19.1
+[v0.19.0]: https://github.com/ottermq/ottermq/releases/tag/v0.19.0
+[v0.18.0]: https://github.com/ottermq/ottermq/releases/tag/v0.18.0
+[v0.17.0]: https://github.com/ottermq/ottermq/releases/tag/v0.17.0
+[v0.16.0]: https://github.com/ottermq/ottermq/releases/tag/v0.16.0
+[v0.15.0]: https://github.com/ottermq/ottermq/releases/tag/v0.15.0
+[v0.14.0]: https://github.com/ottermq/ottermq/releases/tag/v0.14.0
+[v0.13.0]: https://github.com/ottermq/ottermq/releases/tag/v0.13.0
+[v0.12.0]: https://github.com/ottermq/ottermq/releases/tag/v0.12.0
+[v0.10.0]: https://github.com/ottermq/ottermq/releases/tag/v0.10.0
+[v0.9.0]: https://github.com/ottermq/ottermq/releases/tag/v0.9.0
+[v0.8.0]: https://github.com/ottermq/ottermq/releases/tag/v0.8.0
+[v0.7.1]: https://github.com/ottermq/ottermq/releases/tag/v0.7.1

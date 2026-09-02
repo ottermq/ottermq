@@ -1,6 +1,6 @@
 package json
 
-import "github.com/andrelcunha/ottermq/pkg/persistence"
+import "github.com/ottermq/ottermq/pkg/persistence"
 
 type JsonMessageData struct {
 	ID         string                        `json:"id"`

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -70,7 +70,8 @@ func (b *Broker) handleChannelFlow(request *amqp.RequestMethodMessage, vh *vhost
 		return nil, amqpErr
 	}
 	flowActive := content.Active
-
+	// Record channel flow change
+	b.collector.RecordChannelFlow(conn.RemoteAddr().String(), vh.Name, channel, flowActive)
 	b.mu.Lock()
 	_, exists := b.Connections[conn].Channels[channel]
 	b.mu.Unlock()
@@ -169,11 +170,11 @@ func (b *Broker) handleChannelFlowOk(request *amqp.RequestMethodMessage, conn ne
 func (b *Broker) handleChannelClose(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
 	b.mu.Lock()
 	_, exists := b.Connections[conn].Channels[request.Channel]
+	b.mu.Unlock()
 	if !exists {
 		log.Debug().Uint16("channel", request.Channel).Msg("Channel already closed") // no need to rise an error here
 		return nil, nil
 	}
-	b.mu.Unlock()
 	// send channel close ok
 	frame := b.framer.CreateChannelCloseOkFrame(request.Channel)
 	err := b.framer.SendFrame(conn, frame)
@@ -200,6 +201,10 @@ func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage
 
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
 	log.Debug().Uint16("channel", frame.Channel).Msg("New channel added")
+	connName := conn.RemoteAddr().String()
+	conInfo := b.Connections[conn]
+	user := conInfo.Client.Config.Username
+	b.collector.RecordChannelOpen(connName, conInfo.VHostName, user, frame.Channel)
 }
 
 // removeChannel removes a channel from the connection
@@ -207,6 +212,8 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.Connections[conn].Channels, channel)
+	connName := conn.RemoteAddr().String()
+	b.collector.RecordChannelClose(connName, channel)
 }
 
 // checkChannel checks if a channel is already open

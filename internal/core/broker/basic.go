@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/errors"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/amqp/errors"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
 )
 
@@ -63,7 +63,7 @@ func (b *Broker) basicGetHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 	// Get the message from the queue
 	var msg *vhost.Message
 	if msgCount > 0 {
-		msg = vh.GetMessage(queue)
+		msg = vh.GetMessage(queue, noAck)
 	}
 
 	if msgCount == 0 || msg == nil {
@@ -156,22 +156,28 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		return nil, fmt.Errorf("channel not found")
 	}
 	if currentState.MethodFrame != request { // request is "newState.MethodFrame"
+		b.mu.Lock()
 		b.Connections[conn].Channels[channel].MethodFrame = request
+		b.mu.Unlock()
 		log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
 		return nil, nil
 	}
 	// if the class and method are not the same as the current state,
 	// it means that it stated the new publish request
 	if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
+		b.mu.Lock()
 		b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
 		b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
+		b.mu.Unlock()
 		log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
 		return nil, nil
 	}
 	if currentState.Body == nil && newState.Body != nil {
 		log.Trace().Int("body_len", len(newState.Body)).Uint64("expected", currentState.BodySize).Msg("Updating body")
 		// Append the new body to the current body
+		b.mu.Lock()
 		b.Connections[conn].Channels[channel].Body = newState.Body
+		b.mu.Unlock()
 	}
 	log.Trace().Interface("state", currentState).Msg("Current state after all")
 	if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
@@ -232,6 +238,8 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 				return b.BasicReturn(conn, channel, exchange, routingKey, amqpMsg)
 			}
 			// No routing and not mandatory - silently drop the message
+			user := b.Connections[conn].Client.Config.Username
+			b.collector.RecordChannelUnroutable(conn.RemoteAddr().String(), vh.Name, user, channel)
 			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, silently dropped (not mandatory)")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			return nil, nil
@@ -243,6 +251,8 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			// routed successfully
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+			user := b.Connections[conn].Client.Config.Username
+			b.collector.RecordChannelPublish(conn.RemoteAddr().String(), vh.Name, user, channel)
 		}
 
 		// Check the flow state of the channel
@@ -420,6 +430,10 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 		log.Error().Err(err).Str("queue", queueName).Str("consumer_tag", consumerTag).Msg("Failed to register consumer")
 		return nil, err
 	}
+	// Record the consumer registration in metrics
+	user := b.Connections[conn].Client.Config.Username
+	connName := conn.RemoteAddr().String()
+	b.collector.RecordChannelConsumer(connName, vh.Name, user, request.Channel)
 
 	if !noWait {
 		frame := b.framer.CreateBasicConsumeOkFrame(request.Channel, consumerTag)

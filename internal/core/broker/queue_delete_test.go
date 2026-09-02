@@ -1,13 +1,15 @@
 package broker
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 	"github.com/google/uuid"
 )
 
@@ -17,13 +19,21 @@ func newTestConsumerConnID() vhost.ConnectionID {
 }
 
 func TestQueueDeleteHandler_IfUnusedBlocksWhenConsumersExist(t *testing.T) {
-	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
+	mockCollector := metrics.NewCollector(&metrics.Config{
+		Enabled: false,
+	}, context.Background())
+	b := &Broker{
+		framer:      &amqp.DefaultFramer{},
+		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		collector:   mockCollector,
+	}
 	var options = vhost.VHostOptions{
 		QueueBufferSize: 100,
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	vh.SetMetricsCollector(mockCollector)
 	connOwner := &mockConn{}
 	connOwnerID := newTestConsumerConnID()
 
@@ -147,13 +157,21 @@ func TestQueueDeleteHandler_IfEmptyBlocksWhenMessagesExist(t *testing.T) {
 }
 
 func TestQueueDeleteHandler_SuccessDeletesQueueAndSendsOk(t *testing.T) {
-	b := &Broker{framer: &amqp.DefaultFramer{}, Connections: make(map[net.Conn]*amqp.ConnectionInfo)}
+	mockCollector := metrics.NewCollector(&metrics.Config{
+		Enabled: false,
+	}, context.Background())
+	b := &Broker{
+		framer:      &amqp.DefaultFramer{},
+		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
+		collector:   mockCollector,
+	}
 	var options = vhost.VHostOptions{
 		QueueBufferSize: 100,
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("/", options)
 	vh.SetFramer(b.framer)
+	vh.SetMetricsCollector(mockCollector)
 	connID := newTestConsumerConnID()
 
 	// Create queue and seed messages

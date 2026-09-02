@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/testutil"
-	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
+	"github.com/ottermq/ottermq/internal/core/amqp"
+	"github.com/ottermq/ottermq/internal/core/broker/vhost"
+	"github.com/ottermq/ottermq/internal/testutil"
+	"github.com/ottermq/ottermq/pkg/metrics"
+	"github.com/ottermq/ottermq/pkg/persistence/implementations/dummy"
 )
 
 // MockConnection implements net.Conn for testing
@@ -39,11 +40,13 @@ func (m *MockAddr) String() string  { return m.address }
 
 func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 	mockFramer := &testutil.MockFramer{}
+	mockCollector := metrics.NewMockCollector(nil)
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		connToID:    make(map[net.Conn]vhost.ConnectionID),
 		VHosts:      make(map[string]*vhost.VHost),
+		collector:   mockCollector,
 	}
 
 	// Create test vhost with a test queue
@@ -52,6 +55,7 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 		Persistence:     &dummy.DummyPersistence{},
 	}
 	vh := vhost.NewVhost("test-vhost", options)
+	vh.SetMetricsCollector(mockCollector)
 	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100, vh)
 	vh.Queues["test-queue"].Props = &vhost.QueueProperties{
 		Passive:    false,
@@ -67,10 +71,15 @@ func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
 		remoteAddr: &MockAddr{"tcp", "127.0.0.1:12345"},
 	}
 
-	// Initialize connection state
+	// Initialize connection state with Client info (needed for metrics)
 	broker.Connections[conn] = &amqp.ConnectionInfo{
 		VHostName: "test-vhost",
 		Channels:  make(map[uint16]*amqp.ChannelState),
+		Client: &amqp.AmqpClient{
+			Config: &amqp.AmqpClientConfig{
+				Username: "test-user",
+			},
+		},
 	}
 	broker.Connections[conn].Channels[1] = &amqp.ChannelState{}
 

@@ -3,12 +3,12 @@ package web
 import (
 	"os"
 
-	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/web/docs"
-	_ "github.com/andrelcunha/ottermq/web/docs"
-	"github.com/andrelcunha/ottermq/web/handlers/api"
-	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
-	"github.com/andrelcunha/ottermq/web/middleware"
+	"github.com/ottermq/ottermq/internal/core/broker"
+	"github.com/ottermq/ottermq/web/docs"
+	_ "github.com/ottermq/ottermq/web/docs"
+	"github.com/ottermq/ottermq/web/handlers/api"
+	"github.com/ottermq/ottermq/web/handlers/api_admin"
+	"github.com/ottermq/ottermq/web/middleware"
 
 	"github.com/gofiber/swagger"
 
@@ -33,6 +33,7 @@ type Config struct {
 	EnableSwagger bool
 	SwaggerPrefix string
 	ApiPrefix     string
+	UIPath        string
 }
 
 func NewWebServer(config *Config, broker *broker.Broker) (*WebServer, error) {
@@ -48,9 +49,15 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	app := ws.configServer(logFile)
 
 	// Serve static files (ui -- Vue frontend)
+	uiPath := ws.config.UIPath
+
 	if ws.config.EnableUI {
-		log.Info().Msg("Web UI enabled")
-		app.Static("/", "./ui")
+		if _, err := os.Stat(uiPath); err == nil {
+			log.Info().Str("path", uiPath).Msg("Web UI enabled")
+			app.Static("/", uiPath)
+		} else {
+			log.Warn().Str("path", uiPath).Err(err).Msg("Web UI path not found")
+		}
 	}
 	if ws.config.EnableSwagger {
 		docs.SwaggerInfo.Host = "localhost:" + ws.config.WebServerPort
@@ -67,7 +74,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// Public API routes
-	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login)
+	app.Post(ws.config.ApiPrefix+"/login", api_admin.Login(ws.config.JwtKey))
 
 	app.Get(ws.config.ApiPrefix+"/overview/broker", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetBasicBrokerInfo(c, ws.Broker)
@@ -76,6 +83,23 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp := app.Group(ws.config.ApiPrefix)
 	apiGrp.Get("/overview", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetOverview(c, ws.Broker)
+	})
+	apiGrp.Get("/overview/charts", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetOverviewCharts(c, ws.Broker)
+	})
+
+	// VHost routes
+	apiGrp.Get("/vhosts", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListVHosts(c, ws.Broker)
+	})
+	apiGrp.Get("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetVHost(c, ws.Broker)
+	})
+	apiGrp.Put("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CreateVHost(c, ws.Broker)
+	})
+	apiGrp.Delete("/vhosts/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.DeleteVHost(c, ws.Broker)
 	})
 
 	// Queue routes
@@ -117,7 +141,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetExchange(c, ws.Broker)
 	})
-	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+	apiGrp.Post("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})
 	apiGrp.Delete("/exchanges/:vhost/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
@@ -135,7 +159,7 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListBindings(c, ws.Broker)
 	})
 	apiGrp.Get("/bindings/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
-		return api.ListBindings(c, ws.Broker)
+		return api.ListVhostBindings(c, ws.Broker)
 	})
 	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.BindQueue(c, ws.Broker)
@@ -168,6 +192,51 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.GetChannel(c, ws.Broker)
 	})
 
+	// Node routes
+
+	apiGrp.Get("/nodes", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ListNodes(c, ws.Broker)
+	})
+	apiGrp.Get("/nodes/:name", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetNode(c, ws.Broker)
+	})
+	apiGrp.Get("/nodes/:name/memory", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.GetNodeMemory(c, ws.Broker)
+	})
+
+	// Definitions routes
+
+	apiGrp.Get("/definitions", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ExportDefinitions(c, ws.Broker)
+	})
+	apiGrp.Post("/definitions", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ImportDefinitions(c, ws.Broker)
+	})
+	apiGrp.Get("/definitions/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ExportVHostDefinitions(c, ws.Broker)
+	})
+	apiGrp.Post("/definitions/:vhost", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.ImportVHostDefinitions(c, ws.Broker)
+	})
+
+	// Health check routes
+
+	apiGrp.Get("/health/checks/alarms", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CheckAlarms(c, ws.Broker)
+	})
+	apiGrp.Get("/health/checks/local-alarms", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CheckLocalAlarms(c, ws.Broker)
+	})
+	apiGrp.Get("/health/checks/port-listener/:port", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CheckPortListener(c, ws.Broker)
+	})
+	apiGrp.Get("/health/checks/virtual-hosts", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CheckVirtualHosts(c, ws.Broker)
+	})
+	apiGrp.Get("/health/checks/ready", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
+		return api.CheckReady(c, ws.Broker)
+	})
+
 	// Connection routes
 
 	apiGrp.Get("/connections", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
@@ -188,8 +257,18 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	// Admin API routes
 	apiAdminGrp := app.Group(ws.config.ApiPrefix + "/admin")
 	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
+	apiAdminGrp.Use(middleware.AdminOnly)
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
+	apiAdminGrp.Get("/users/:username", api_admin.GetUser)
+	apiAdminGrp.Delete("/users/:username", api_admin.DeleteUser)
+	apiAdminGrp.Put("/users/:username/password", api_admin.ChangePassword)
+
+	// Permissions routes
+	apiAdminGrp.Get("/permissions", api_admin.ListPermissions)
+	apiAdminGrp.Get("/permissions/:vhost/:username", api_admin.GetPermission)
+	apiAdminGrp.Put("/permissions/:vhost/:username", api_admin.GrantPermission)
+	apiAdminGrp.Delete("/permissions/:vhost/:username", api_admin.RevokePermission)
 }
 
 func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
@@ -198,8 +277,8 @@ func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 
 		Prefork:               false,
 		AppName:               "ottermq-management-ui",
-		ViewsLayout:           "layout",
 		DisableStartupMessage: true,
+		Immutable:             true,
 	}
 	app := fiber.New(config)
 
