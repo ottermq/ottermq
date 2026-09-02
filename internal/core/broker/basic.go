@@ -234,6 +234,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			if mandatory {
 				// Return message to the publisher
 				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
+				b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 				return b.BasicReturn(conn, channel, exchange, routingKey, amqpMsg)
 			}
 			// No routing and not mandatory - silently drop the message
@@ -247,6 +248,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 		msg := vhost.NewMessage(*amqpMsg, msgID)
 		_, err = vh.Publish(exchange, routingKey, &msg)
 		if err == nil {
+			// routed successfully
 			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			user := b.Connections[conn].Client.Config.Username
