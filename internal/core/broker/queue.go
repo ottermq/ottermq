@@ -232,7 +232,7 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 		return sendChannelErrorResponse(err, b, conn, request)
 	}
 
-	err = vh.BindToDefaultExchange(queueName)
+	err = vh.BindToDefaultExchange(queue.Name)
 	if err != nil {
 		log.Debug().Err(err).Msg("Error binding to default exchange")
 		return nil, err
@@ -241,7 +241,7 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 	consumerCount := uint32(0)
 
 	if !content.NoWait {
-		frame := b.framer.CreateQueueDeclareOkFrame(request.Channel, queueName, messageCount, consumerCount)
+		frame := b.framer.CreateQueueDeclareOkFrame(request.Channel, queue.Name, messageCount, consumerCount)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send queue declare frame")
 		}
