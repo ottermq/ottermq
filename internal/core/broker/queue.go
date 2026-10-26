@@ -242,7 +242,7 @@ func (b *Broker) queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vho
 		return nil, err
 	}
 	messageCount := uint32(queue.Len())
-	consumerCount := uint32(0)
+	consumerCount := uint32(len(vh.GetActiveConsumersForQueue(queue.Name)))
 
 	if !content.NoWait {
 		frame, err := b.framer.CreateQueueDeclareOkFrame(request.Channel, queue.Name, messageCount, consumerCount)
