@@ -17,7 +17,7 @@ type declareOkRecorder struct {
 	calls         int
 }
 
-func (r *declareOkRecorder) CreateQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) []byte {
+func (r *declareOkRecorder) CreateQueueDeclareOkFrame(channel uint16, queueName string, messageCount, consumerCount uint32) ([]byte, error) {
 	r.messageCount = messageCount
 	r.consumerCount = consumerCount
 	r.calls++
